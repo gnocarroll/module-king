@@ -114,6 +114,10 @@ impl ArgParser {
 
             if hyphen_count == 0 {
                 if let Some(ref key) = current_key {
+                    if self.kwargs[key] == ArgQuantity::One && ret_map.contains_key(key) {
+                        return Err(format!{"expected only one value for {key}"});
+                    }
+
                     push_to_vec(&mut ret_map, key, arg_string.to_string());
                 }
                 else {
@@ -175,6 +179,10 @@ impl ArgParser {
                     }
                 }
                 else {
+                    if self.kwargs[&key] == ArgQuantity::One && ret_map.contains_key(&key) {
+                        return Err(format!{"expected only one value for {key}"});
+                    }
+
                     push_to_vec(
                         &mut ret_map,
                         &key,
