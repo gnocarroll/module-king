@@ -22,7 +22,9 @@ fn main() -> ExitCode {
         }
     }
 
-    let args = match arg_parser.parse_args(std::env::args()) {
+    // skip executable name in args
+
+    let args = match arg_parser.parse_args(std::env::args().skip(1)) {
         Ok(map) => map,
         Err(msg) => {
             eprintln!("Bad args provided: {msg}");

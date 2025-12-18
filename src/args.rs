@@ -92,22 +92,27 @@ impl ArgParser {
         for arg in args {
             let arg_string = arg.as_ref().to_string();
 
+            let mut counting_hyphens = true;
             let mut hyphen_count = 0;
             let mut equal_pos = 0;
             let string_len = arg_string.chars().count();
 
             for (idx, c) in arg_string.chars().enumerate() {
-                if hyphen_count == 0 && c == '-' {
+                if counting_hyphens && c == '-' {
                     hyphen_count += 1;
                     continue;
                 }
+                else {
+                    counting_hyphens = false;
+                }
+
                 if c == '=' {
                     equal_pos = idx;
                     break;
                 }
             }
 
-            if hyphen_count == 0 && equal_pos == 0 {
+            if hyphen_count == 0 {
                 if let Some(ref key) = current_key {
                     push_to_vec(&mut ret_map, key, arg_string.to_string());
                 }
@@ -128,6 +133,15 @@ impl ArgParser {
 
                     if self.positional_args[arg_pos].quantity == ArgQuantity::One {
                         arg_pos += 1;
+                    }
+                }
+
+                if let Some(ref key) = current_key{
+                    match self.kwargs.get(key) {
+                        Some(ArgQuantity::Multiple) => {}
+                        _ => {
+                            current_key = None;
+                        }
                     }
                 }
             }
@@ -166,15 +180,6 @@ impl ArgParser {
                         &key,
                         arg_string.chars().skip(equal_pos + 1).collect()
                     );
-                }
-            }
-
-            if let Some(ref key) = current_key{
-                match self.kwargs.get(key) {
-                    Some(ArgQuantity::Multiple) => {}
-                    _ => {
-                        current_key = None;
-                    }
                 }
             }
         }
