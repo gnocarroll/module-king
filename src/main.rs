@@ -2,8 +2,9 @@ use std::{collections::HashMap, fs, io::Read, process::ExitCode};
 
 use crate::args::{ArgParser, ArgQuantity};
 
-pub mod args;
-pub mod scan;
+mod args;
+mod parse;
+mod scan;
 
 fn main() -> ExitCode {
     let mut arg_parser = ArgParser::default();
@@ -71,14 +72,16 @@ fn main() -> ExitCode {
         file_strings.insert("STDIN".to_string(), stdin_string);
     }
 
-    // print token info
-
     println!();
 
     for (filename, file_string) in file_strings {
-        let tokens = scan::tokenize(file_string.as_str()).expect(
-            "tokenization failed"
-        );
+        let tokens = match scan::tokenize(file_string.as_str()) {
+            Ok(tokens) => tokens,
+            Err(msg) => {
+                eprintln!("Tokenization of file {} failed: {}", filename, msg);
+                return 1.into();
+            }
+        };
 
         println!("FILE: {filename}");
 
