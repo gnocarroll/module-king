@@ -343,9 +343,11 @@ pub struct Token<'a> {
 pub fn tokenize<'a>(
     s: &'a str
 ) -> Result<Vec<Token<'a>>,String> {
-    let mut line = 0;
+    // line, column are 1-indexed
+    let mut line = 1;
     let mut column = 1;
 
+    // iterator for use throughout function and Token vec for ret
     let mut chars = s.chars();
     let mut tokens: Vec<Token<'a>> = Vec::new();
 
@@ -356,16 +358,14 @@ pub fn tokenize<'a>(
 
         // consume chars and modify line, column
 
-        if skip > 0 {
-            for _ in 0..skip {
-                let c = chars.next().expect("bug in ws/comments scan func");
+        for _ in 0..skip {
+            let c = chars.next().expect("bug in ws/comments scan func");
 
-                column += 1;
+            column += 1;
 
-                if c == '\n' {
-                    line += 1;
-                    column = 1;
-                }
+            if c == '\n' {
+                line += 1;
+                column = 1;
             }
         }
 
@@ -407,7 +407,17 @@ pub fn tokenize<'a>(
         }
 
         if max_match == 0 { // => no match was found
-            return Err(format!("no matching token found at "))
+            let s = chars.as_str();
+            let len = std::cmp::min(chars.count(), 25);
+
+            let s = &s[..len];
+
+            return Err(format!(
+                "Ln {}, Col {}: no matching token found here \"{}\"",
+                line,
+                column,
+                s,
+            ));
         }
 
         // push new token
