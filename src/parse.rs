@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::scan::Token;
+use crate::scan::{Token, TokenType};
 
 #[derive(Clone, Copy, PartialEq)]
 enum TypeVariant {
@@ -18,8 +18,6 @@ struct TypeLiteral<'a> {
 
     // body is an Expr
     pub body: u32,
-
-    pub end_name: &'a str,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -33,7 +31,6 @@ struct Function<'a> {
     pub name: &'a str,
     pub params: u32,
     pub body: u32,
-    pub end_name: &'a str,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -51,24 +48,49 @@ struct Identifier<'a> {
     pub variant: IdentifierVariant,
 }
 
-enum Operator {
-
+struct Operation {
+    pub op: TokenType,
+    pub lhs: u32,
+    pub rhs: u32,
 }
 
+#[derive(Clone, Copy, PartialEq)]
 
-enum Operation {
-    // TODO: add field for operator itself
+enum OperatorVariant {
+    Prefix,
+    Postfix,
+    Infix,
+    Around, // e.g. paren
+    PostfixAround, // e.g. function call
+}
 
-    Unary(u32),
-    Binary(u32, u32),
+enum Assoc {
+    Left, // left-to-right
+    Right, // right-to-left
+}
+
+struct OperatorInfo {
+    pub ttype: TokenType,
+
+    // binding power
+    pub bp: u8,
+
+    pub variant: OperatorVariant,
+    pub assoc: Assoc,
+
+    // is rhs arg optional (e.g. comma for tuples)
+    pub is_rhs_optional: bool,
 }
 
 enum ExprVariant<'a> {
     IntegerLiteral(u64),
     FloatLiteral(f64),
     StringLiteral(&'a str),
+
     FunctionLiteral(Function<'a>),
+
     TypeLiteral(TypeLiteral<'a>),
+    
     Operation(Operation),
 }
 
