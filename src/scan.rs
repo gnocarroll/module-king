@@ -54,14 +54,29 @@ pub enum TokenType {
 
     Begin,
     End,
+    Import,
+    Export,
+    From,
+
+    If,
+    Else,
+    Loop,
+    While,
+    For,
+
+    Return,
+    Goto,
+    Break,
+    Continue,
+
+    // KW means keyword e.g. the keyword "integer"
+    KWInteger,
+    KWFloat,
     Function,
     Struct,
     Class,
     Enum,
     Variant,
-    Import,
-    Export,
-    From,
 
     Identifier,
     Integer,
@@ -339,14 +354,28 @@ impl TokenType {
                 
             Begin => Text("begin"),
             End => Text("end"),
+            Import => Text("import"),
+            Export => Text("export"),
+            From => Text("from"),
+
+            If => Text("if"),
+            Else => Text("else"),
+            Loop => Text("loop"),
+            While => Text("while"),
+            For => Text("for"),
+
+            Return => Text("return"),
+            Goto => Text("goto"),
+            Break => Text("break"),
+            Continue => Text("continue"),
+
+            KWInteger => Text("integer"),
+            KWFloat => Text("float"),
             Function => Text("function"),
             Struct => Text("struct"),
             Class => Text("class"),
             Enum => Text("enum"),
             Variant => Text("variant"),
-            Import => Text("import"),
-            Export => Text("export"),
-            From => Text("from"),
 
             Identifier => Proc(scan_identifier),
             Integer => Proc(scan_integer),
