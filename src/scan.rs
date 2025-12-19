@@ -66,6 +66,8 @@ pub enum TokenType {
     Float,
     String,
 
+    Eof,
+
     // NOTE: keep this as last and do not set discriminant values
     // this ensures scanning code works correctly
     TokenTypeCount,
@@ -324,6 +326,8 @@ impl TokenType {
             Float => Proc(scan_float),
             String => Proc(scan_string),
 
+            Eof => Text(""),
+
             TokenTypeCount => Text(""),
         }
     }
@@ -348,7 +352,26 @@ pub fn tokenize<'a>(
     while chars.as_str() != "" {
         // advance past whitespace, comment(s)
 
-        
+        let skip = scan_ws_and_comments(chars.as_str());
+
+        // consume chars and modify line, column
+
+        if skip > 0 {
+            for _ in 0..skip {
+                let c = chars.next().expect("bug in ws/comments scan func");
+
+                column += 1;
+
+                if c == '\n' {
+                    line += 1;
+                    column = 1;
+                }
+            }
+        }
+
+        if chars.as_str() == "" {
+            break;
+        }
 
         // find longest match TokenType
 
@@ -391,15 +414,25 @@ pub fn tokenize<'a>(
 
         tokens.push(Token {
             ttype: match_ttype,
-            offset: offset,
-            text: &s[offset..offset + max_match],
+            line: line,
+            column: column,
+            text: &chars.as_str()[..max_match],
         });
 
-        // advance offset int, chars iterator
+        // advance column, chars iterator
 
-        offset += max_match;
+        column += max_match;
         chars.nth(max_match - 1);
     }
 
-    Err
+    // always push EOF token on at the end
+
+    tokens.push(Token {
+        ttype: Eof,
+        line: line,
+        column: column,
+        text: "",
+    });
+
+    Ok(tokens)
 }
