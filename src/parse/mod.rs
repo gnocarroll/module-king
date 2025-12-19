@@ -1,3 +1,5 @@
+pub mod operator;
+
 use std::collections::HashMap;
 
 use crate::scan::{Token, TokenType};
@@ -54,34 +56,6 @@ struct Operation {
     pub rhs: u32,
 }
 
-#[derive(Clone, Copy, PartialEq)]
-
-enum OperatorVariant {
-    Prefix,
-    Postfix,
-    Infix,
-    Around, // e.g. paren
-    PostfixAround, // e.g. function call
-}
-
-enum Assoc {
-    Left, // left-to-right
-    Right, // right-to-left
-}
-
-struct OperatorInfo {
-    pub ttype: TokenType,
-
-    // binding power
-    pub bp: u8,
-
-    pub variant: OperatorVariant,
-    pub assoc: Assoc,
-
-    // is rhs arg optional (e.g. comma for tuples)
-    pub is_rhs_optional: bool,
-}
-
 enum ExprVariant<'a> {
     IntegerLiteral(u64),
     FloatLiteral(f64),
@@ -90,7 +64,7 @@ enum ExprVariant<'a> {
     FunctionLiteral(Function<'a>),
 
     TypeLiteral(TypeLiteral<'a>),
-    
+
     Operation(Operation),
 }
 
