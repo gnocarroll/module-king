@@ -1,4 +1,4 @@
-use std::string::String;
+use std::{string::String, sync::LazyLock};
 
 enum ScanMethod {
     Text(&'static str),
@@ -6,7 +6,7 @@ enum ScanMethod {
 }
 
 
-#[derive(PartialEq, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 #[repr(u8)]
 pub enum TokenType {
     Semicolon,
@@ -71,6 +71,38 @@ pub enum TokenType {
     // NOTE: keep this as last and do not set discriminant values
     // this ensures scanning code works correctly
     TokenTypeCount,
+}
+
+// some code for stringifying, displaying TokenType
+
+static TTYPE_STRINGS: LazyLock<Vec<String>> = LazyLock::new(|| (0..=(TokenTypeCount as u8)).map(
+    |ttype_int|
+    format!(
+        "{:?}",
+        unsafe {
+            std::mem::transmute::<u8,TokenType>(ttype_int)
+        },
+    )
+).collect());
+
+impl AsRef<str> for TokenType {
+    fn as_ref(&self) -> &str {
+        TTYPE_STRINGS[unsafe{
+            std::mem::transmute::<TokenType,u8>(*self)
+        } as usize].as_str()
+    }
+}
+
+impl TokenType {
+    pub fn as_str(&self) -> &str {
+        self.as_ref()
+    }
+}
+
+impl std::fmt::Display for TokenType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 use ScanMethod::*;

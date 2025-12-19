@@ -80,7 +80,7 @@ fn main() -> ExitCode {
 
         for (idx, tok) in tokens.iter().enumerate() {
             println!(
-                "{}: {:?} \"{}\"",
+                "{}: {} \"{}\"",
                 idx,
                 tok.ttype,
                 tok.text,
