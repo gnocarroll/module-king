@@ -1,8 +1,9 @@
-use std::process::ExitCode;
+use std::{collections::HashMap, fs, io::Read, process::ExitCode};
 
 use crate::args::{ArgParser, ArgQuantity};
 
 pub mod args;
+pub mod scan;
 
 fn main() -> ExitCode {
     let mut arg_parser = ArgParser::default();
@@ -32,7 +33,7 @@ fn main() -> ExitCode {
         }
     };
 
-    for (ref arg, ref vec) in args {
+    for (arg, vec) in &args {
         print!("{arg}:");
 
         for ref item in vec {
@@ -40,6 +41,34 @@ fn main() -> ExitCode {
         }
 
         println!();
+    }
+
+    // read file(s) into memory
+
+    let mut file_strings: HashMap<String,String> = HashMap::new();
+
+    if let Some(input_files) = args.get("input") {
+        for filename in input_files {
+            let file_string = match fs::read_to_string(filename) {
+                Ok(s) => s,
+                Err(e) => {
+                    eprintln!("Failed to read in file {filename}: {e}");
+                    return 1.into();
+                }
+            };
+
+            file_strings.insert(filename.to_string(), file_string);
+        }
+    }
+    else {
+        let mut stdin_string = String::new();
+
+        if let Err(e) =  std::io::stdin().read_to_string(&mut stdin_string) {
+            eprintln!("Problem occurred while reading from STDIN: {e}");
+            return 1.into();
+        }
+
+        file_strings.insert("STDIN".to_string(), stdin_string);
     }
 
     0.into()
