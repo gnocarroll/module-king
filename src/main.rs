@@ -71,6 +71,10 @@ fn main() -> ExitCode {
         file_strings.insert("STDIN".to_string(), stdin_string);
     }
 
+    // print token info
+
+    println!();
+
     for (filename, file_string) in file_strings {
         let tokens = scan::tokenize(file_string.as_str()).expect(
             "tokenization failed"

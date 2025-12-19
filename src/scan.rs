@@ -447,12 +447,6 @@ pub fn tokenize<'a>(
 
         // push new token
 
-        println!(
-            "{}, SIZE {}",
-            match_ttype,
-            max_match,
-        );
-
         tokens.push(Token {
             ttype: match_ttype,
             line: line,
