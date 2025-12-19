@@ -6,7 +6,7 @@ enum ScanMethod {
 }
 
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 #[repr(u8)]
 pub enum TokenType {
     Semicolon,
@@ -395,9 +395,7 @@ pub fn tokenize<'a>(
                         0
                     }
                 },
-                Proc(f) => {
-                    f(chars.as_str())
-                },
+                Proc(f) => f(chars.as_str()),
             };
 
             if curr_match > max_match {
@@ -432,7 +430,7 @@ pub fn tokenize<'a>(
         // advance column, chars iterator
 
         column += max_match;
-        chars.nth(max_match - 1);
+        chars.nth(max_match);
     }
 
     // always push EOF token on at the end
