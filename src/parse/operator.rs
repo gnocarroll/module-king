@@ -1,6 +1,6 @@
 #[derive(Clone, Copy, PartialEq)]
 #[repr(u8)]
-enum OperatorVariant {
+pub enum OperatorVariant {
     Prefix,
     Postfix,
     Infix,
@@ -17,12 +17,12 @@ use crate::scan::TokenType;
 
 #[derive(Clone, Copy, PartialEq)]
 
-enum Assoc {
+pub enum Assoc {
     Left, // left-to-right
     Right, // right-to-left
 }
 
-struct OperatorInfo {
+pub struct OperatorInfo {
     pub ttype: TokenType,
 
     pub variant: OperatorVariant,
@@ -39,8 +39,10 @@ static DEFAULT_OP_INFO : OperatorInfo = OperatorInfo{
     is_rhs_optional: false,
 };
 
+// very large table defining all language operators alongside info for parsing
+// e.g. token for operator, is it infix, does it have left associativity
 // later in table => higher binding power
-static OP_INFO_TABLE : &[&[OperatorInfo]] = &[
+pub static OP_INFO_TABLE : &[&[OperatorInfo]] = &[
     &[
         OperatorInfo{
             ttype: TokenType::Semicolon,
@@ -393,13 +395,15 @@ static OP_INFO_TABLE : &[&[OperatorInfo]] = &[
 
 // includes binding power
 #[derive(Clone, Copy)]
-struct BpAndOperatorInfo {
+pub struct BpAndOperatorInfo {
     pub is_empty: bool,
     pub left_bp: usize,
     pub right_bp: usize,
     pub op_info: &'static OperatorInfo,
 }
 
+// generates mapping from (TokenType, OperatorVariant e.g. Infix)
+// to OperatorInfo and binding power
 fn generate_type_to_operator_info() -> [
     [BpAndOperatorInfo; OperatorVariantCount as usize];
     TokenType::TokenTypeCount as usize
@@ -434,6 +438,13 @@ fn generate_type_to_operator_info() -> [
             ret_entry.left_bp = bp;
             ret_entry.right_bp = bp;
 
+            if op_info.assoc == Assoc::Left {
+                ret_entry.right_bp += 1;
+            }
+            else {
+                ret_entry.left_bp += 1;
+            }
+
             ret_entry.op_info = op_info;
         }
     }
@@ -441,7 +452,9 @@ fn generate_type_to_operator_info() -> [
     return table;
 }
 
-static TTYPE_TO_OPERATOR_INFO: LazyLock<[
+// maps (TokenType, OperatorVariant) -> Binding Power And OperatorInfo
+// so if you have (Plus, Infix) you will find the info for the binary plus
+pub static TTYPE_TO_OPERATOR_INFO: LazyLock<[
     [BpAndOperatorInfo; OperatorVariantCount as usize];
     TokenType::TokenTypeCount as usize
 ]> = LazyLock::new(generate_type_to_operator_info);
