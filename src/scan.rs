@@ -1,3 +1,5 @@
+use std::string::String;
+
 enum ScanMethod {
     Text(&'static str),
     Proc(fn(&str) -> usize),
@@ -209,6 +211,59 @@ fn scan_string(s: &str) -> usize {
     ret
 }
 
+fn scan_ws_and_comments(s: &str) -> usize {
+    let mut len: usize = 0;
+    let mut chars = s.chars();
+
+    loop {
+        let mut found_ws_or_comment = false;
+
+        match chars.next() {
+            Some(mut c) => {
+                if c == '/' {
+                    if let Some('/') = chars.next() {
+                        found_ws_or_comment = true;
+
+                        len += 2;
+
+                        while let Some(c) = chars.next() {
+                            len += 1;
+                            
+                            if c == '\n' {
+                                break;
+                            }
+                        }
+                    }
+                    else {
+                        break;
+                    }
+                }
+                else {
+                    while c.is_whitespace() {
+                        found_ws_or_comment = true;
+                        
+                        len += 1;
+
+                        if let Some(new_c) = chars.next() {
+                            c = new_c;
+                        }
+                        else {
+                            break;
+                        }
+                    }
+                }
+            },
+            None => {}
+        }
+
+        if !found_ws_or_comment {
+            break;
+        }
+    }
+
+    len
+}
+
 impl TokenType {
     fn get_scan_method(&self) -> ScanMethod {
         match self {
@@ -276,13 +331,27 @@ impl TokenType {
 
 pub struct Token<'a> {
     pub ttype: TokenType,
+    pub line: usize,
+    pub column: usize,
     pub text: &'a str,
 }
 
-pub fn tokenize<'a>(s: &'a str) -> Result<Vec<Token<'a>>,&'static str> {
-    let mut chars = s.chars();
+pub fn tokenize<'a>(
+    s: &'a str
+) -> Result<Vec<Token<'a>>,String> {
+    let mut line = 0;
+    let mut column = 1;
 
-    loop {
+    let mut chars = s.chars();
+    let mut tokens: Vec<Token<'a>> = Vec::new();
+
+    while chars.as_str() != "" {
+        // advance past whitespace, comment(s)
+
+        
+
+        // find longest match TokenType
+
         let mut max_match: usize = 0;
         let mut match_ttype: TokenType = TokenType::Plus;
 
@@ -294,7 +363,43 @@ pub fn tokenize<'a>(s: &'a str) -> Result<Vec<Token<'a>>,&'static str> {
                 std::mem::transmute(ttype_int)
             };
 
+            let curr_match = match ttype.get_scan_method() {
+                Text(s) => {
+                    if chars.as_str().starts_with(s) {
+                        s.chars().count()
+                    }
+                    else {
+                        0
+                    }
+                },
+                Proc(f) => {
+                    f(chars.as_str())
+                },
+            };
 
+            if curr_match > max_match {
+                max_match = curr_match;
+                match_ttype = ttype;
+            }
         }
+
+        if max_match == 0 { // => no match was found
+            return Err(format!("no matching token found at "))
+        }
+
+        // push new token
+
+        tokens.push(Token {
+            ttype: match_ttype,
+            offset: offset,
+            text: &s[offset..offset + max_match],
+        });
+
+        // advance offset int, chars iterator
+
+        offset += max_match;
+        chars.nth(max_match - 1);
     }
+
+    Err
 }
