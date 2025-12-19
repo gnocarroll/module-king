@@ -73,15 +73,17 @@ fn main() -> ExitCode {
 
     for (filename, file_string) in file_strings {
         let tokens = scan::tokenize(file_string.as_str()).expect(
-            "tokenizatoin failed"
+            "tokenization failed"
         );
 
         println!("FILE: {filename}");
 
         for (idx, tok) in tokens.iter().enumerate() {
             println!(
-                "{}: {} \"{}\"",
+                "{}; Ln {}, Col {}; {} \"{}\"",
                 idx,
+                tok.line,
+                tok.column,
                 tok.ttype,
                 tok.text,
             );

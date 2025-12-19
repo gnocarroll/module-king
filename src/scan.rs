@@ -252,42 +252,33 @@ fn scan_ws_and_comments(s: &str) -> usize {
     loop {
         let mut found_ws_or_comment = false;
 
-        match chars.next() {
-            Some(mut c) => {
-                if c == '/' {
-                    if let Some('/') = chars.next() {
-                        found_ws_or_comment = true;
+        // 'a' is acceptable default since loop will quit if next is None
+        let c = chars.next().unwrap_or('a');
+        
+        if c == '/' {
+            // check if comment has been found, if not break
 
-                        len += 2;
+            if let Some('/') = chars.next() {
+                found_ws_or_comment = true;
 
-                        while let Some(c) = chars.next() {
-                            len += 1;
-                            
-                            if c == '\n' {
-                                break;
-                            }
-                        }
-                    }
-                    else {
+                len += 2;
+
+                while let Some(c) = chars.next() {
+                    len += 1;
+                    
+                    if c == '\n' {
                         break;
                     }
                 }
-                else {
-                    while c.is_whitespace() {
-                        found_ws_or_comment = true;
-                        
-                        len += 1;
-
-                        if let Some(new_c) = chars.next() {
-                            c = new_c;
-                        }
-                        else {
-                            break;
-                        }
-                    }
-                }
-            },
-            None => {}
+            }
+            else {
+                break;
+            }
+        }
+        else if c.is_whitespace() {
+            found_ws_or_comment = true;
+            
+            len += 1;
         }
 
         if !found_ws_or_comment {
