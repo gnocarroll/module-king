@@ -57,6 +57,8 @@ pub enum TokenType {
     Function,
     Struct,
     Class,
+    Enum,
+    Variant,
     Import,
     Export,
     From,
@@ -340,6 +342,8 @@ impl TokenType {
             Function => Text("function"),
             Struct => Text("struct"),
             Class => Text("class"),
+            Enum => Text("enum"),
+            Variant => Text("variant"),
             Import => Text("import"),
             Export => Text("export"),
             From => Text("from"),
@@ -443,6 +447,12 @@ pub fn tokenize<'a>(
 
         // push new token
 
+        println!(
+            "{}, SIZE {}",
+            match_ttype,
+            max_match,
+        );
+
         tokens.push(Token {
             ttype: match_ttype,
             line: line,
@@ -453,7 +463,7 @@ pub fn tokenize<'a>(
         // advance column, chars iterator
 
         column += max_match;
-        chars.nth(max_match);
+        chars.nth(max_match - 1);
     }
 
     // always push EOF token on at the end
