@@ -327,55 +327,25 @@ impl AST {
         })
     }
 
-    fn parse_lhs(&mut self, tokens: &mut Tokens) -> u32 {
+    fn expect(&mut self, tokens: &mut Tokens, ttype: TokenType) -> Result<Token, ExpectedToken> {
+        let ret = tokens.expect(ttype);
+
+        if let Err(e) = &ret {
+            self.parse_errors.push(ParseError::ExpectedToken(*e))
+        }
+
+        ret
+    }
+
+    // expect sequence of tokens, success is Unit since will not allocate vec
+    fn expect_sequence(&mut self, tokens: &mut Tokens, ttype: TokenType) -> Result<(), ExpectToken> {
+        
+    }
+
+    // atom e.g. literal like integer
+    fn parse_atom(&mut self, tokens: &mut Tokens) -> u32 {
         let tok_idx = tokens.idx();
         let tok = tokens.peek();
-
-        // see if you have prefix op
-
-        match operator::get_bp(tok.ttype, Prefix) {
-            Some((_, r_bp)) => {
-                tokens.next();
-
-                let rhs = self.parse_expr_bp(tokens, r_bp);
-
-                return self.expr_prefix(
-                    tok,
-                    rhs,
-                );
-            },
-            _ => {},
-        }
-
-        // around e.g. (1)
-
-        match operator::get_bp(tok.ttype, Around) {
-            Some(_) => {
-                tokens.next();
-
-                let rhs = self.parse_expr(tokens);
-
-                let mut found_end = false;
-
-                match tokens.expect(match tok.ttype {
-                    TokenType::LParen => TokenType::RParen,
-                    TokenType::LBrace => TokenType::RBrace,
-                    _ => panic!("unexpected ttype for Around"),
-                }) {
-                    Ok(_) => {
-                        found_end = true;
-                    },
-                    Err(e) => {
-                        self.parse_errors.push(
-                            ParseError::ExpectedToken(e),
-                        );
-                    },
-                }
-
-                return self.expr_around(tok, rhs, found_end);
-            },
-            _ => {},
-        }
 
         match tok.ttype {
             // single token (e.g. integer) literals or ident
@@ -409,9 +379,114 @@ impl AST {
                     }
                 })
             },
+            TokenType::Function => { // function literal
+                tokens.next();
+
+                let tok = tokens.peek();
+
+                let name = match tokens.peek().ttype {
+                    TokenType::Identifier => {
+                        Some(tok)
+                    },
+                    _ => None,
+                };
+
+                let attempt_parse_func = |
+                    ast: &mut AST,
+                    tokens: &mut Tokens,
+                | {
+                    if ast.expect(tokens, TokenType::LParen).is_err() {
+                        return (false, ast.expr_unit(tokens.idx()), ast.expr_unit(tokens.idx()));
+                    }
+
+                    let params = ast.parse_expr(tokens);
+
+                    if
+                        ast.expect(tokens, TokenType::RParen).is_err() ||
+                        ast.expect(tokens, TokenType::Begin).is_err()
+                    {
+                        return (false, params, ast.expr_unit(tokens.idx()));
+                    }
+
+                    let body = ast.parse_expr(tokens);
+
+                    if
+
+                    (true, params, body)
+                };
+
+                let (success, params, body) = attempt_parse_func(self, tokens);
+
+                if !success {
+                    // TODO: sync tokens
+                }
+
+                self.expr_push(Expr {
+                    tok: tok_idx,
+                    end_tok: tokens.idx(), // TODO: correct
+                    etype: 0,
+                    variant: ExprVariant::FunctionLiteral(FunctionLiteral {
+                        name: name,
+                        params: params,
+                        body: body,
+                    })
+                })
+            },
             // if no atom or other (e.g. prefix) expr is found return Unit
             _ => self.expr_unit(tok_idx),
         }
+    }
+
+    fn parse_lhs(&mut self, tokens: &mut Tokens) -> u32 {
+        let tok = tokens.peek();
+
+        // see if you have prefix op
+
+        match operator::get_bp(tok.ttype, Prefix) {
+            Some((_, r_bp)) => {
+                tokens.next();
+
+                let rhs = self.parse_expr_bp(tokens, r_bp);
+
+                return self.expr_prefix(
+                    tok,
+                    rhs,
+                );
+            },
+            _ => {},
+        }
+
+        // around "operator" e.g. parens like this (1)
+
+        match operator::get_bp(tok.ttype, Around) {
+            Some(_) => {
+                tokens.next();
+
+                let rhs = self.parse_expr(tokens);
+
+                let mut found_end = false;
+
+                match tokens.expect(match tok.ttype {
+                    TokenType::LParen => TokenType::RParen,
+                    TokenType::LBrace => TokenType::RBrace,
+                    _ => panic!("unexpected ttype for Around"),
+                }) {
+                    Ok(_) => {
+                        found_end = true;
+                    },
+                    Err(e) => {
+                        self.parse_errors.push(
+                            ParseError::ExpectedToken(e),
+                        );
+                    },
+                }
+
+                return self.expr_around(tok, rhs, found_end);
+            },
+            _ => {},
+        }
+
+        self.parse_atom(tokens)
     }
 
     // bp is Binding Power (Pratt parsing) and ret is expr id

@@ -2,18 +2,17 @@
 
 use crate::scan::{Token, TokenType};
 
+#[derive(Clone, Copy)]
 pub struct ExpectedToken {
     pub expected: TokenType,
     pub found: Token,
 }
 
 // e.g. function beginning, end name does not match
+#[derive(Clone, Copy)]
 pub struct NameMismatch {
-    pub line: usize,
-    pub column: usize,
-
-    pub expected: String,
-    pub found: String,
+    pub expected: Token,
+    pub found: Token,
 }
 
 pub enum ParseError {
