@@ -337,16 +337,18 @@ impl AST {
         ret
     }
 
-    // expect sequence of tokens, success is Unit since will not allocate vec
-    fn expect_sequence(&mut self, tokens: &mut Tokens, ttypes: &[TokenType]) -> Result<(), ExpectedToken> {
+    // expect sequence of tokens, returns last one
+    fn expect_sequence(&mut self, tokens: &mut Tokens, ttypes: &[TokenType]) -> Result<Token, ExpectedToken> {
+        let mut ret: Token = Token::default();
+        
         for ttype in ttypes {
-            match self.expect(tokens, *ttype) {
-                Ok(_) => (),
+            ret = match self.expect(tokens, *ttype) {
+                Ok(t) => t,
                 Err(e) => return Err(e),
             }
         }
 
-        Ok(())
+        Ok(ret)
     }
 
     // atom e.g. literal like integer
@@ -402,15 +404,6 @@ impl AST {
                     ast: &mut AST,
                     tokens: &mut Tokens,
                 | {
-                    let mut params: Option<u32> = None;
-                    let mut body: Option<u32> = None;
-
-                    let ret = |success: bool| (
-                        success,
-                        params.unwrap_or_else(|| ast.expr_unit(tokens.idx())),
-                        body.unwrap_or_else(|| ast.expr_unit(tokens.idx())),
-                    );
-
                     if ast.expect(tokens, TokenType::LParen).is_err() {
                         return (
                             false,
@@ -421,16 +414,36 @@ impl AST {
 
                     let params = ast.parse_expr(tokens);
 
-                    if ast.expect_sequence(tokens, &[TokenType::RParen, TokenType::Begin]).is_err() ||
-                    {
+                    if ast.expect_sequence(
+                        tokens,
+                        &[TokenType::RParen, TokenType::Begin],
+                    ).is_err() {
                         return (false, params, ast.expr_unit(tokens.idx()));
                     }
 
                     let body = ast.parse_expr(tokens);
 
-                    if
+                    if ast.expect(tokens, TokenType::End).is_err() {
+                        return (false, params, body);
+                    }
 
-                    (true, params, body)
+                    let success = if name.is_some() {
+                        let result = self.expect(
+                            tokens,
+                            TokenType::Identifier,
+                        );
+
+                        if let Ok(t) = result {
+                            
+                        }
+
+                        result.is_ok()
+                    }
+                    else {
+                        self.expect(tokens, TokenType::Function).is_ok()
+                    };
+
+                    (success, params, body)
                 };
 
                 let (success, params, body) = attempt_parse_func(self, tokens);
