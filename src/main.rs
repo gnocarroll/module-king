@@ -92,7 +92,7 @@ fn main() -> ExitCode {
                 tok.line,
                 tok.column,
                 tok.ttype,
-                &file_string[tok.column as usize..tok.end_column as usize],
+                tok.as_str(file_string.as_str()),
             );
         }
     }

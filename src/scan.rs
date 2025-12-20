@@ -407,6 +407,16 @@ pub struct Token {
 
     // NOTE: end_column is NOT inclusive
     pub end_column: u32,
+
+    // overall offset in file
+    pub offset: u32,
+}
+
+impl Token {
+    // s is string where Token was sourced from
+    pub fn as_str<'a>(&self, s: &'a str) -> &'a str {
+        &s[self.offset as usize..(self.offset + self.end_column - self.column) as usize]
+    }
 }
 
 impl Default for Token {
@@ -416,6 +426,7 @@ impl Default for Token {
             line: 1,
             column: 1,
             end_column: 1,
+            offset: 0,
         }
     }
 }
@@ -423,6 +434,9 @@ impl Default for Token {
 pub fn tokenize(
     s: &str
 ) -> Result<Vec<Token>,String> {
+    // offset in file (s)
+    let mut offset = 0;
+
     // line, column are 1-indexed
     let mut line = 1;
     let mut column = 1;
@@ -435,6 +449,8 @@ pub fn tokenize(
         // advance past whitespace, comment(s)
 
         let skip = scan_ws_and_comments(chars.as_str());
+
+        offset += skip;
 
         // consume chars and modify line, column
 
@@ -506,10 +522,12 @@ pub fn tokenize(
             line: line,
             column: column,
             end_column: column + max_match as u32,
+            offset: offset as u32,
         });
 
-        // advance column, chars iterator
+        // advance column, chars iterator, and offset
 
+        offset += max_match;
         column += max_match as u32;
         chars.nth(max_match - 1);
     }
@@ -521,6 +539,7 @@ pub fn tokenize(
         line: line,
         column: column,
         end_column: column,
+        offset: offset as u32,
     });
 
     Ok(tokens)
