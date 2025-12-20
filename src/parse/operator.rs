@@ -397,12 +397,15 @@ pub struct OperatorBp {
     pub right_bp: u8,
 }
 
-// generates mapping from (TokenType, OperatorVariant e.g. Infix)
-// to binding power
-fn generate_ttype_to_operator_bp() -> [
+// table type using above struct to map ttype to binding power
+type TTypeBpTable = [
     [OperatorBp; OperatorVariantCount as usize];
     TokenType::TokenTypeCount as usize
-]{
+];
+
+// generates mapping from (TokenType, OperatorVariant e.g. Infix)
+// to binding power
+fn generate_ttype_to_operator_bp() -> TTypeBpTable{
     let mut table: [
         [OperatorBp; OperatorVariantCount as usize];
         TokenType::TokenTypeCount as usize
@@ -447,10 +450,7 @@ fn generate_ttype_to_operator_bp() -> [
 
 // maps (TokenType, OperatorVariant) -> Binding Power And OperatorInfo
 // so if you have (Plus, Infix) you will find the info for the binary plus
-static TTYPE_TO_OPERATOR_BP: LazyLock<[
-    [OperatorBp; OperatorVariantCount as usize];
-    TokenType::TokenTypeCount as usize
-]> = LazyLock::new(generate_ttype_to_operator_bp);
+static TTYPE_TO_OPERATOR_BP: LazyLock<TTypeBpTable> = LazyLock::new(generate_ttype_to_operator_bp);
 
 // function which will be used during parsing to access info from this Rust
 // file test if given token is an operator with given OperatorVariant
