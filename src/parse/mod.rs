@@ -206,6 +206,23 @@ impl<'a> Tokens<'a> {
 
         Ok(maybe_ret)
     }
+
+    // advance until you find one of the provided token types (or EOF)
+    // but DO NOT consume it, so ret will be peek()
+    pub fn sync(&mut self, ttypes: &[TokenType]) -> Token {
+        loop {
+            let tok = self.peek();
+
+            if
+                tok.ttype == TokenType::Eof ||
+                ttypes.iter().any(|ttype| *ttype == tok.ttype)
+            {
+                return tok;
+            }
+
+            self.next();
+        }
+    }
 }
 
 // NOTE: AST is used for syntax and semantic analysis since I think
@@ -444,8 +461,32 @@ impl AST {
             name,
         );
 
+        // if problem occurred during function parsing try to
+        // recover by skipping ahead to one of these ttypes
+
         if !success {
-            // TODO: sync tokens
+            let found = tokens.sync(&[
+                TokenType::End,
+                TokenType::Function,
+                TokenType::Semicolon,
+            ]);
+
+            match found.ttype {
+                TokenType::End => {
+                    tokens.next();
+
+                    match tokens.peek().ttype {
+                        TokenType::Function | TokenType::Identifier => {
+                            tokens.next();
+                        },
+                        _ => (),
+                    };
+                },
+                TokenType::Function => {
+                    tokens.next();
+                },
+                _ => (),
+            };
         }
 
         self.expr_push(Expr {
