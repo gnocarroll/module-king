@@ -399,35 +399,37 @@ impl TokenType {
     }
 }
 
-#[derive(Clone, Copy)]
-pub struct Token<'a> {
+#[derive(Clone)]
+pub struct Token {
     pub ttype: TokenType,
     pub line: usize,
     pub column: usize,
-    pub text: &'a str,
+
+    // will be present when necessary e.g. identifiers
+    pub text: Option<String>,
 }
 
-impl Default for Token<'_> {
+impl Default for Token {
     fn default() -> Self {
         Token {
             ttype: TokenType::Eof,
             line: 1,
             column: 1,
-            text: "",
+            text: None,
         }
     }
 }
 
-pub fn tokenize<'a>(
-    s: &'a str
-) -> Result<Vec<Token<'a>>,String> {
+pub fn tokenize(
+    s: &str
+) -> Result<Vec<Token>,String> {
     // line, column are 1-indexed
     let mut line = 1;
     let mut column = 1;
 
     // iterator for use throughout function and Token vec for ret
     let mut chars = s.chars();
-    let mut tokens: Vec<Token<'a>> = Vec::new();
+    let mut tokens: Vec<Token> = Vec::new();
 
     while chars.as_str() != "" {
         // advance past whitespace, comment(s)
@@ -497,12 +499,18 @@ pub fn tokenize<'a>(
         }
 
         // push new token
+        // record text as String if necessary
 
         tokens.push(Token {
             ttype: match_ttype,
             line: line,
             column: column,
-            text: &chars.as_str()[..max_match],
+            text: match match_ttype {
+                Identifier | Integer | Float | String => {
+                    Some(chars.as_str()[..max_match].to_string())
+                },
+                _ => None,
+            }
         });
 
         // advance column, chars iterator
@@ -517,7 +525,7 @@ pub fn tokenize<'a>(
         ttype: Eof,
         line: line,
         column: column,
-        text: "",
+        text: None,
     });
 
     Ok(tokens)

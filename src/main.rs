@@ -87,7 +87,7 @@ fn main() -> ExitCode {
 
         for (idx, tok) in tokens.iter().enumerate() {
             println!(
-                "{}; Ln {}, Col {}; {} \"{}\"",
+                "{}; Ln {}, Col {}; {} \"{:?}\"",
                 idx,
                 tok.line,
                 tok.column,

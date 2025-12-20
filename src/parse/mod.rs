@@ -4,7 +4,7 @@ pub mod operator;
 use std::{collections::HashMap};
 
 use crate::scan::{Token, TokenType};
-use errors::{ParseError, SemanticError};
+use errors::{ParseError, SemanticError, ExpectedToken};
 
 #[derive(Clone, Copy, PartialEq)]
 enum TypeVariant {
@@ -128,14 +128,14 @@ struct Tokens<'a> {
 
 impl<'a> Tokens<'a> {
     fn new(tokens: &'a Vec<Token<'a>>) -> Self {
-        Tokens::<'a>{
+        Tokens{
             tokens: tokens,
             offset: 0,
         }
     }
 
     // 0-indexed (e.g. 0 is the same as just calling peek())
-    fn _peek_nth(&'a self, idx: isize) -> Token<'a> {
+    fn _peek_nth(&self, idx: isize) -> Token<'_> {
         let mut idx = idx + (self.offset as isize);
 
         if idx < 0 {
@@ -151,15 +151,15 @@ impl<'a> Tokens<'a> {
         }
     }
     
-    pub fn peek_nth(&'a self, idx: usize) -> Token<'a> {
+    pub fn peek_nth(&self, idx: usize) -> Token<'_> {
         self._peek_nth(idx as isize)
     }
 
-    pub fn peek(&'a self) -> Token<'a> {
+    pub fn peek(&self) -> Token<'_> {
         self.peek_nth(0)
     }
 
-    pub fn next(&'a mut self) -> Token<'a> {
+    pub fn next(&mut self) -> Token<'_> {
         if self.offset < self.tokens.len() - 1 {
             self.offset += 1;
         }
@@ -167,8 +167,21 @@ impl<'a> Tokens<'a> {
         self._peek_nth(-1)
     }
 
-    pub fn expect(ttype: TokenType) -> Result<Token<'a>, ParseError> {
+    pub fn expect(&'a mut self, ttype: TokenType) -> Result<Token<'a>, ExpectedToken<'a>> {
+        let maybe_ret = self.peek();
 
+        let maybe_ret = maybe_ret;
+
+        if maybe_ret.ttype != ttype {
+            return Err(ExpectedToken{
+                expected: ttype,
+                found: maybe_ret,
+            })
+        }
+
+        self.next();
+
+        Ok(maybe_ret)
     }
 }
 

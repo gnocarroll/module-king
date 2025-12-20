@@ -2,23 +2,23 @@
 
 use crate::scan::{Token, TokenType};
 
-pub struct ExpectedToken<'a> {
+pub struct ExpectedToken {
     pub expected: TokenType,
-    pub found: Token<'a>,
+    pub found: Token,
 }
 
 // e.g. function beginning, end name does not match
-pub struct NameMismatch<'a> {
+pub struct NameMismatch {
     pub line: usize,
     pub column: usize,
 
-    pub expected: &'a str,
-    pub found: &'a str,
+    pub expected: String,
+    pub found: String,
 }
 
-pub enum ParseError<'a> {
-    ExpectedToken(ExpectedToken<'a>),
-    NameMismatch(NameMismatch<'a>),
+pub enum ParseError {
+    ExpectedToken(ExpectedToken),
+    NameMismatch(NameMismatch),
 }
 
 pub struct SemanticError {
