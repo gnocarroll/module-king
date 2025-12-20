@@ -344,8 +344,9 @@ impl AST {
         }
 
         match tok.ttype {
-            // single token (e.g. integer) literals
-            TokenType::Integer | TokenType::Float | TokenType::String => {
+            // single token (e.g. integer) literals or ident
+            TokenType::Integer | TokenType::Float |
+            TokenType::String | TokenType::Identifier => {
                 tokens.next();
 
                 self.expr_push(Expr {
@@ -364,6 +365,12 @@ impl AST {
                             ),
                         ),
                         TokenType::String => ExprVariant::StringLiteral(tok),
+                        TokenType::Identifier => ExprVariant::Identifier(
+                            Identifier {
+                                name: tok,
+                                variant: IdentifierVariant::Unknown,
+                            }
+                        ),
                         _ => panic!("single token literal parsing broken"),
                     }
                 })
@@ -425,6 +432,9 @@ impl AST {
             ExprVariant::FloatLiteral(f) => f.to_string(),
             ExprVariant::StringLiteral(t) => {
                 tokens.tok_as_str(&t).to_string()
+            },
+            ExprVariant::Identifier(ident) => {
+                tokens.tok_as_str(&ident.name).to_string()
             },
             ExprVariant::Operation(operation) => {
                 let operand_to_string = |operand: Option<u32>| {

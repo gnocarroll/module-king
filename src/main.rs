@@ -95,6 +95,8 @@ fn main() -> ExitCode {
                 tok.as_str(file_string.as_str()),
             );
         }
+
+        parse::parse_file(file_string.as_str(), &tokens);
     }
 
     0.into()
