@@ -87,12 +87,12 @@ fn main() -> ExitCode {
 
         for (idx, tok) in tokens.iter().enumerate() {
             println!(
-                "{}; Ln {}, Col {}; {} \"{:?}\"",
+                "{}; Ln {}, Col {}; {} \"{}\"",
                 idx,
                 tok.line,
                 tok.column,
                 tok.ttype,
-                tok.text,
+                &file_string[tok.column as usize..tok.end_column as usize],
             );
         }
     }

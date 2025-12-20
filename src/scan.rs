@@ -402,11 +402,11 @@ impl TokenType {
 #[derive(Clone)]
 pub struct Token {
     pub ttype: TokenType,
-    pub line: usize,
-    pub column: usize,
+    pub line: u32,
+    pub column: u32,
 
-    // will be present when necessary e.g. identifiers
-    pub text: Option<String>,
+    // NOTE: end_column is NOT inclusive
+    pub end_column: u32,
 }
 
 impl Default for Token {
@@ -415,7 +415,7 @@ impl Default for Token {
             ttype: TokenType::Eof,
             line: 1,
             column: 1,
-            text: None,
+            end_column: 1,
         }
     }
 }
@@ -505,27 +505,22 @@ pub fn tokenize(
             ttype: match_ttype,
             line: line,
             column: column,
-            text: match match_ttype {
-                Identifier | Integer | Float | String => {
-                    Some(chars.as_str()[..max_match].to_string())
-                },
-                _ => None,
-            }
+            end_column: column + max_match as u32,
         });
 
         // advance column, chars iterator
 
-        column += max_match;
+        column += max_match as u32;
         chars.nth(max_match - 1);
     }
 
-    // always push EOF token on at the end
+    // always push EOF token on at the end (zero width)
 
     tokens.push(Token {
         ttype: Eof,
         line: line,
         column: column,
-        text: None,
+        end_column: column,
     });
 
     Ok(tokens)
