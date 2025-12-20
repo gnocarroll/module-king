@@ -400,6 +400,7 @@ impl AST {
 
         let name = match tok.ttype {
             TokenType::Identifier => {
+                tokens.next();
                 Some(tok)
             },
             _ => None,
@@ -717,6 +718,20 @@ impl AST {
                     operation.op,
                     operand_to_string(operation.operand1),
                     operand_to_string(operation.operand2),
+                )
+            },
+            ExprVariant::FunctionLiteral(function_literal) => {
+                format!(
+                    "(defun {}({}) {})",
+                    match function_literal.name {
+                        Some(name) => format!(
+                            "{} ",
+                            tokens.tok_as_str(&name),
+                        ),
+                        None => "".to_string(),
+                    },
+                    self.expr_to_string(tokens, function_literal.params),
+                    self.expr_to_string(tokens, function_literal.body),
                 )
             },
             _ => "ERR".to_string(),

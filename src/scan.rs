@@ -6,7 +6,7 @@ enum ScanMethod {
 }
 
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 #[repr(u8)]
 pub enum TokenType {
     Semicolon,
