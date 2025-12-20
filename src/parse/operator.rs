@@ -479,7 +479,11 @@ pub fn get_bp_and_op_info(
 
     // access relevant entry in table and if it is not empty then return it
 
-    let maybe_ret = TTYPE_TO_OPERATOR_INFO[ttype as usize][op_variant as usize];
+    let maybe_ret: BpAndOperatorInfo = TTYPE_TO_OPERATOR_INFO[
+        ttype as usize
+    ][
+        op_variant as usize
+    ];
 
     if maybe_ret.is_empty {
         return None;
