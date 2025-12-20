@@ -258,10 +258,44 @@ impl AST {
         })
     }
 
+    fn expr_postfix_around(
+        &mut self,
+        op: Token,
+        lhs: u32,
+        rhs: u32,
+        found_end: bool,
+    ) -> u32 {
+        self.expr_push(Expr {
+            tok: self.expr(lhs).tok,
+            end_tok: self.expr(rhs).end_tok + if found_end {
+                1
+            } else { 0 },
+            etype: 0,
+            variant: ExprVariant::Operation(Operation{
+                op: op.ttype,
+                operand1: Some(lhs),
+                operand2: Some(rhs),
+            })
+        })
+    }
+
     fn expr_prefix(&mut self, op: Token, rhs: u32) -> u32 {     
         self.expr_push(Expr {
             tok: self.expr(rhs).tok - 1,
             end_tok: self.expr(rhs).end_tok,
+            etype: 0,
+            variant: ExprVariant::Operation(Operation {
+                op: op.ttype,
+                operand1: Some(rhs),
+                operand2: None,
+            }),
+        })
+    }
+
+    fn expr_postfix(&mut self, op: Token, rhs: u32) -> u32 {     
+        self.expr_push(Expr {
+            tok: self.expr(rhs).tok,
+            end_tok: self.expr(rhs).end_tok + 1,
             etype: 0,
             variant: ExprVariant::Operation(Operation {
                 op: op.ttype,
@@ -384,31 +418,80 @@ impl AST {
     fn parse_expr_bp(&mut self, tokens: &mut Tokens, min_bp: u8) -> u32 {
         let mut lhs = self.parse_lhs(tokens);
 
-        if self.expr(lhs).is_unit() {
-            return lhs;
-        }
-
         loop {
             let op = tokens.peek();
 
-            let (l_bp, r_bp) = match operator::get_bp(op.ttype, Infix) {
-                Some(bp) => bp,
-                None => break,
+            // see if one of the operator variants e.g. Infix works with
+            // above token and get binding power if so
+
+            let determine_op_variant_and_bp = || {
+                for op_variant in [Infix, Postfix, PostfixAround] {
+                    if let Some((l_bp, r_bp)) = operator::get_bp(
+                        op.ttype,
+                        op_variant,
+                    ) {
+                        return Some((op_variant, l_bp, r_bp));
+                    }
+                }
+
+                None
             };
 
-            if l_bp < min_bp {
+            if let Some((op_variant, l_bp, r_bp)) = determine_op_variant_and_bp() {
+                if l_bp < min_bp { // applies to infix and postfix
+                    break;
+                }
+                
+                tokens.next();
+
+                // how lhs is replaced depends on op variant
+
+                match op_variant {
+                    Infix => {
+                        let rhs = self.parse_expr_bp(tokens, r_bp);
+
+                        lhs = self.expr_infix(
+                            op,
+                            lhs,
+                            rhs,
+                        );
+                    },
+                    Postfix => {
+                        lhs = self.expr_postfix(op, lhs);
+                    },
+                    PostfixAround => { // e.g. function call
+                        let rhs = self.parse_expr(tokens);
+
+                        let mut found_end = false;
+
+                        match tokens.expect(match op.ttype {
+                            TokenType::LParen => TokenType::RParen,
+                            TokenType::LBrace => TokenType::RBrace,
+                            _ => panic!("unexpected ttype for Around"),
+                        }) {
+                            Ok(_) => {
+                                found_end = true;
+                            },
+                            Err(e) => {
+                                self.parse_errors.push(
+                                    ParseError::ExpectedToken(e),
+                                );
+                            },
+                        }
+
+                        lhs = self.expr_postfix_around(
+                            op,
+                            lhs,
+                            rhs,
+                            found_end,
+                        );
+                    },
+                    _ => panic!("UNEXPECTED OP VARIANT"),
+                }
+            }
+            else {
                 break;
             }
-
-            tokens.next();
-
-            let rhs = self.parse_expr_bp(tokens, r_bp);
-
-            lhs = self.expr_infix(
-                op,
-                lhs,
-                rhs,
-            );
         }
 
         lhs
