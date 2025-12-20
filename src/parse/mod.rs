@@ -1,8 +1,10 @@
+mod errors;
 pub mod operator;
 
-use std::collections::HashMap;
+use std::{collections::HashMap};
 
 use crate::scan::{Token, TokenType};
+use errors::{ParseError, SemanticError};
 
 #[derive(Clone, Copy, PartialEq)]
 enum TypeVariant {
@@ -84,7 +86,7 @@ struct Expr<'a> {
 enum Visibility {
     Private,
     Export,
-    Static,
+    Global,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -119,8 +121,81 @@ struct Scope<'a> {
     pub members: HashMap<&'a str, u32>,
 }
 
-struct AST<'a> {
+struct Tokens<'a> {
+    tokens: &'a Vec<Token<'a>>,
+    offset: usize,
+}
+
+impl<'a> Tokens<'a> {
+    fn new(tokens: &'a Vec<Token<'a>>) -> Self {
+        Tokens::<'a>{
+            tokens: tokens,
+            offset: 0,
+        }
+    }
+
+    // 0-indexed (e.g. 0 is the same as just calling peek())
+    fn _peek_nth(&'a self, idx: isize) -> Token<'a> {
+        let mut idx = idx + (self.offset as isize);
+
+        if idx < 0 {
+            idx = 0;
+        }
+
+        match self.tokens.get(idx as usize) {
+            Some(t) => *t,
+            None => match self.tokens.last() {
+                Some(t) => *t,
+                None => Token::default(),
+            }
+        }
+    }
+    
+    pub fn peek_nth(&'a self, idx: usize) -> Token<'a> {
+        self._peek_nth(idx as isize)
+    }
+
+    pub fn peek(&'a self) -> Token<'a> {
+        self.peek_nth(0)
+    }
+
+    pub fn next(&'a mut self) -> Token<'a> {
+        if self.offset < self.tokens.len() - 1 {
+            self.offset += 1;
+        }
+
+        self._peek_nth(-1)
+    }
+
+    pub fn expect(ttype: TokenType) -> Result<Token<'a>, ParseError> {
+
+    }
+}
+
+// NOTE: AST is used for syntax and semantic analysis since I think
+// it simplifies things
+#[derive(Default)]
+pub struct AST<'a> {
+    // exprs used in initial parsing and semantic analysis stage
     exprs: Vec<Expr<'a>>,
+
+    // scopes, members not used until semantic analysis stage
     scopes: Vec<Scope<'a>>,
     members: Vec<Member<'a>>,
+
+    parse_errors: Vec<ParseError<'a>>,
+    semantic_errors: Vec<SemanticError>,
+}
+
+// public function to perform syntactic + semantic analysis
+pub fn parse_file<'a>(tokens: &Vec<Token<'a>>) -> AST<'a> {
+    let ast = AST::default();
+    let tokens = Tokens::new(tokens);
+
+
+    ast
+}
+
+impl AST<'_> {
+    
 }

@@ -1,3 +1,9 @@
+// main purpose of this file is that you can insert new operator information
+// into op info table and that change will "propagate" to binding power
+// function to ensure that precedence levels of operators change correctly
+// makes things easier if new operators are added in the future or some
+// mistake is made
+
 #[derive(Clone, Copy, PartialEq)]
 #[repr(u8)]
 pub enum OperatorVariant {
@@ -83,6 +89,13 @@ static OP_INFO_TABLE : &[&[OperatorInfo]] = &[
             variant: Prefix,
             assoc: Assoc::Right,
             is_rhs_optional: false, // requires label
+        },
+
+        OperatorInfo{
+            ttype: TokenType::Global,
+            variant: Prefix,
+            assoc: Assoc::Right,
+            is_rhs_optional: false,
         },
     ],
     &[

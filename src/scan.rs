@@ -61,6 +61,7 @@ pub enum TokenType {
     Import,
     Export,
     From,
+    Global,
 
     If,
     Else,
@@ -365,6 +366,7 @@ impl TokenType {
             Import => Text("import"),
             Export => Text("export"),
             From => Text("from"),
+            Global => Text("global"),
 
             If => Text("if"),
             Else => Text("else"),
@@ -397,11 +399,23 @@ impl TokenType {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct Token<'a> {
     pub ttype: TokenType,
     pub line: usize,
     pub column: usize,
     pub text: &'a str,
+}
+
+impl Default for Token<'_> {
+    fn default() -> Self {
+        Token {
+            ttype: TokenType::Eof,
+            line: 1,
+            column: 1,
+            text: "",
+        }
+    }
 }
 
 pub fn tokenize<'a>(
