@@ -14,7 +14,8 @@ enum TypeVariant {
 }
 
 struct TypeLiteral<'a> {
-    pub name: &'a str,
+    // may be empty str if type literal does not provide name
+    pub name: Option<&'a str>,
     
     pub variant: TypeVariant,
 
@@ -24,13 +25,13 @@ struct TypeLiteral<'a> {
 
 #[derive(Clone, Copy, PartialEq)]
 enum ScopeVariant {
-    Scope,
+    Scope, // e.g. scope for a for loop or other block
     Module,
     Type,
 }
 
-struct Function<'a> {
-    pub name: &'a str,
+struct FunctionLiteral<'a> {
+    pub name: Option<&'a str>,
     pub params: u32,
     pub body: u32,
 }
@@ -41,7 +42,7 @@ enum IdentifierVariant {
     Module,
     Type,
     Instance,
-    Member,
+    Member, // e.g. for point.x would be "x"
 }
 
 struct Identifier<'a> {
@@ -52,8 +53,8 @@ struct Identifier<'a> {
 
 struct Operation {
     pub op: TokenType,
-    pub lhs: u32,
-    pub rhs: u32,
+    pub operand1: Option<u32>,
+    pub operand2: Option<u32>,
 }
 
 enum ExprVariant<'a> {
@@ -61,16 +62,19 @@ enum ExprVariant<'a> {
     FloatLiteral(f64),
     StringLiteral(&'a str),
 
-    FunctionLiteral(Function<'a>),
-
-    TypeLiteral(TypeLiteral<'a>),
+    Identifier(Identifier<'a>),
 
     Operation(Operation),
+
+    FunctionLiteral(FunctionLiteral<'a>),
+
+    TypeLiteral(TypeLiteral<'a>),
 }
 
 struct Expr<'a> {
     pub tokens: &'a [Token<'a>],
 
+    // ID of language type
     pub etype: u32,
 
     pub variant: ExprVariant<'a>,
@@ -107,7 +111,7 @@ struct Member<'a> {
 // - module
 // - type (e.g. Integer)
 struct Scope<'a> {
-    pub name: &'a str,
+    pub name: Option<&'a str>,
     pub variant: ScopeVariant,
 
     pub parent_scope: u32,
