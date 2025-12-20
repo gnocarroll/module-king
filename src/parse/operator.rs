@@ -32,13 +32,6 @@ pub struct OperatorInfo {
     pub is_rhs_optional: bool,
 }
 
-static DEFAULT_OP_INFO : OperatorInfo = OperatorInfo{
-    ttype: TokenType::Plus,
-    variant: Infix,
-    assoc: Assoc::Left,
-    is_rhs_optional: false,
-};
-
 // very large table defining all language operators alongside info for parsing
 // e.g. token for operator, is it infix, does it have left associativity
 // later in table => higher binding power
@@ -393,36 +386,32 @@ static OP_INFO_TABLE : &[&[OperatorInfo]] = &[
     ],
 ];
 
-// includes binding power
+// struct for recording left, right binding powers of operators in a table
 #[derive(Clone, Copy)]
-pub struct BpAndOperatorInfo {
+pub struct OperatorBp {
     // used in a table where some entries will be empty
     pub is_empty: bool,
 
     // left, right binding power for parsing exprs
-    pub left_bp: usize,
-    pub right_bp: usize,
-
-    // reference to relevant operator info
-    pub op_info: &'static OperatorInfo,
+    pub left_bp: u8,
+    pub right_bp: u8,
 }
 
 // generates mapping from (TokenType, OperatorVariant e.g. Infix)
-// to OperatorInfo and binding power
-fn generate_type_to_operator_info() -> [
-    [BpAndOperatorInfo; OperatorVariantCount as usize];
+// to binding power
+fn generate_ttype_to_operator_bp() -> [
+    [OperatorBp; OperatorVariantCount as usize];
     TokenType::TokenTypeCount as usize
 ]{
     let mut table: [
-        [BpAndOperatorInfo; OperatorVariantCount as usize];
+        [OperatorBp; OperatorVariantCount as usize];
         TokenType::TokenTypeCount as usize
     ] = [
         [
-            BpAndOperatorInfo{
+            OperatorBp{
                 is_empty: true,
                 left_bp: 0,
                 right_bp: 0,
-                op_info: &DEFAULT_OP_INFO,
             };
             OperatorVariantCount as usize
         ];
@@ -440,8 +429,8 @@ fn generate_type_to_operator_info() -> [
 
             ret_entry.is_empty = false;
 
-            ret_entry.left_bp = bp;
-            ret_entry.right_bp = bp;
+            ret_entry.left_bp = bp as u8;
+            ret_entry.right_bp = bp as u8;
 
             // for correct parsing need to modify based on Assoc
             if op_info.assoc == Assoc::Left {
@@ -450,8 +439,6 @@ fn generate_type_to_operator_info() -> [
             else {
                 ret_entry.left_bp += 1;
             }
-
-            ret_entry.op_info = op_info;
         }
     }
 
@@ -460,26 +447,26 @@ fn generate_type_to_operator_info() -> [
 
 // maps (TokenType, OperatorVariant) -> Binding Power And OperatorInfo
 // so if you have (Plus, Infix) you will find the info for the binary plus
-static TTYPE_TO_OPERATOR_INFO: LazyLock<[
-    [BpAndOperatorInfo; OperatorVariantCount as usize];
+static TTYPE_TO_OPERATOR_BP: LazyLock<[
+    [OperatorBp; OperatorVariantCount as usize];
     TokenType::TokenTypeCount as usize
-]> = LazyLock::new(generate_type_to_operator_info);
+]> = LazyLock::new(generate_ttype_to_operator_bp);
 
 // function which will be used during parsing to access info from this Rust
 // file test if given token is an operator with given OperatorVariant
 // e.g. does there exist an Infix operator whose token is Plus? (Yes)
-// and then you will receive info if it is present
-pub fn get_bp_and_op_info(
+// and then you will receive (left_bp, right_bp) if it is present
+pub fn get_bp(
     ttype: TokenType,
     op_variant: OperatorVariant,
-) -> Option<BpAndOperatorInfo> {
+) -> Option<(u8, u8)> {
     if ttype == TokenType::TokenTypeCount || op_variant == OperatorVariantCount {
         return None;
     }
 
     // access relevant entry in table and if it is not empty then return it
 
-    let maybe_ret: BpAndOperatorInfo = TTYPE_TO_OPERATOR_INFO[
+    let maybe_ret: OperatorBp = TTYPE_TO_OPERATOR_BP[
         ttype as usize
     ][
         op_variant as usize
@@ -489,5 +476,5 @@ pub fn get_bp_and_op_info(
         return None;
     }
 
-    Some(maybe_ret)
+    Some((maybe_ret.left_bp, maybe_ret.right_bp))
 }
