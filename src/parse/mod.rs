@@ -3,7 +3,7 @@ pub mod operator;
 
 use std::{collections::HashMap};
 
-use crate::scan::{Token, TokenType};
+use crate::{parse::errors::NameMismatch, scan::{Token, TokenType}};
 use errors::{ParseError, SemanticError, ExpectedToken};
 
 #[derive(Clone, Copy, PartialEq)]
@@ -351,6 +351,115 @@ impl AST {
         Ok(ret)
     }
 
+    fn test_name_match(
+        &mut self,
+        tokens: &mut Tokens,
+        expected: Token,
+        found: Token,
+    ) -> Result<(), NameMismatch> {
+        if tokens.tok_as_str(&expected) == tokens.tok_as_str(&found) {
+            Ok(())
+        }
+        else {
+            let ret = NameMismatch{
+                expected: expected,
+                found: found,
+            };
+
+            self.parse_errors.push(ParseError::NameMismatch(ret));
+
+            Err(ret)
+        }
+    }
+
+    // NOTE: this function assumes "function" is upcoming token so that should
+    // have been checked at call site
+    fn parse_function(&mut self, tokens: &mut Tokens) -> u32 {
+        let tok_idx = tokens.idx();        
+
+        tokens.next();
+
+        let tok = tokens.peek();
+
+        let name = match tok.ttype {
+            TokenType::Identifier => {
+                Some(tok)
+            },
+            _ => None,
+        };
+
+        // having this in lambda makes it easy to jump ahead if failure occurs
+        // it is Temu goto
+        let attempt_parse_func = |
+            ast: &mut AST,
+            tokens: &mut Tokens,
+            name: Option<Token>,
+        | {
+            if ast.expect(tokens, TokenType::LParen).is_err() {
+                return (
+                    false,
+                    ast.expr_unit(tokens.idx()),
+                    ast.expr_unit(tokens.idx()),
+                );
+            }
+
+            let params = ast.parse_expr(tokens);
+
+            if ast.expect_sequence(
+                tokens,
+                &[TokenType::RParen, TokenType::Begin],
+            ).is_err() {
+                return (false, params, ast.expr_unit(tokens.idx()));
+            }
+
+            let body = ast.parse_expr(tokens);
+
+            if ast.expect(tokens, TokenType::End).is_err() {
+                return (false, params, body);
+            }
+
+            let success = if let Some(name_tok) = name {
+                let result = ast.expect(
+                    tokens,
+                    TokenType::Identifier,
+                );
+
+                if let Ok(t) = result {
+                    // compare start, end function names
+                    let _ = ast.test_name_match(tokens, name_tok, t);
+                }
+
+                result.is_ok()
+            }
+            else {
+                ast.expect(tokens, TokenType::Function).is_ok()
+            };
+
+            (success, params, body)
+        };
+
+        let (success, params, body) = attempt_parse_func(
+            self,
+            tokens,
+            name,
+        );
+
+        if !success {
+            // TODO: sync tokens
+        }
+
+        self.expr_push(Expr {
+            tok: tok_idx,
+            end_tok: tokens.idx(), // TODO: correct
+            etype: 0,
+            variant: ExprVariant::FunctionLiteral(FunctionLiteral {
+                name: name,
+                params: params,
+                body: body,
+            })
+        })
+    }
+
     // atom e.g. literal like integer
     fn parse_atom(&mut self, tokens: &mut Tokens) -> u32 {
         let tok_idx = tokens.idx();
@@ -388,81 +497,7 @@ impl AST {
                     }
                 })
             },
-            TokenType::Function => { // function literal
-                tokens.next();
-
-                let tok = tokens.peek();
-
-                let name = match tokens.peek().ttype {
-                    TokenType::Identifier => {
-                        Some(tok)
-                    },
-                    _ => None,
-                };
-
-                let attempt_parse_func = |
-                    ast: &mut AST,
-                    tokens: &mut Tokens,
-                | {
-                    if ast.expect(tokens, TokenType::LParen).is_err() {
-                        return (
-                            false,
-                            ast.expr_unit(tokens.idx()),
-                            ast.expr_unit(tokens.idx()),
-                        );
-                    }
-
-                    let params = ast.parse_expr(tokens);
-
-                    if ast.expect_sequence(
-                        tokens,
-                        &[TokenType::RParen, TokenType::Begin],
-                    ).is_err() {
-                        return (false, params, ast.expr_unit(tokens.idx()));
-                    }
-
-                    let body = ast.parse_expr(tokens);
-
-                    if ast.expect(tokens, TokenType::End).is_err() {
-                        return (false, params, body);
-                    }
-
-                    let success = if name.is_some() {
-                        let result = self.expect(
-                            tokens,
-                            TokenType::Identifier,
-                        );
-
-                        if let Ok(t) = result {
-                            
-                        }
-
-                        result.is_ok()
-                    }
-                    else {
-                        self.expect(tokens, TokenType::Function).is_ok()
-                    };
-
-                    (success, params, body)
-                };
-
-                let (success, params, body) = attempt_parse_func(self, tokens);
-
-                if !success {
-                    // TODO: sync tokens
-                }
-
-                self.expr_push(Expr {
-                    tok: tok_idx,
-                    end_tok: tokens.idx(), // TODO: correct
-                    etype: 0,
-                    variant: ExprVariant::FunctionLiteral(FunctionLiteral {
-                        name: name,
-                        params: params,
-                        body: body,
-                    })
-                })
-            },
+            TokenType::Function => self.parse_function(tokens),
             // if no atom or other (e.g. prefix) expr is found return Unit
             _ => self.expr_unit(tok_idx),
         }
