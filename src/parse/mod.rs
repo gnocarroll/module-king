@@ -192,7 +192,7 @@ impl<'a> Tokens<'a> {
         self._peek_nth(-1)
     }
 
-    pub fn expect(&'a mut self, ttype: TokenType) -> Result<Token, ExpectedToken> {
+    pub fn expect(&mut self, ttype: TokenType) -> Result<Token, ExpectedToken> {
         let maybe_ret = self.peek();
 
         if maybe_ret.ttype != ttype {
@@ -258,9 +258,90 @@ impl AST {
         })
     }
 
-    fn parse_lhs(&mut self, tokens: &mut Tokens, min_bp: u8) -> u32 {
-        let tok = tokens.peek();
+    fn expr_prefix(&mut self, op: Token, rhs: u32) -> u32 {     
+        self.expr_push(Expr {
+            tok: self.expr(rhs).tok - 1,
+            end_tok: self.expr(rhs).end_tok,
+            etype: 0,
+            variant: ExprVariant::Operation(Operation {
+                op: op.ttype,
+                operand1: Some(rhs),
+                operand2: None,
+            }),
+        })
+    }
+
+    fn expr_around(
+        &mut self,
+        op: Token,
+        rhs: u32,
+        found_end: bool,
+    ) -> u32 {     
+        self.expr_push(Expr {
+            tok: self.expr(rhs).tok - 1,
+            end_tok: self.expr(rhs).end_tok + if found_end {
+                1
+            } else {
+                0
+            },
+            etype: 0,
+            variant: ExprVariant::Operation(Operation {
+                op: op.ttype,
+                operand1: Some(rhs),
+                operand2: None,
+            }),
+        })
+    }
+
+    fn parse_lhs(&mut self, tokens: &mut Tokens) -> u32 {
         let tok_idx = tokens.idx();
+        let tok = tokens.peek();
+
+        // see if you have prefix op
+
+        match operator::get_bp(tok.ttype, Prefix) {
+            Some((_, r_bp)) => {
+                tokens.next();
+
+                let rhs = self.parse_expr_bp(tokens, r_bp);
+
+                return self.expr_prefix(
+                    tok,
+                    rhs,
+                );
+            },
+            _ => {},
+        }
+
+        // around e.g. (1)
+
+        match operator::get_bp(tok.ttype, Around) {
+            Some(_) => {
+                tokens.next();
+
+                let rhs = self.parse_expr(tokens);
+
+                let mut found_end = false;
+
+                match tokens.expect(match tok.ttype {
+                    TokenType::LParen => TokenType::RParen,
+                    TokenType::LBrace => TokenType::RBrace,
+                    _ => panic!("unexpected ttype for Around"),
+                }) {
+                    Ok(_) => {
+                        found_end = true;
+                    },
+                    Err(e) => {
+                        self.parse_errors.push(
+                            ParseError::ExpectedToken(e),
+                        );
+                    },
+                }
+
+                return self.expr_around(tok, rhs, found_end);
+            },
+            _ => {},
+        }
 
         match tok.ttype {
             // single token (e.g. integer) literals
@@ -273,12 +354,12 @@ impl AST {
                     etype: 0,
                     variant: match tok.ttype {
                         TokenType::Integer => ExprVariant::IntegerLiteral(
-                            str::parse::<u64>(tokens.tok_as_str(&tok)).expect(
+                            tokens.tok_as_str(&tok).parse::<u64>().expect(
                                 "integer scanning or getting token text is broken",
                             ),
                         ),
                         TokenType::Float => ExprVariant::FloatLiteral(
-                            str::parse::<f64>(tokens.tok_as_str(&tok)).expect(
+                            tokens.tok_as_str(&tok).parse::<f64>().expect(
                                 "float scanning or getting token text is broken",
                             ),
                         ),
@@ -294,7 +375,7 @@ impl AST {
 
     // bp is Binding Power (Pratt parsing) and ret is expr id
     fn parse_expr_bp(&mut self, tokens: &mut Tokens, min_bp: u8) -> u32 {
-        let mut lhs = self.parse_lhs(tokens, min_bp);
+        let mut lhs = self.parse_lhs(tokens);
 
         if self.expr(lhs).is_unit() {
             return lhs;
@@ -330,6 +411,42 @@ impl AST {
     fn parse_expr(&mut self, tokens: &mut Tokens) -> u32 {
         self.parse_expr_bp(tokens, 0)
     }
+
+    pub fn expr_to_string(&self, tokens: &Tokens, expr: u32) -> String {
+        if expr >= self.exprs.len() as u32 {
+            return "".to_string();
+        }
+
+        let expr_ref = self.expr(expr);
+
+        match &expr_ref.variant {
+            ExprVariant::Unit => "()".to_string(),
+            ExprVariant::IntegerLiteral(i) => i.to_string(),
+            ExprVariant::FloatLiteral(f) => f.to_string(),
+            ExprVariant::StringLiteral(t) => {
+                tokens.tok_as_str(&t).to_string()
+            },
+            ExprVariant::Operation(operation) => {
+                let operand_to_string = |operand: Option<u32>| {
+                    match operand {
+                        Some(id) => format!(
+                            " {}",
+                            self.expr_to_string(tokens, id),
+                        ),
+                        None => "".to_string()
+                    }
+                };
+                
+                format!(
+                    "({}{}{})",
+                    operation.op,
+                    operand_to_string(operation.operand1),
+                    operand_to_string(operation.operand2),
+                )
+            },
+            _ => "ERR".to_string(),
+        }
+    }
 }
 
 // public function to perform syntactic + semantic analysis
@@ -339,7 +456,9 @@ pub fn parse_file(file_str: &str, tokens: &Vec<Token>) -> AST {
 
     // call to parse_expr does syntactic analysis
 
-    let _root = ast.parse_expr(&mut tokens);
+    let root = ast.parse_expr(&mut tokens);
+
+    println!("{}", ast.expr_to_string(&tokens, root));
 
     // TODO: semantic analysis
 
