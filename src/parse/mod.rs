@@ -124,16 +124,25 @@ struct Scope {
 }
 
 struct Tokens<'a> {
+    file_str: &'a str,
     tokens: &'a Vec<Token>,
+
+    // token not file offset
     offset: usize,
 }
 
 impl<'a> Tokens<'a> {
-    fn new(tokens: &'a Vec<Token>) -> Self {
+    fn new(file_str: &'a str, tokens: &'a Vec<Token>) -> Self {
         Tokens{
+            file_str,
             tokens: tokens,
             offset: 0,
         }
+    }
+
+    // Token -> &str
+    pub fn tok_as_str(&self, token: &Token) -> &str {
+        token.as_str(self.file_str)
     }
 
     // 0-indexed (e.g. 0 is the same as just calling peek())
@@ -210,9 +219,9 @@ impl AST {
 }
 
 // public function to perform syntactic + semantic analysis
-pub fn parse_file(tokens: &Vec<Token>) -> AST {
+pub fn parse_file(file_str: &str, tokens: &Vec<Token>) -> AST {
     let mut ast = AST::default();
-    let mut tokens = Tokens::new(tokens);
+    let mut tokens = Tokens::new(file_str, tokens);
 
     // call to parse_expr does syntactic analysis
 
