@@ -338,8 +338,15 @@ impl AST {
     }
 
     // expect sequence of tokens, success is Unit since will not allocate vec
-    fn expect_sequence(&mut self, tokens: &mut Tokens, ttype: TokenType) -> Result<(), ExpectToken> {
-        
+    fn expect_sequence(&mut self, tokens: &mut Tokens, ttypes: &[TokenType]) -> Result<(), ExpectedToken> {
+        for ttype in ttypes {
+            match self.expect(tokens, *ttype) {
+                Ok(_) => (),
+                Err(e) => return Err(e),
+            }
+        }
+
+        Ok(())
     }
 
     // atom e.g. literal like integer
@@ -395,15 +402,26 @@ impl AST {
                     ast: &mut AST,
                     tokens: &mut Tokens,
                 | {
+                    let mut params: Option<u32> = None;
+                    let mut body: Option<u32> = None;
+
+                    let ret = |success: bool| (
+                        success,
+                        params.unwrap_or_else(|| ast.expr_unit(tokens.idx())),
+                        body.unwrap_or_else(|| ast.expr_unit(tokens.idx())),
+                    );
+
                     if ast.expect(tokens, TokenType::LParen).is_err() {
-                        return (false, ast.expr_unit(tokens.idx()), ast.expr_unit(tokens.idx()));
+                        return (
+                            false,
+                            ast.expr_unit(tokens.idx()),
+                            ast.expr_unit(tokens.idx()),
+                        );
                     }
 
                     let params = ast.parse_expr(tokens);
 
-                    if
-                        ast.expect(tokens, TokenType::RParen).is_err() ||
-                        ast.expect(tokens, TokenType::Begin).is_err()
+                    if ast.expect_sequence(tokens, &[TokenType::RParen, TokenType::Begin]).is_err() ||
                     {
                         return (false, params, ast.expr_unit(tokens.idx()));
                     }
