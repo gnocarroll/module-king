@@ -260,34 +260,35 @@ impl AST {
 
     fn parse_lhs(&mut self, tokens: &mut Tokens, min_bp: u8) -> u32 {
         let tok = tokens.peek();
+        let tok_idx = tokens.idx();
 
         match tok.ttype {
+            // single token (e.g. integer) literals
             TokenType::Integer | TokenType::Float | TokenType::String => {
-                let idx = tokens.idx();
-
                 tokens.next();
 
                 self.expr_push(Expr {
-                    tok: idx,
-                    end_tok: idx + 1,
+                    tok: tok_idx,
+                    end_tok: tok_idx + 1,
                     etype: 0,
                     variant: match tok.ttype {
                         TokenType::Integer => ExprVariant::IntegerLiteral(
                             str::parse::<u64>(tokens.tok_as_str(&tok)).expect(
                                 "integer scanning or getting token text is broken",
-                            )
+                            ),
                         ),
                         TokenType::Float => ExprVariant::FloatLiteral(
                             str::parse::<f64>(tokens.tok_as_str(&tok)).expect(
                                 "float scanning or getting token text is broken",
-                            )
+                            ),
                         ),
                         TokenType::String => ExprVariant::StringLiteral(tok),
-                        _ => panic!("literal parsing broken"),
+                        _ => panic!("single token literal parsing broken"),
                     }
                 })
             },
-            _ => self.expr_unit(),
+            // if no atom or other (e.g. prefix) expr is found return Unit
+            _ => self.expr_unit(tok_idx),
         }
     }
 
