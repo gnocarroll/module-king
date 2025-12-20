@@ -74,7 +74,7 @@ enum ExprVariant<'a> {
 }
 
 struct Expr<'a> {
-    pub tokens: &'a [Token<'a>],
+    pub tokens: &'a [Token],
 
     // ID of language type
     pub etype: u32,
@@ -122,12 +122,12 @@ struct Scope<'a> {
 }
 
 struct Tokens<'a> {
-    tokens: &'a Vec<Token<'a>>,
+    tokens: &'a Vec<Token>,
     offset: usize,
 }
 
 impl<'a> Tokens<'a> {
-    fn new(tokens: &'a Vec<Token<'a>>) -> Self {
+    fn new(tokens: &'a Vec<Token>) -> Self {
         Tokens{
             tokens: tokens,
             offset: 0,
@@ -135,31 +135,33 @@ impl<'a> Tokens<'a> {
     }
 
     // 0-indexed (e.g. 0 is the same as just calling peek())
-    fn _peek_nth(&self, idx: isize) -> Token<'_> {
+    fn _peek_nth(&self, idx: isize) -> Token {
         let mut idx = idx + (self.offset as isize);
 
         if idx < 0 {
             idx = 0;
         }
 
+        // cost of cloning is ACCEPTABLE fr
+
         match self.tokens.get(idx as usize) {
-            Some(t) => *t,
+            Some(t) => t.clone(),
             None => match self.tokens.last() {
-                Some(t) => *t,
+                Some(t) => t.clone(),
                 None => Token::default(),
             }
         }
     }
     
-    pub fn peek_nth(&self, idx: usize) -> Token<'_> {
+    pub fn peek_nth(&self, idx: usize) -> Token {
         self._peek_nth(idx as isize)
     }
 
-    pub fn peek(&self) -> Token<'_> {
+    pub fn peek(&self) -> Token {
         self.peek_nth(0)
     }
 
-    pub fn next(&mut self) -> Token<'_> {
+    pub fn next(&mut self) -> Token {
         if self.offset < self.tokens.len() - 1 {
             self.offset += 1;
         }
@@ -167,10 +169,8 @@ impl<'a> Tokens<'a> {
         self._peek_nth(-1)
     }
 
-    pub fn expect(&'a mut self, ttype: TokenType) -> Result<Token<'a>, ExpectedToken<'a>> {
+    pub fn expect(&'a mut self, ttype: TokenType) -> Result<Token, ExpectedToken> {
         let maybe_ret = self.peek();
-
-        let maybe_ret = maybe_ret;
 
         if maybe_ret.ttype != ttype {
             return Err(ExpectedToken{
@@ -196,12 +196,12 @@ pub struct AST<'a> {
     scopes: Vec<Scope<'a>>,
     members: Vec<Member<'a>>,
 
-    parse_errors: Vec<ParseError<'a>>,
+    parse_errors: Vec<ParseError>,
     semantic_errors: Vec<SemanticError>,
 }
 
 // public function to perform syntactic + semantic analysis
-pub fn parse_file<'a>(tokens: &Vec<Token<'a>>) -> AST<'a> {
+pub fn parse_file<'a>(tokens: &Vec<Token>) -> AST<'a> {
     let ast = AST::default();
     let tokens = Tokens::new(tokens);
 
