@@ -200,15 +200,25 @@ pub struct AST<'a> {
     semantic_errors: Vec<SemanticError>,
 }
 
-// public function to perform syntactic + semantic analysis
-pub fn parse_file<'a>(tokens: &Vec<Token>) -> AST<'a> {
-    let ast = AST::default();
-    let tokens = Tokens::new(tokens);
-
-
-    ast
+impl AST<'_> {
+    // ret expr id
+    pub fn parse_expr(&mut self, tokens: &mut Tokens) -> u32 {
+        0
+    }
 }
 
-impl AST<'_> {
-    
+// public function to perform syntactic + semantic analysis
+pub fn parse_file<'a>(tokens: &Vec<Token>) -> AST<'a> {
+    let mut ast = AST::default();
+    let mut tokens = Tokens::new(tokens);
+
+    // call to parse_expr does syntactic analysis
+
+    ast.parse_expr(&mut tokens);
+
+    // TODO: semantic analysis
+
+    // ...
+
+    ast
 }
