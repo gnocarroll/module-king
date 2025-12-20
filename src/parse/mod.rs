@@ -60,6 +60,7 @@ struct Operation {
 }
 
 enum ExprVariant {
+    Unit,
     IntegerLiteral(u64),
     FloatLiteral(f64),
     StringLiteral(Token),
@@ -82,6 +83,15 @@ struct Expr {
     pub etype: u32,
 
     pub variant: ExprVariant,
+}
+
+impl Expr {
+    pub fn is_unit(&self) -> bool {
+        match self.variant {
+            ExprVariant::Unit => true,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -145,6 +155,10 @@ impl<'a> Tokens<'a> {
         token.as_str(self.file_str)
     }
 
+    pub fn idx(&self) -> u32 {
+        self.offset as u32
+    }
+
     // 0-indexed (e.g. 0 is the same as just calling peek())
     fn _peek_nth(&self, idx: isize) -> Token {
         let mut idx = idx + (self.offset as isize);
@@ -153,12 +167,10 @@ impl<'a> Tokens<'a> {
             idx = 0;
         }
 
-        // cost of cloning is ACCEPTABLE fr
-
         match self.tokens.get(idx as usize) {
-            Some(t) => t.clone(),
+            Some(t) => *t,
             None => match self.tokens.last() {
-                Some(t) => t.clone(),
+                Some(t) => *t,
                 None => Token::default(),
             }
         }
@@ -211,10 +223,111 @@ pub struct AST {
     semantic_errors: Vec<SemanticError>,
 }
 
+use operator::OperatorVariant::*;
+
 impl AST {
+    fn expr(&self, expr: u32) -> &Expr {
+        &self.exprs[expr as usize]
+    }
+
+    fn expr_unit(&mut self, tok_idx: u32) -> u32 {
+        self.expr_push(Expr{
+            tok: tok_idx,
+            end_tok: tok_idx,
+            etype: 0,
+            variant: ExprVariant::Unit,
+        })
+    }
+
+    fn expr_push(&mut self, expr: Expr) -> u32 {
+        self.exprs.push(expr);
+
+        (self.exprs.len() - 1) as u32
+    }
+
+    fn expr_infix(&mut self, op: Token, lhs: u32, rhs: u32) -> u32 {
+        self.expr_push(Expr {
+            tok: self.expr(lhs).tok,
+            end_tok: self.expr(rhs).end_tok,
+            etype: 0,
+            variant: ExprVariant::Operation(Operation{
+                op: op.ttype,
+                operand1: Some(lhs),
+                operand2: Some(rhs),
+            })
+        })
+    }
+
+    fn parse_lhs(&mut self, tokens: &mut Tokens, min_bp: u8) -> u32 {
+        let tok = tokens.peek();
+
+        match tok.ttype {
+            TokenType::Integer | TokenType::Float | TokenType::String => {
+                let idx = tokens.idx();
+
+                tokens.next();
+
+                self.expr_push(Expr {
+                    tok: idx,
+                    end_tok: idx + 1,
+                    etype: 0,
+                    variant: match tok.ttype {
+                        TokenType::Integer => ExprVariant::IntegerLiteral(
+                            str::parse::<u64>(tokens.tok_as_str(&tok)).expect(
+                                "integer scanning or getting token text is broken",
+                            )
+                        ),
+                        TokenType::Float => ExprVariant::FloatLiteral(
+                            str::parse::<f64>(tokens.tok_as_str(&tok)).expect(
+                                "float scanning or getting token text is broken",
+                            )
+                        ),
+                        TokenType::String => ExprVariant::StringLiteral(tok),
+                        _ => panic!("literal parsing broken"),
+                    }
+                })
+            },
+            _ => self.expr_unit(),
+        }
+    }
+
+    // bp is Binding Power (Pratt parsing) and ret is expr id
+    fn parse_expr_bp(&mut self, tokens: &mut Tokens, min_bp: u8) -> u32 {
+        let mut lhs = self.parse_lhs(tokens, min_bp);
+
+        if self.expr(lhs).is_unit() {
+            return lhs;
+        }
+
+        loop {
+            let op = tokens.peek();
+
+            let (l_bp, r_bp) = match operator::get_bp(op.ttype, Infix) {
+                Some(bp) => bp,
+                None => break,
+            };
+
+            if l_bp < min_bp {
+                break;
+            }
+
+            tokens.next();
+
+            let rhs = self.parse_expr_bp(tokens, r_bp);
+
+            lhs = self.expr_infix(
+                op,
+                lhs,
+                rhs,
+            );
+        }
+
+        lhs
+    }
+
     // ret expr id
-    pub fn parse_expr(&mut self, tokens: &mut Tokens) -> u32 {
-        0
+    fn parse_expr(&mut self, tokens: &mut Tokens) -> u32 {
+        self.parse_expr_bp(tokens, 0)
     }
 }
 
@@ -225,7 +338,7 @@ pub fn parse_file(file_str: &str, tokens: &Vec<Token>) -> AST {
 
     // call to parse_expr does syntactic analysis
 
-    ast.parse_expr(&mut tokens);
+    let _root = ast.parse_expr(&mut tokens);
 
     // TODO: semantic analysis
 

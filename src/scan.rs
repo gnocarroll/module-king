@@ -399,14 +399,14 @@ impl TokenType {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct Token {
     pub ttype: TokenType,
-    pub line: u32,
-    pub column: u32,
+    pub line: u16,
+    pub column: u16,
 
     // NOTE: end_column is NOT inclusive
-    pub end_column: u32,
+    pub end_column: u16,
 
     // overall offset in file
     pub offset: u32,
@@ -415,7 +415,7 @@ pub struct Token {
 impl Token {
     // s is string where Token was sourced from
     pub fn as_str<'a>(&self, s: &'a str) -> &'a str {
-        &s[self.offset as usize..(self.offset + self.end_column - self.column) as usize]
+        &s[self.offset as usize..(self.offset + self.end_column as u32 - self.column as u32) as usize]
     }
 }
 
@@ -521,14 +521,14 @@ pub fn tokenize(
             ttype: match_ttype,
             line: line,
             column: column,
-            end_column: column + max_match as u32,
+            end_column: column + max_match as u16,
             offset: offset as u32,
         });
 
         // advance column, chars iterator, and offset
 
         offset += max_match;
-        column += max_match as u32;
+        column += max_match as u16;
         chars.nth(max_match - 1);
     }
 
