@@ -15,9 +15,9 @@ enum TypeVariant {
     Variant, // tagged union (can have fields which are just tag)
 }
 
-struct TypeLiteral<'a> {
+struct TypeLiteral {
     // may be empty str if type literal does not provide name
-    pub name: Option<&'a str>,
+    pub name: Option<Token>,
     
     pub variant: TypeVariant,
 
@@ -32,8 +32,8 @@ enum ScopeVariant {
     Type,
 }
 
-struct FunctionLiteral<'a> {
-    pub name: Option<&'a str>,
+struct FunctionLiteral {
+    pub name: Option<Token>,
     pub params: u32,
     pub body: u32,
 }
@@ -47,8 +47,8 @@ enum IdentifierVariant {
     Member, // e.g. for point.x would be "x"
 }
 
-struct Identifier<'a> {
-    pub name: &'a str,
+struct Identifier {
+    pub name: Token,
 
     pub variant: IdentifierVariant,
 }
@@ -59,27 +59,29 @@ struct Operation {
     pub operand2: Option<u32>,
 }
 
-enum ExprVariant<'a> {
+enum ExprVariant {
     IntegerLiteral(u64),
     FloatLiteral(f64),
-    StringLiteral(&'a str),
+    StringLiteral(Token),
 
-    Identifier(Identifier<'a>),
+    Identifier(Identifier),
 
     Operation(Operation),
 
-    FunctionLiteral(FunctionLiteral<'a>),
+    FunctionLiteral(FunctionLiteral),
 
-    TypeLiteral(TypeLiteral<'a>),
+    TypeLiteral(TypeLiteral),
 }
 
-struct Expr<'a> {
-    pub tokens: &'a [Token],
+struct Expr {
+    // token indices range for expression (end_tok is not inclusive)
+    pub tok: u32,
+    pub end_tok: u32,
 
     // ID of language type
     pub etype: u32,
 
-    pub variant: ExprVariant<'a>,
+    pub variant: ExprVariant,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -97,8 +99,8 @@ enum MemberVariant {
     Instance,
 }
 
-struct Member<'a> {
-    pub name: &'a str,
+struct Member {
+    pub name: Token,
     pub visibility: Visibility,
 
     pub variant: MemberVariant,
@@ -112,13 +114,13 @@ struct Member<'a> {
 // a scope may refer to a scope for a code block or
 // - module
 // - type (e.g. Integer)
-struct Scope<'a> {
-    pub name: Option<&'a str>,
+struct Scope {
+    pub name: Option<Token>,
     pub variant: ScopeVariant,
 
     pub parent_scope: u32,
 
-    pub members: HashMap<&'a str, u32>,
+    pub members: HashMap<Token, u32>,
 }
 
 struct Tokens<'a> {
@@ -188,19 +190,19 @@ impl<'a> Tokens<'a> {
 // NOTE: AST is used for syntax and semantic analysis since I think
 // it simplifies things
 #[derive(Default)]
-pub struct AST<'a> {
+pub struct AST {
     // exprs used in initial parsing and semantic analysis stage
-    exprs: Vec<Expr<'a>>,
+    exprs: Vec<Expr>,
 
     // scopes, members not used until semantic analysis stage
-    scopes: Vec<Scope<'a>>,
-    members: Vec<Member<'a>>,
+    scopes: Vec<Scope>,
+    members: Vec<Member>,
 
     parse_errors: Vec<ParseError>,
     semantic_errors: Vec<SemanticError>,
 }
 
-impl AST<'_> {
+impl AST {
     // ret expr id
     pub fn parse_expr(&mut self, tokens: &mut Tokens) -> u32 {
         0
@@ -208,7 +210,7 @@ impl AST<'_> {
 }
 
 // public function to perform syntactic + semantic analysis
-pub fn parse_file<'a>(tokens: &Vec<Token>) -> AST<'a> {
+pub fn parse_file(tokens: &Vec<Token>) -> AST {
     let mut ast = AST::default();
     let mut tokens = Tokens::new(tokens);
 
