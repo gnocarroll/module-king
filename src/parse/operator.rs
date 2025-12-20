@@ -42,7 +42,7 @@ static DEFAULT_OP_INFO : OperatorInfo = OperatorInfo{
 // very large table defining all language operators alongside info for parsing
 // e.g. token for operator, is it infix, does it have left associativity
 // later in table => higher binding power
-pub static OP_INFO_TABLE : &[&[OperatorInfo]] = &[
+static OP_INFO_TABLE : &[&[OperatorInfo]] = &[
     &[
         OperatorInfo{
             ttype: TokenType::Semicolon,
@@ -396,9 +396,14 @@ pub static OP_INFO_TABLE : &[&[OperatorInfo]] = &[
 // includes binding power
 #[derive(Clone, Copy)]
 pub struct BpAndOperatorInfo {
+    // used in a table where some entries will be empty
     pub is_empty: bool,
+
+    // left, right binding power for parsing exprs
     pub left_bp: usize,
     pub right_bp: usize,
+
+    // reference to relevant operator info
     pub op_info: &'static OperatorInfo,
 }
 
@@ -438,6 +443,7 @@ fn generate_type_to_operator_info() -> [
             ret_entry.left_bp = bp;
             ret_entry.right_bp = bp;
 
+            // for correct parsing need to modify based on Assoc
             if op_info.assoc == Assoc::Left {
                 ret_entry.right_bp += 1;
             }
@@ -454,7 +460,30 @@ fn generate_type_to_operator_info() -> [
 
 // maps (TokenType, OperatorVariant) -> Binding Power And OperatorInfo
 // so if you have (Plus, Infix) you will find the info for the binary plus
-pub static TTYPE_TO_OPERATOR_INFO: LazyLock<[
+static TTYPE_TO_OPERATOR_INFO: LazyLock<[
     [BpAndOperatorInfo; OperatorVariantCount as usize];
     TokenType::TokenTypeCount as usize
 ]> = LazyLock::new(generate_type_to_operator_info);
+
+// function which will be used during parsing to access info from this Rust
+// file test if given token is an operator with given OperatorVariant
+// e.g. does there exist an Infix operator whose token is Plus? (Yes)
+// and then you will receive info if it is present
+pub fn get_bp_and_op_info(
+    ttype: TokenType,
+    op_variant: OperatorVariant,
+) -> Option<BpAndOperatorInfo> {
+    if ttype == TokenType::TokenTypeCount || op_variant == OperatorVariantCount {
+        return None;
+    }
+
+    // access relevant entry in table and if it is not empty then return it
+
+    let maybe_ret = TTYPE_TO_OPERATOR_INFO[ttype as usize][op_variant as usize];
+
+    if maybe_ret.is_empty {
+        return None;
+    }
+
+    Some(maybe_ret)
+}
