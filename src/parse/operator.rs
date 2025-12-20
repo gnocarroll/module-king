@@ -17,12 +17,12 @@ use crate::scan::TokenType;
 
 #[derive(Clone, Copy, PartialEq)]
 
-pub enum Assoc {
+enum Assoc {
     Left, // left-to-right
     Right, // right-to-left
 }
 
-pub struct OperatorInfo {
+struct OperatorInfo {
     pub ttype: TokenType,
 
     pub variant: OperatorVariant,
