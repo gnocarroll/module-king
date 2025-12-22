@@ -1,24 +1,27 @@
 mod errors;
 pub mod operator;
 
-use std::{collections::HashMap};
+use std::collections::HashMap;
 
-use crate::{parse::errors::NameMismatch, scan::{Token, TokenType}};
-use errors::{ParseError, SemanticError, ExpectedToken};
+use crate::{
+    parse::errors::NameMismatch,
+    scan::{Token, TokenType},
+};
+use errors::{ExpectedToken, ParseError, SemanticError};
 
 #[derive(Clone, Copy, PartialEq)]
 enum TypeVariant {
     Integer,
     Float,
-    Struct, // class keyword can also be used for this
-    Enum, // simple C enum
+    Struct,  // class keyword can also be used for this
+    Enum,    // simple C enum
     Variant, // tagged union (can have fields which are just tag)
 }
 
 struct TypeLiteral {
     // may be empty str if type literal does not provide name
     pub name: Option<Token>,
-    
+
     pub variant: TypeVariant,
 
     // body is an Expr
@@ -35,6 +38,7 @@ enum ScopeVariant {
 struct FunctionLiteral {
     pub name: Option<Token>,
     pub params: u32,
+    pub return_type: u32,
     pub body: u32,
 }
 
@@ -102,7 +106,6 @@ enum Visibility {
 }
 
 #[derive(Clone, Copy, PartialEq)]
-
 enum MemberVariant {
     Module,
     Type,
@@ -114,7 +117,7 @@ struct Member {
     pub visibility: Visibility,
 
     pub variant: MemberVariant,
-    
+
     // this refers to:
     // - the scope which this member owns if it is a module or type
     // - the type of this member if this member is an instance
@@ -143,7 +146,7 @@ struct Tokens<'a> {
 
 impl<'a> Tokens<'a> {
     fn new(file_str: &'a str, tokens: &'a Vec<Token>) -> Self {
-        Tokens{
+        Tokens {
             file_str,
             tokens: tokens,
             offset: 0,
@@ -172,10 +175,10 @@ impl<'a> Tokens<'a> {
             None => match self.tokens.last() {
                 Some(t) => *t,
                 None => Token::default(),
-            }
+            },
         }
     }
-    
+
     pub fn peek_nth(&self, idx: usize) -> Token {
         self._peek_nth(idx as isize)
     }
@@ -196,10 +199,10 @@ impl<'a> Tokens<'a> {
         let maybe_ret = self.peek();
 
         if maybe_ret.ttype != ttype {
-            return Err(ExpectedToken{
+            return Err(ExpectedToken {
                 expected: ttype,
                 found: maybe_ret,
-            })
+            });
         }
 
         self.next();
@@ -213,10 +216,7 @@ impl<'a> Tokens<'a> {
         loop {
             let tok = self.peek();
 
-            if
-                tok.ttype == TokenType::Eof ||
-                ttypes.iter().any(|ttype| *ttype == tok.ttype)
-            {
+            if tok.ttype == TokenType::Eof || ttypes.iter().any(|ttype| *ttype == tok.ttype) {
                 return tok;
             }
 
@@ -248,7 +248,7 @@ impl AST {
     }
 
     fn expr_unit(&mut self, tok_idx: u32) -> u32 {
-        self.expr_push(Expr{
+        self.expr_push(Expr {
             tok: tok_idx,
             end_tok: tok_idx,
             etype: 0,
@@ -267,36 +267,28 @@ impl AST {
             tok: self.expr(lhs).tok,
             end_tok: self.expr(rhs).end_tok,
             etype: 0,
-            variant: ExprVariant::Operation(Operation{
+            variant: ExprVariant::Operation(Operation {
                 op: op.ttype,
                 operand1: Some(lhs),
                 operand2: Some(rhs),
-            })
+            }),
         })
     }
 
-    fn expr_postfix_around(
-        &mut self,
-        op: Token,
-        lhs: u32,
-        rhs: u32,
-        found_end: bool,
-    ) -> u32 {
+    fn expr_postfix_around(&mut self, op: Token, lhs: u32, rhs: u32, found_end: bool) -> u32 {
         self.expr_push(Expr {
             tok: self.expr(lhs).tok,
-            end_tok: self.expr(rhs).end_tok + if found_end {
-                1
-            } else { 0 },
+            end_tok: self.expr(rhs).end_tok + if found_end { 1 } else { 0 },
             etype: 0,
-            variant: ExprVariant::Operation(Operation{
+            variant: ExprVariant::Operation(Operation {
                 op: op.ttype,
                 operand1: Some(lhs),
                 operand2: Some(rhs),
-            })
+            }),
         })
     }
 
-    fn expr_prefix(&mut self, op: Token, rhs: u32) -> u32 {     
+    fn expr_prefix(&mut self, op: Token, rhs: u32) -> u32 {
         self.expr_push(Expr {
             tok: self.expr(rhs).tok - 1,
             end_tok: self.expr(rhs).end_tok,
@@ -309,7 +301,7 @@ impl AST {
         })
     }
 
-    fn expr_postfix(&mut self, op: Token, rhs: u32) -> u32 {     
+    fn expr_postfix(&mut self, op: Token, rhs: u32) -> u32 {
         self.expr_push(Expr {
             tok: self.expr(rhs).tok,
             end_tok: self.expr(rhs).end_tok + 1,
@@ -322,19 +314,10 @@ impl AST {
         })
     }
 
-    fn expr_around(
-        &mut self,
-        op: Token,
-        rhs: u32,
-        found_end: bool,
-    ) -> u32 {     
+    fn expr_around(&mut self, op: Token, rhs: u32, found_end: bool) -> u32 {
         self.expr_push(Expr {
             tok: self.expr(rhs).tok - 1,
-            end_tok: self.expr(rhs).end_tok + if found_end {
-                1
-            } else {
-                0
-            },
+            end_tok: self.expr(rhs).end_tok + if found_end { 1 } else { 0 },
             etype: 0,
             variant: ExprVariant::Operation(Operation {
                 op: op.ttype,
@@ -355,9 +338,13 @@ impl AST {
     }
 
     // expect sequence of tokens, returns last one
-    fn expect_sequence(&mut self, tokens: &mut Tokens, ttypes: &[TokenType]) -> Result<Token, ExpectedToken> {
+    fn expect_sequence(
+        &mut self,
+        tokens: &mut Tokens,
+        ttypes: &[TokenType],
+    ) -> Result<Token, ExpectedToken> {
         let mut ret: Token = Token::default();
-        
+
         for ttype in ttypes {
             ret = match self.expect(tokens, *ttype) {
                 Ok(t) => t,
@@ -376,9 +363,8 @@ impl AST {
     ) -> Result<(), NameMismatch> {
         if tokens.tok_as_str(&expected) == tokens.tok_as_str(&found) {
             Ok(())
-        }
-        else {
-            let ret = NameMismatch{
+        } else {
+            let ret = NameMismatch {
                 expected: expected,
                 found: found,
             };
@@ -392,7 +378,7 @@ impl AST {
     // NOTE: this function assumes "function" is upcoming token so that should
     // have been checked at call site
     fn parse_function(&mut self, tokens: &mut Tokens) -> u32 {
-        let tok_idx = tokens.idx();        
+        let tok_idx = tokens.idx();
 
         tokens.next();
 
@@ -402,31 +388,17 @@ impl AST {
             TokenType::Identifier => {
                 tokens.next();
                 Some(tok)
-            },
+            }
             _ => None,
         };
 
         // having this in lambda makes it easy to jump ahead if failure occurs
         // it is Temu goto
-        let attempt_parse_func = |
-            ast: &mut AST,
-            tokens: &mut Tokens,
-            name: Option<Token>,
-        | {
-            let ret = |
-                success,
-                params: Option<u32>,
-                ret_type: Option<u32>,
-                body: Option<u32>,
-            | (
-                success,
-                
-            );
-
+        let attempt_parse_func = |ast: &mut AST, tokens: &mut Tokens, name: Option<Token>| {
             if ast.expect(tokens, TokenType::LParen).is_err() {
                 return (
                     false,
-                    ast.expr_unit(tokens.idx())
+                    ast.expr_unit(tokens.idx()),
                     ast.expr_unit(tokens.idx()),
                     ast.expr_unit(tokens.idx()),
                 );
@@ -449,23 +421,16 @@ impl AST {
                 tokens.next();
             }
 
-            let ret_type = ast.parse_expr(tokens);
+            let return_type = ast.parse_expr(tokens);
 
             if ast.expect(tokens, TokenType::Eq).is_err() {
-                return (false, params, ret_type, ast.expr_unit(tokens.idx()));
+                return (false, params, return_type, ast.expr_unit(tokens.idx()));
             }
 
             let body = ast.parse_expr(tokens);
 
-            if ast.expect(tokens, TokenType::End).is_err() {
-                return (false, params, ret_type, body);
-            }
-
             let success = if let Some(name_tok) = name {
-                let result = ast.expect(
-                    tokens,
-                    TokenType::Identifier,
-                );
+                let result = ast.expect(tokens, TokenType::Identifier);
 
                 if let Ok(t) = result {
                     // compare start, end function names
@@ -473,29 +438,20 @@ impl AST {
                 }
 
                 result.is_ok()
-            }
-            else {
+            } else {
                 ast.expect(tokens, TokenType::Function).is_ok()
             };
 
-            (success, params, ret_type, body)
+            (success, params, return_type, body)
         };
 
-        let (success, params, ret_type, body) = attempt_parse_func(
-            self,
-            tokens,
-            name,
-        );
+        let (success, params, return_type, body) = attempt_parse_func(self, tokens, name);
 
         // if problem occurred during function parsing try to
         // recover by skipping ahead to one of these ttypes
 
         if !success {
-            let found = tokens.sync(&[
-                TokenType::End,
-                TokenType::Function,
-                TokenType::Semicolon,
-            ]);
+            let found = tokens.sync(&[TokenType::End, TokenType::Function, TokenType::Semicolon]);
 
             match found.ttype {
                 TokenType::End => {
@@ -504,13 +460,13 @@ impl AST {
                     match tokens.peek().ttype {
                         TokenType::Function | TokenType::Identifier => {
                             tokens.next();
-                        },
+                        }
                         _ => (),
                     };
-                },
+                }
                 TokenType::Function => {
                     tokens.next();
-                },
+                }
                 _ => (),
             };
         }
@@ -523,7 +479,7 @@ impl AST {
                 name: name,
                 params: params,
                 body: body,
-            })
+            }),
         })
     }
 
@@ -534,8 +490,7 @@ impl AST {
 
         match tok.ttype {
             // single token (e.g. integer) literals or ident
-            TokenType::Integer | TokenType::Float |
-            TokenType::String | TokenType::Identifier => {
+            TokenType::Integer | TokenType::Float | TokenType::String | TokenType::Identifier => {
                 tokens.next();
 
                 self.expr_push(Expr {
@@ -544,24 +499,24 @@ impl AST {
                     etype: 0,
                     variant: match tok.ttype {
                         TokenType::Integer => ExprVariant::IntegerLiteral(
-                            tokens.tok_as_str(&tok).parse::<u64>().expect(
-                                "integer scanning or getting token text is broken",
-                            ),
+                            tokens
+                                .tok_as_str(&tok)
+                                .parse::<u64>()
+                                .expect("integer scanning or getting token text is broken"),
                         ),
                         TokenType::Float => ExprVariant::FloatLiteral(
-                            tokens.tok_as_str(&tok).parse::<f64>().expect(
-                                "float scanning or getting token text is broken",
-                            ),
+                            tokens
+                                .tok_as_str(&tok)
+                                .parse::<f64>()
+                                .expect("float scanning or getting token text is broken"),
                         ),
                         TokenType::String => ExprVariant::StringLiteral(tok),
-                        TokenType::Identifier => ExprVariant::Identifier(
-                            Identifier {
-                                name: tok,
-                                variant: IdentifierVariant::Unknown,
-                            }
-                        ),
+                        TokenType::Identifier => ExprVariant::Identifier(Identifier {
+                            name: tok,
+                            variant: IdentifierVariant::Unknown,
+                        }),
                         _ => panic!("single token literal parsing broken"),
-                    }
+                    },
                 })
             },
             TokenType::Function => self.parse_function(tokens),
@@ -581,12 +536,9 @@ impl AST {
 
                 let rhs = self.parse_expr_bp(tokens, r_bp);
 
-                return self.expr_prefix(
-                    tok,
-                    rhs,
-                );
-            },
-            _ => {},
+                return self.expr_prefix(tok, rhs);
+            }
+            _ => {}
         }
 
         // around "operator" e.g. parens like this (1)
@@ -606,17 +558,15 @@ impl AST {
                 }) {
                     Ok(_) => {
                         found_end = true;
-                    },
+                    }
                     Err(e) => {
-                        self.parse_errors.push(
-                            ParseError::ExpectedToken(e),
-                        );
-                    },
+                        self.parse_errors.push(ParseError::ExpectedToken(e));
+                    }
                 }
 
                 return self.expr_around(tok, rhs, found_end);
-            },
-            _ => {},
+            }
+            _ => {}
         }
 
         self.parse_atom(tokens)
@@ -634,10 +584,7 @@ impl AST {
 
             let determine_op_variant_and_bp = || {
                 for op_variant in [Infix, Postfix, PostfixAround] {
-                    if let Some((l_bp, r_bp)) = operator::get_bp(
-                        op.ttype,
-                        op_variant,
-                    ) {
+                    if let Some((l_bp, r_bp)) = operator::get_bp(op.ttype, op_variant) {
                         return Some((op_variant, l_bp, r_bp));
                     }
                 }
@@ -646,10 +593,11 @@ impl AST {
             };
 
             if let Some((op_variant, l_bp, r_bp)) = determine_op_variant_and_bp() {
-                if l_bp < min_bp { // applies to infix and postfix
+                if l_bp < min_bp {
+                    // applies to infix and postfix
                     break;
                 }
-                
+
                 tokens.next();
 
                 // how lhs is replaced depends on op variant
@@ -658,16 +606,13 @@ impl AST {
                     Infix => {
                         let rhs = self.parse_expr_bp(tokens, r_bp);
 
-                        lhs = self.expr_infix(
-                            op,
-                            lhs,
-                            rhs,
-                        );
-                    },
+                        lhs = self.expr_infix(op, lhs, rhs);
+                    }
                     Postfix => {
                         lhs = self.expr_postfix(op, lhs);
-                    },
-                    PostfixAround => { // e.g. function call
+                    }
+                    PostfixAround => {
+                        // e.g. function call
                         let rhs = self.parse_expr(tokens);
 
                         let mut found_end = false;
@@ -679,25 +624,17 @@ impl AST {
                         }) {
                             Ok(_) => {
                                 found_end = true;
-                            },
+                            }
                             Err(e) => {
-                                self.parse_errors.push(
-                                    ParseError::ExpectedToken(e),
-                                );
-                            },
+                                self.parse_errors.push(ParseError::ExpectedToken(e));
+                            }
                         }
 
-                        lhs = self.expr_postfix_around(
-                            op,
-                            lhs,
-                            rhs,
-                            found_end,
-                        );
-                    },
+                        lhs = self.expr_postfix_around(op, lhs, rhs, found_end);
+                    }
                     _ => panic!("UNEXPECTED OP VARIANT"),
                 }
-            }
-            else {
+            } else {
                 break;
             }
         }
@@ -721,44 +658,32 @@ impl AST {
             ExprVariant::Unit => "()".to_string(),
             ExprVariant::IntegerLiteral(i) => i.to_string(),
             ExprVariant::FloatLiteral(f) => f.to_string(),
-            ExprVariant::StringLiteral(t) => {
-                tokens.tok_as_str(&t).to_string()
-            },
-            ExprVariant::Identifier(ident) => {
-                tokens.tok_as_str(&ident.name).to_string()
-            },
+            ExprVariant::StringLiteral(t) => tokens.tok_as_str(&t).to_string(),
+            ExprVariant::Identifier(ident) => tokens.tok_as_str(&ident.name).to_string(),
             ExprVariant::Operation(operation) => {
-                let operand_to_string = |operand: Option<u32>| {
-                    match operand {
-                        Some(id) => format!(
-                            " {}",
-                            self.expr_to_string(tokens, id),
-                        ),
-                        None => "".to_string()
-                    }
+                let operand_to_string = |operand: Option<u32>| match operand {
+                    Some(id) => format!(" {}", self.expr_to_string(tokens, id),),
+                    None => "".to_string(),
                 };
-                
+
                 format!(
                     "({}{}{})",
                     operation.op,
                     operand_to_string(operation.operand1),
                     operand_to_string(operation.operand2),
                 )
-            },
+            }
             ExprVariant::FunctionLiteral(function_literal) => {
                 format!(
                     "(defun {}({}) {})",
                     match function_literal.name {
-                        Some(name) => format!(
-                            "{} ",
-                            tokens.tok_as_str(&name),
-                        ),
+                        Some(name) => format!("{} ", tokens.tok_as_str(&name),),
                         None => "".to_string(),
                     },
                     self.expr_to_string(tokens, function_literal.params),
                     self.expr_to_string(tokens, function_literal.body),
                 )
-            },
+            }
             _ => "ERR".to_string(),
         }
     }
