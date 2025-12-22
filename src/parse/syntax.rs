@@ -516,7 +516,7 @@ impl AST {
     }
 
     // ret expr id
-    pub fn parse_expr(&mut self, tokens: &mut Tokens) -> u32 {
+    fn parse_expr(&mut self, tokens: &mut Tokens) -> u32 {
         self.parse_expr_bp(tokens, 0)
     }
 
@@ -571,5 +571,9 @@ impl AST {
             }
             _ => "ERR".to_string(),
         }
+    }
+
+    pub fn do_syntax_analysis(&mut self, tokens: &mut Tokens) {
+        self.root_expr = Some(self.parse_expr(tokens));
     }
 }

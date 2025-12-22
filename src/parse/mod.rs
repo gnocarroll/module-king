@@ -1,5 +1,6 @@
 mod errors;
 pub mod operator;
+mod semantic;
 mod syntax;
 
 use std::collections::HashMap;
@@ -238,6 +239,8 @@ pub struct AST {
 
     parse_errors: Vec<ParseError>,
     semantic_errors: Vec<SemanticError>,
+
+    root_expr: Option<u32>,
 }
 
 // public function to perform syntactic + semantic analysis
@@ -247,13 +250,15 @@ pub fn parse_file(file_str: &str, tokens: &Vec<Token>) -> AST {
 
     // call to parse_expr does syntactic analysis
 
-    let root = ast.parse_expr(&mut tokens);
+    ast.do_syntax_analysis(&mut tokens);
 
-    println!("{}", ast.expr_to_string(&tokens, root));
+    if let Some(expr) = ast.root_expr {
+        println!("{}", ast.expr_to_string(&tokens, expr));
+    }
 
     // TODO: semantic analysis
 
-    // ...
+    ast.do_semantic_analysis();
 
     ast
 }
