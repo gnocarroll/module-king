@@ -421,25 +421,50 @@ impl AST {
                 tokens.next();
             }
 
-            let return_type = ast.parse_expr(tokens);
+            // prevent consumption of Eq after return type (if it is present)
+
+            let return_type = ast.parse_expr_bp_ban_ops(
+                tokens,
+                0,
+                &[TokenType::Eq],
+            );
 
             if ast.expect(tokens, TokenType::Eq).is_err() {
                 return (false, params, return_type, ast.expr_unit(tokens.idx()));
             }
 
-            let body = ast.parse_expr(tokens);
+            // prevent consumption of semicolon if there is one after function
+            // body since this could lead to e.g. a lot of the rest of the
+            // file being consumed as part of func body
 
-            let success = if let Some(name_tok) = name {
-                let result = ast.expect(tokens, TokenType::Identifier);
+            let body = ast.parse_expr_bp_ban_ops(
+                tokens,
+                0,
+                &[TokenType::Semicolon],
+            );
 
-                if let Ok(t) = result {
-                    // compare start, end function names
-                    let _ = ast.test_name_match(tokens, name_tok, t);
+            // if body of function is block expr check for desired terminating token
+            // (name in case of named function, otherwise keyword "function")
+
+            let success = if let ExprVariant::Operation(Operation {
+                op: TokenType::Begin,
+                ..
+            }) = ast.expr(body).variant
+            {
+                if let Some(name_tok) = name {
+                    let result = ast.expect(tokens, TokenType::Identifier);
+
+                    if let Ok(t) = result {
+                        // compare start, end function names
+                        let _ = ast.test_name_match(tokens, name_tok, t);
+                    }
+
+                    result.is_ok()
+                } else {
+                    ast.expect(tokens, TokenType::Function).is_ok()
                 }
-
-                result.is_ok()
             } else {
-                ast.expect(tokens, TokenType::Function).is_ok()
+                true
             };
 
             (success, params, return_type, body)
@@ -478,6 +503,7 @@ impl AST {
             variant: ExprVariant::FunctionLiteral(FunctionLiteral {
                 name: name,
                 params: params,
+                return_type: return_type,
                 body: body,
             }),
         })
@@ -518,7 +544,7 @@ impl AST {
                         _ => panic!("single token literal parsing broken"),
                     },
                 })
-            },
+            }
             TokenType::Function => self.parse_function(tokens),
             // if no atom or other (e.g. prefix) expr is found return Unit
             _ => self.expr_unit(tok_idx),
@@ -554,6 +580,7 @@ impl AST {
                 match tokens.expect(match tok.ttype {
                     TokenType::LParen => TokenType::RParen,
                     TokenType::LBrace => TokenType::RBrace,
+                    TokenType::Begin => TokenType::End,
                     _ => panic!("unexpected ttype for Around"),
                 }) {
                     Ok(_) => {
@@ -574,10 +601,32 @@ impl AST {
 
     // bp is Binding Power (Pratt parsing) and ret is expr id
     fn parse_expr_bp(&mut self, tokens: &mut Tokens, min_bp: u8) -> u32 {
+        return self.parse_expr_bp_ban_ops(
+            tokens,
+            min_bp,
+            &[],
+        );
+    }
+
+    // same purpose as above but in some parsing situations want to prevent
+    // consumption of ops e.g.
+    // function inc(x: Integer) = x + 1;
+    // would want to prevent semicolon at end there from being part of func
+    // body since then later lines would be consumed
+    fn parse_expr_bp_ban_ops(
+        &mut self,
+        tokens: &mut Tokens,
+        min_bp: u8,
+        banned_ops: &[TokenType],
+    ) -> u32 {
         let mut lhs = self.parse_lhs(tokens);
 
         loop {
             let op = tokens.peek();
+
+            if banned_ops.iter().any(|ttype| *ttype == op.ttype) {
+                break;
+            }
 
             // see if one of the operator variants e.g. Infix works with
             // above token and get binding power if so
@@ -620,6 +669,7 @@ impl AST {
                         match tokens.expect(match op.ttype {
                             TokenType::LParen => TokenType::RParen,
                             TokenType::LBrace => TokenType::RBrace,
+                            TokenType::Begin => TokenType::End,
                             _ => panic!("unexpected ttype for Around"),
                         }) {
                             Ok(_) => {

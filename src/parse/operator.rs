@@ -402,8 +402,7 @@ type TTypeBpTable =
 // generates mapping from (TokenType, OperatorVariant e.g. Infix)
 // to binding power
 fn generate_ttype_to_operator_bp() -> TTypeBpTable {
-    let mut table: [[OperatorBp; OperatorVariantCount as usize];
-        TokenType::TokenTypeCount as usize] = [[OperatorBp {
+    let mut table: TTypeBpTable = [[OperatorBp {
         is_empty: true,
         left_bp: 0,
         right_bp: 0,
