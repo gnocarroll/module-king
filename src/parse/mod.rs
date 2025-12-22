@@ -705,7 +705,7 @@ impl AST {
         let expr_ref = self.expr(expr);
 
         match &expr_ref.variant {
-            ExprVariant::Unit => "()".to_string(),
+            ExprVariant::Unit => "Unit".to_string(),
             ExprVariant::IntegerLiteral(i) => i.to_string(),
             ExprVariant::FloatLiteral(f) => f.to_string(),
             ExprVariant::StringLiteral(t) => tokens.tok_as_str(&t).to_string(),
@@ -725,12 +725,13 @@ impl AST {
             }
             ExprVariant::FunctionLiteral(function_literal) => {
                 format!(
-                    "(defun {}({}) {})",
+                    "(defun {}{} => {} = {})",
                     match function_literal.name {
                         Some(name) => format!("{} ", tokens.tok_as_str(&name),),
                         None => "".to_string(),
                     },
                     self.expr_to_string(tokens, function_literal.params),
+                    self.expr_to_string(tokens, function_literal.return_type),
                     self.expr_to_string(tokens, function_literal.body),
                 )
             }
