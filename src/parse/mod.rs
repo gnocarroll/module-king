@@ -423,12 +423,18 @@ impl AST {
 
             let params = ast.parse_expr(tokens);
 
-            if ast.expect_sequence(
-                tokens,
-                &[TokenType::RParen, TokenType::Begin],
-            ).is_err() {
+            if ast.expect(tokens, TokenType::RParen).is_err() {
                 return (false, params, ast.expr_unit(tokens.idx()));
             }
+
+            // optional "=>" before return type
+
+            if tokens.peek().ttype == TokenType::DArrow {
+                tokens.next();
+            }
+
+            let ret_type = ast.parse_expr(tokens);
+
 
             let body = ast.parse_expr(tokens);
 

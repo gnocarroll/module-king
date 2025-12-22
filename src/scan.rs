@@ -55,6 +55,7 @@ pub enum TokenType {
     Colon,
     PlusPlus,
     MinusMinus,
+    DArrow,
 
     Begin,
     End,
@@ -360,6 +361,7 @@ impl TokenType {
             Colon => Text(":"),
             PlusPlus => Text("++"),
             MinusMinus => Text("--"),
+            DArrow => Text("=>"),
                 
             Begin => Text("begin"),
             End => Text("end"),
