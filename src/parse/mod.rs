@@ -79,6 +79,8 @@ enum ExprVariant {
     FunctionLiteral(FunctionLiteral),
 
     TypeLiteral(TypeLiteral),
+
+    Module,
 }
 
 struct Expr {
@@ -86,10 +88,26 @@ struct Expr {
     pub tok: u32,
     pub end_tok: u32,
 
-    // ID of language type
+    // ID of language type (or module if expr is module)
     pub etype: u32,
 
     pub variant: ExprVariant,
+
+    // start off false and then set to true if/when semantic analysis is
+    // successfully completed for Expr
+    pub finalized: bool,
+}
+
+impl Default for Expr {
+    fn default() -> Self {
+        Expr {
+            tok: 0,
+            end_tok: 0,
+            etype: 0,
+            variant: ExprVariant::Unit,
+            finalized: false,
+        }
+    }
 }
 
 impl Expr {

@@ -53,6 +53,7 @@ impl AST {
                 operand1: Some(lhs),
                 operand2: Some(rhs),
             }),
+            ..Default::default()
         })
     }
 
@@ -66,6 +67,7 @@ impl AST {
                 operand1: Some(rhs),
                 operand2: None,
             }),
+            ..Default::default()
         })
     }
 
@@ -79,6 +81,7 @@ impl AST {
                 operand1: Some(rhs),
                 operand2: None,
             }),
+            ..Default::default()
         })
     }
 
@@ -92,6 +95,7 @@ impl AST {
                 operand1: Some(rhs),
                 operand2: None,
             }),
+            ..Default::default()
         })
     }
 
@@ -278,6 +282,7 @@ impl AST {
                 return_type: return_type,
                 body: body,
             }),
+            ..Default::default()
         })
     }
 
@@ -347,6 +352,7 @@ impl AST {
                 variant,
                 body,
             }),
+            ..Default::default()
         })
     }
 
@@ -384,6 +390,7 @@ impl AST {
                         }),
                         _ => panic!("single token literal parsing broken"),
                     },
+                    ..Default::default()
                 })
             }
             TokenType::Function => self.parse_function(tokens),

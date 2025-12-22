@@ -12,7 +12,7 @@ impl AST {
     fn semantic_analyze_expr(&mut self, tokens: &Tokens, scope: u32, expr: u32) {
         let expr_ref = self.expr(expr);
 
-        match expr_ref.variant {
+        match &expr_ref.variant {
             ExprVariant::Unit
             | ExprVariant::IntegerLiteral(_)
             | ExprVariant::FloatLiteral(_)
@@ -36,11 +36,11 @@ impl AST {
                 }
             }
             ExprVariant::Identifier(ident) => {
-                // if it is a member then type should be determined when
-                // analyzing access operator
-                if ident.variant == IdentifierVariant::Member {
-                    return;
-                }
+                let name = tokens.tok_as_str(&ident.name);
+
+                let member = self.scope_search(scope, name);
+
+
             }
             _ => (),
         }
