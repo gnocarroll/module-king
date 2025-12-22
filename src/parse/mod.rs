@@ -6,12 +6,14 @@ mod syntax;
 use std::collections::HashMap;
 
 use crate::{
-    parse::errors::{ExpectedToken, NameMismatch, ParseError, SemanticError},
+    parse::errors::{ExpectedToken, ParseError, SemanticError},
     scan::{Token, TokenType},
 };
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum TypeVariant {
+    Unit,
+    String,
     Integer,
     Float,
     Struct,  // class keyword can also be used for this

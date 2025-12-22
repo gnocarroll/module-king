@@ -1,15 +1,67 @@
 use std::collections::HashMap;
 
-use crate::parse::{
-    AST, Member, MemberVariant, Scope, ScopeVariant, TokenOrString, Tokens, TypeVariant, Visibility,
+use crate::{
+    constants::{FLOAT_TYPE, INTEGER_TYPE, STRING_TYPE, UNIT_TYPE},
+    parse::{
+        AST, ExprVariant, IdentifierVariant, Member, MemberVariant, Scope, ScopeVariant, TokenOrString, Tokens, TypeVariant, Visibility
+    },
 };
 
 impl AST {
     // semantic analysis on particular expression
-    fn semantic_analyze_expr(&mut self, scope: u32, expr: u32) {
+    fn semantic_analyze_expr(&mut self, tokens: &Tokens, scope: u32, expr: u32) {
         let expr_ref = self.expr(expr);
 
-        match expr_ref.variant {}
+        match expr_ref.variant {
+            ExprVariant::Unit
+            | ExprVariant::IntegerLiteral(_)
+            | ExprVariant::FloatLiteral(_)
+            | ExprVariant::StringLiteral(_) => {
+                // find built-in type id and set type of expr
+
+                let type_name = match expr_ref.variant {
+                    ExprVariant::Unit => UNIT_TYPE,
+                    ExprVariant::IntegerLiteral(_) => INTEGER_TYPE,
+                    ExprVariant::FloatLiteral(_) => FLOAT_TYPE,
+                    ExprVariant::StringLiteral(_) => STRING_TYPE,
+                    _ => panic!("only unit, integer, float here"),
+                };
+
+                if let Some(member) = self.scope_search(0, type_name) {
+                    let type_id = self.members[member as usize].module_or_type;
+
+                    self.exprs[expr as usize].etype = type_id;
+                } else {
+                    panic!("Builtin type not found: {type_name}");
+                }
+            }
+            ExprVariant::Identifier(ident) => {
+                // if it is a member then type should be determined when
+                // analyzing access operator
+                if ident.variant == IdentifierVariant::Member {
+                    return;
+                }
+            }
+            _ => (),
+        }
+    }
+
+    // search provided scope for a given name and received Member if said name
+    // can be found, also recurse to parent if needed
+    fn scope_search(&mut self, scope: u32, name: &str) -> Option<u32> {
+        let mut scope = scope;
+
+        loop {
+            let scope_ref = &self.scopes[scope as usize];
+
+            if let Some(member) = scope_ref.members.get(name) {
+                return Some(*member);
+            } else if scope_ref.parent_scope == scope {
+                return None;
+            }
+
+            scope = scope_ref.parent_scope;
+        }
     }
 
     fn scope_push(&mut self, scope: Scope) -> u32 {
@@ -79,8 +131,10 @@ impl AST {
             });
 
             for (name, variant) in [
-                ("Integer", TypeVariant::Integer),
-                ("Float", TypeVariant::Float),
+                (INTEGER_TYPE, TypeVariant::Integer),
+                (FLOAT_TYPE, TypeVariant::Float),
+                (UNIT_TYPE, TypeVariant::Unit),
+                (STRING_TYPE, TypeVariant::String),
             ] {
                 self.scope_add_member_type(
                     tokens,
@@ -101,7 +155,7 @@ impl AST {
 
             // analyze root expr and provided new scope as scope
 
-            self.semantic_analyze_expr(module_scope, expr);
+            self.semantic_analyze_expr(tokens, module_scope, expr);
         };
     }
 }
