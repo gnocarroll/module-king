@@ -3,11 +3,28 @@ use std::collections::HashMap;
 use crate::{
     constants::{FLOAT_TYPE, INTEGER_TYPE, STRING_TYPE, UNIT_TYPE},
     parse::{
-        AST, ExprVariant, Identifier, IdentifierVariant, Member, MemberVariant, Scope, ScopeVariant, TokenOrString, Tokens, TypeVariant, Visibility
+        AST, ExprVariant, FunctionLiteral, Identifier, IdentifierVariant, Member, MemberVariant, Scope, ScopeVariant, TokenOrString, Tokens, TypeVariant, Visibility
     },
 };
 
 impl AST {
+    fn semantic_analyze_func(&mut self, tokens: &Tokens, scope: u32, expr: u32) {
+        let func_literal = match &self.exprs[expr as usize].variant {
+            ExprVariant::FunctionLiteral(f) => f.clone(),
+            _ => panic!(),
+        };
+
+        for child_expr in [func_literal.params, func_literal.body, func_literal.return_type] {
+            self.semantic_analyze_expr(tokens, scope, child_expr);
+        }
+
+        let x = func_literal.body;
+    }
+
+    fn semantic_analyze_type_literal(&mut self, tokens: &Tokens, scope: u32, expr: u32) {
+
+    }
+
     // semantic analysis on particular expression
     fn semantic_analyze_expr(&mut self, tokens: &Tokens, scope: u32, expr: u32) {
         match &self.expr(expr).variant {
@@ -60,8 +77,11 @@ impl AST {
                     expr.finalized = true;
                 }
             }
-            ExprVariant::FunctionLiteral(function_literal) => {
-                
+            ExprVariant::FunctionLiteral(_) => {
+                self.semantic_analyze_func(tokens, scope, expr);
+            }
+            ExprVariant::TypeLiteral(_) => {
+                self.semantic_analyze_type_literal(tokens, scope, expr);
             }
             _ => (),
         }

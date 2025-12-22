@@ -38,6 +38,7 @@ enum ScopeVariant {
     Type(TypeVariant),
 }
 
+#[derive(Clone)]
 struct FunctionLiteral {
     pub name: Option<Token>,
     pub params: u32,
