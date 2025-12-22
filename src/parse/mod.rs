@@ -413,9 +413,20 @@ impl AST {
             tokens: &mut Tokens,
             name: Option<Token>,
         | {
+            let ret = |
+                success,
+                params: Option<u32>,
+                ret_type: Option<u32>,
+                body: Option<u32>,
+            | (
+                success,
+                
+            );
+
             if ast.expect(tokens, TokenType::LParen).is_err() {
                 return (
                     false,
+                    ast.expr_unit(tokens.idx())
                     ast.expr_unit(tokens.idx()),
                     ast.expr_unit(tokens.idx()),
                 );
@@ -424,7 +435,12 @@ impl AST {
             let params = ast.parse_expr(tokens);
 
             if ast.expect(tokens, TokenType::RParen).is_err() {
-                return (false, params, ast.expr_unit(tokens.idx()));
+                return (
+                    false,
+                    params,
+                    ast.expr_unit(tokens.idx()),
+                    ast.expr_unit(tokens.idx()),
+                );
             }
 
             // optional "=>" before return type
@@ -435,11 +451,14 @@ impl AST {
 
             let ret_type = ast.parse_expr(tokens);
 
+            if ast.expect(tokens, TokenType::Eq).is_err() {
+                return (false, params, ret_type, ast.expr_unit(tokens.idx()));
+            }
 
             let body = ast.parse_expr(tokens);
 
             if ast.expect(tokens, TokenType::End).is_err() {
-                return (false, params, body);
+                return (false, params, ret_type, body);
             }
 
             let success = if let Some(name_tok) = name {
@@ -459,10 +478,10 @@ impl AST {
                 ast.expect(tokens, TokenType::Function).is_ok()
             };
 
-            (success, params, body)
+            (success, params, ret_type, body)
         };
 
-        let (success, params, body) = attempt_parse_func(
+        let (success, params, ret_type, body) = attempt_parse_func(
             self,
             tokens,
             name,
