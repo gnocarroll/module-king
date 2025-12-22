@@ -3,6 +3,7 @@ use std::{collections::HashMap, fs, io::Read, process::ExitCode};
 use crate::args::{ArgParser, ArgQuantity};
 
 mod args;
+mod constants;
 mod parse;
 mod scan;
 
@@ -92,7 +93,7 @@ fn main() -> ExitCode {
             );
         }
 
-        parse::parse_file(file_string.as_str(), &tokens);
+        parse::parse_file(filename.as_str(), file_string.as_str(), &tokens);
     }
 
     0.into()

@@ -2,13 +2,16 @@ use operator::OperatorVariant::*;
 
 use crate::{
     parse::{
-        AST, Expr, ExprVariant, FunctionLiteral, Identifier, IdentifierVariant, Operation, Tokens, TypeLiteral, TypeVariant, errors::{ExpectedToken, NameMismatch, ParseError}, operator
+        AST, Expr, ExprVariant, FunctionLiteral, Identifier, IdentifierVariant, Operation, Tokens,
+        TypeLiteral, TypeVariant,
+        errors::{ExpectedToken, NameMismatch, ParseError},
+        operator,
     },
     scan::{Token, TokenType},
 };
 
 impl AST {
-    fn expr(&self, expr: u32) -> &Expr {
+    pub fn expr(&self, expr: u32) -> &Expr {
         &self.exprs[expr as usize]
     }
 

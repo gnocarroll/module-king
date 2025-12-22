@@ -29,11 +29,11 @@ struct TypeLiteral {
     pub body: u32,
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy)]
 enum ScopeVariant {
     Scope, // e.g. scope for a for loop or other block
     Module,
-    Type,
+    Type(TypeVariant),
 }
 
 struct FunctionLiteral {
@@ -113,8 +113,14 @@ enum MemberVariant {
     Instance,
 }
 
+#[derive(Clone)]
+enum TokenOrString {
+    Token(Token),
+    String(String),
+}
+
 struct Member {
-    pub name: Token,
+    pub name: TokenOrString,
     pub visibility: Visibility,
 
     pub variant: MemberVariant,
@@ -129,12 +135,14 @@ struct Member {
 // - module
 // - type (e.g. Integer)
 struct Scope {
-    pub name: Option<Token>,
+    // name may be present in the code but could also be from elsewhere
+    // e.g. name of file is name of corresponding module
+    pub name: Option<TokenOrString>,
     pub variant: ScopeVariant,
 
     pub parent_scope: u32,
 
-    pub members: HashMap<Token, u32>,
+    pub members: HashMap<String, u32>,
 }
 
 struct Tokens<'a> {
@@ -244,7 +252,7 @@ pub struct AST {
 }
 
 // public function to perform syntactic + semantic analysis
-pub fn parse_file(file_str: &str, tokens: &Vec<Token>) -> AST {
+pub fn parse_file(file_name: &str, file_str: &str, tokens: &Vec<Token>) -> AST {
     let mut ast = AST::default();
     let mut tokens = Tokens::new(file_str, tokens);
 
@@ -258,7 +266,7 @@ pub fn parse_file(file_str: &str, tokens: &Vec<Token>) -> AST {
 
     // TODO: semantic analysis
 
-    ast.do_semantic_analysis();
+    ast.do_semantic_analysis(&tokens, file_name);
 
     ast
 }
