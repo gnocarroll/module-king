@@ -8,20 +8,62 @@ use crate::{
 };
 
 impl AST {
+    fn get_builtin_type(&mut self, name: &str) -> u32 {
+        if let Some(member) = self.scope_search(0, name) {
+            member
+        } else {
+            panic!("Builtin type not found: {name}");
+        }
+    }
+
+    fn get_builtin_type_id(&mut self, name: &str) -> u32 {
+        if let Some(member) = self.scope_search(0, name) {
+            member
+        } else {
+            panic!("Builtin type not found: {name}");
+        }
+    }
+
     fn semantic_analyze_func(&mut self, tokens: &Tokens, scope: u32, expr: u32) {
         let func_literal = match &self.exprs[expr as usize].variant {
             ExprVariant::FunctionLiteral(f) => f.clone(),
             _ => panic!(),
         };
 
-        for child_expr in [func_literal.params, func_literal.body, func_literal.return_type] {
-            self.semantic_analyze_expr(tokens, scope, child_expr);
-        }
+        // create function scope as child of parent then use it later on
 
-        let x = func_literal.body;
+        let func_scope = self.scope_push(Scope {
+            name: None,
+            variant: ScopeVariant::Scope,
+            parent_scope: scope,
+            refers_to: Some(expr), // connect to function literal
+            members: HashMap::new(),
+        });
+
+        for child_expr in [func_literal.params, func_literal.body, func_literal.return_type] {
+            self.semantic_analyze_expr(tokens, func_scope, child_expr);
+        }
     }
 
     fn semantic_analyze_type_literal(&mut self, tokens: &Tokens, scope: u32, expr: u32) {
+        let type_literal = match &self.exprs[expr as usize].variant {
+            ExprVariant::TypeLiteral(t) => t.clone(),
+            _ => panic!(),
+        };
+
+        let type_scope = self.scope_push(Scope {
+            name: match type_literal.name {
+                Some(t) => Some(TokenOrString::Token(t)),
+                None => None,
+            },
+            variant: ScopeVariant::Type(type_literal.variant),
+            parent_scope: scope,
+            refers_to: None,
+            members: HashMap::new(),
+        });
+
+        self.semantic_analyze_expr(tokens, type_scope, type_literal.body);
+
 
     }
 
@@ -42,16 +84,14 @@ impl AST {
                     _ => panic!("only unit, integer, float here"),
                 };
 
-                if let Some(member) = self.scope_search(0, type_name) {
-                    let type_id = self.members[member as usize].module_or_type;
+                let member = self.get_builtin_type(type_name);
 
-                    let expr = self.expr_mut(expr);
+                let type_id = self.members[member as usize].module_or_type;
 
-                    expr.etype = type_id;
-                    expr.finalized = true;
-                } else {
-                    panic!("Builtin type not found: {type_name}");
-                }
+                let expr = self.expr_mut(expr);
+
+                expr.etype = type_id;
+                expr.finalized = true;
             }
             ExprVariant::Identifier(ident) => {
                 let name = tokens.tok_as_str(&ident.name);
@@ -144,6 +184,7 @@ impl AST {
             name: Some(name.clone()),
             variant: ScopeVariant::Type(variant),
             parent_scope: scope,
+            refers_to: None,
             members: HashMap::new(),
         });
 
@@ -168,6 +209,7 @@ impl AST {
                 name: Some(TokenOrString::String("GLOBAL".to_string())),
                 variant: ScopeVariant::Module,
                 parent_scope: 0,
+                refers_to: None,
                 members: HashMap::new(),
             });
 
@@ -191,6 +233,7 @@ impl AST {
                 name: Some(TokenOrString::String(module_name.to_string())),
                 variant: ScopeVariant::Module,
                 parent_scope: global_scope,
+                refers_to: None,
                 members: HashMap::new(),
             });
 

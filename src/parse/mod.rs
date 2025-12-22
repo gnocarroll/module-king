@@ -21,6 +21,7 @@ enum TypeVariant {
     Variant, // tagged union (can have fields which are just tag)
 }
 
+#[derive(Clone)]
 struct TypeLiteral {
     // may be empty str if type literal does not provide name
     pub name: Option<Token>,
@@ -160,6 +161,10 @@ struct Scope {
     pub variant: ScopeVariant,
 
     pub parent_scope: u32,
+
+    // refers to what this scope belongs to e.g. function
+    // (if present)
+    pub refers_to: Option<u32>,
 
     pub members: HashMap<String, u32>,
 }
