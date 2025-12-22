@@ -79,8 +79,6 @@ enum ExprVariant {
     FunctionLiteral(FunctionLiteral),
 
     TypeLiteral(TypeLiteral),
-
-    Module,
 }
 
 struct Expr {

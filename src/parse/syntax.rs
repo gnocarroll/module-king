@@ -15,12 +15,17 @@ impl AST {
         &self.exprs[expr as usize]
     }
 
+    pub fn expr_mut(&mut self, expr: u32) -> &mut Expr {
+        &mut self.exprs[expr as usize]
+    }
+
     fn expr_unit(&mut self, tok_idx: u32) -> u32 {
         self.expr_push(Expr {
             tok: tok_idx,
             end_tok: tok_idx,
             etype: 0,
             variant: ExprVariant::Unit,
+            ..Default::default()
         })
     }
 
@@ -40,6 +45,7 @@ impl AST {
                 operand1: Some(lhs),
                 operand2: Some(rhs),
             }),
+            ..Default::default()
         })
     }
 

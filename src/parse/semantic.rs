@@ -3,23 +3,21 @@ use std::collections::HashMap;
 use crate::{
     constants::{FLOAT_TYPE, INTEGER_TYPE, STRING_TYPE, UNIT_TYPE},
     parse::{
-        AST, ExprVariant, IdentifierVariant, Member, MemberVariant, Scope, ScopeVariant, TokenOrString, Tokens, TypeVariant, Visibility
+        AST, ExprVariant, Identifier, IdentifierVariant, Member, MemberVariant, Scope, ScopeVariant, TokenOrString, Tokens, TypeVariant, Visibility
     },
 };
 
 impl AST {
     // semantic analysis on particular expression
     fn semantic_analyze_expr(&mut self, tokens: &Tokens, scope: u32, expr: u32) {
-        let expr_ref = self.expr(expr);
-
-        match &expr_ref.variant {
+        match &self.expr(expr).variant {
             ExprVariant::Unit
             | ExprVariant::IntegerLiteral(_)
             | ExprVariant::FloatLiteral(_)
             | ExprVariant::StringLiteral(_) => {
                 // find built-in type id and set type of expr
 
-                let type_name = match expr_ref.variant {
+                let type_name = match self.expr(expr).variant {
                     ExprVariant::Unit => UNIT_TYPE,
                     ExprVariant::IntegerLiteral(_) => INTEGER_TYPE,
                     ExprVariant::FloatLiteral(_) => FLOAT_TYPE,
@@ -30,7 +28,10 @@ impl AST {
                 if let Some(member) = self.scope_search(0, type_name) {
                     let type_id = self.members[member as usize].module_or_type;
 
-                    self.exprs[expr as usize].etype = type_id;
+                    let expr = self.expr_mut(expr);
+
+                    expr.etype = type_id;
+                    expr.finalized = true;
                 } else {
                     panic!("Builtin type not found: {type_name}");
                 }
@@ -38,9 +39,29 @@ impl AST {
             ExprVariant::Identifier(ident) => {
                 let name = tokens.tok_as_str(&ident.name);
 
-                let member = self.scope_search(scope, name);
+                if let Some(member) = self.scope_search(scope, name) {
+                    let member = &self.members[member as usize];
 
+                    let etype = member.module_or_type;
+                    let ident_variant = match member.variant {
+                        MemberVariant::Module => IdentifierVariant::Module,
+                        MemberVariant::Type => IdentifierVariant::Type,
+                        MemberVariant::Instance => IdentifierVariant::Instance,
+                    };
 
+                    let expr = self.expr_mut(expr);
+
+                    expr.etype = etype;
+
+                    if let ExprVariant::Identifier(ident) = &mut expr.variant {
+                        ident.variant = ident_variant;
+                    }
+
+                    expr.finalized = true;
+                }
+            }
+            ExprVariant::FunctionLiteral(function_literal) => {
+                
             }
             _ => (),
         }
