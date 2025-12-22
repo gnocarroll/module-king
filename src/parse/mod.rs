@@ -4,12 +4,11 @@ pub mod operator;
 use std::collections::HashMap;
 
 use crate::{
-    parse::errors::NameMismatch,
+    parse::errors::{ExpectedToken, NameMismatch, ParseError, SemanticError},
     scan::{Token, TokenType},
 };
-use errors::{ExpectedToken, ParseError, SemanticError};
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 enum TypeVariant {
     Integer,
     Float,
@@ -423,10 +422,12 @@ impl AST {
 
             // prevent consumption of Eq after return type (if it is present)
 
-            let return_type = ast.parse_expr_bp_ban_ops(
+            let return_type = ast.parse_expr_bp(
                 tokens,
-                0,
-                &[TokenType::Eq],
+                match operator::get_bp(TokenType::Eq, Infix) {
+                    Some((l_bp, _)) => l_bp + 1,
+                    _ => panic!("semicolon is not infix op?"),
+                }
             );
 
             if ast.expect(tokens, TokenType::Eq).is_err() {
@@ -437,10 +438,12 @@ impl AST {
             // body since this could lead to e.g. a lot of the rest of the
             // file being consumed as part of func body
 
-            let body = ast.parse_expr_bp_ban_ops(
+            let body = ast.parse_expr_bp(
                 tokens,
-                0,
-                &[TokenType::Semicolon],
+                match operator::get_bp(TokenType::Semicolon, Infix) {
+                    Some((l_bp, _)) => l_bp + 1,
+                    _ => panic!("semicolon is not infix op?"),
+                },
             );
 
             // if body of function is block expr check for desired terminating token
@@ -509,6 +512,71 @@ impl AST {
         })
     }
 
+    fn parse_type_literal(&mut self, tokens: &mut Tokens) -> u32 {
+        let tok_idx = tokens.idx();
+        let type_variant_tok = tokens.next();
+        
+        let variant = match type_variant_tok.ttype {
+            TokenType::KWInteger => TypeVariant::Integer,
+            TokenType::KWFloat => TypeVariant::Float,
+            TokenType::Struct => TypeVariant::Struct,
+            TokenType::Class => TypeVariant::Struct,
+            TokenType::Enum => TypeVariant::Enum,
+            TokenType::Variant => TypeVariant::Variant,
+            _ => panic!("unexpected ttype for beginning of type literal"),
+        };
+
+        let name = {
+            let tok = tokens.peek();
+
+            match tok.ttype {
+                TokenType::Identifier => {
+                    tokens.next();
+                    Some(tok)
+                }
+                _ => None,
+            }
+        };
+
+        let _ = tokens.expect(TokenType::Eq);
+
+        // don't want to consume semicolon as part of body
+
+        let body = self.parse_expr_bp(
+            tokens,
+            match operator::get_bp(TokenType::Semicolon, Infix) {
+                Some((l_bp, _)) => l_bp + 1,
+                _ => panic!("semicolon is not infix op?")
+            },
+        );
+
+        // if body is a block check for correct terminating token
+
+        if let ExprVariant::Operation(Operation {
+            op: TokenType::Begin,
+            ..
+        }) = self.expr(body).variant
+        {
+            if let Some(name_tok) = name {
+                let result = self.expect(tokens, TokenType::Identifier);
+
+                if let Ok(t) = result {
+                    // compare start, end function names
+                    let _ = self.test_name_match(tokens, name_tok, t);
+                }
+            } else {
+                let _ = self.expect(tokens, type_variant_tok.ttype).is_ok();
+            }
+        }
+
+        self.expr_push(Expr {
+            tok: tok_idx,
+            end_tok: tokens.idx(),
+            etype: 0,
+            variant: ExprVariant::TypeLiteral(TypeLiteral { name, variant, body }),
+        })
+    }
+
     // atom e.g. literal like integer
     fn parse_atom(&mut self, tokens: &mut Tokens) -> u32 {
         let tok_idx = tokens.idx();
@@ -546,6 +614,13 @@ impl AST {
                 })
             }
             TokenType::Function => self.parse_function(tokens),
+            // One of these tokens indicates type literal
+            TokenType::KWInteger
+            | TokenType::KWFloat
+            | TokenType::Struct
+            | TokenType::Class
+            | TokenType::Enum
+            | TokenType::Variant => self.parse_type_literal(tokens),
             // if no atom or other (e.g. prefix) expr is found return Unit
             _ => self.expr_unit(tok_idx),
         }
@@ -601,32 +676,10 @@ impl AST {
 
     // bp is Binding Power (Pratt parsing) and ret is expr id
     fn parse_expr_bp(&mut self, tokens: &mut Tokens, min_bp: u8) -> u32 {
-        return self.parse_expr_bp_ban_ops(
-            tokens,
-            min_bp,
-            &[],
-        );
-    }
-
-    // same purpose as above but in some parsing situations want to prevent
-    // consumption of ops e.g.
-    // function inc(x: Integer) = x + 1;
-    // would want to prevent semicolon at end there from being part of func
-    // body since then later lines would be consumed
-    fn parse_expr_bp_ban_ops(
-        &mut self,
-        tokens: &mut Tokens,
-        min_bp: u8,
-        banned_ops: &[TokenType],
-    ) -> u32 {
         let mut lhs = self.parse_lhs(tokens);
 
         loop {
             let op = tokens.peek();
-
-            if banned_ops.iter().any(|ttype| *ttype == op.ttype) {
-                break;
-            }
 
             // see if one of the operator variants e.g. Infix works with
             // above token and get binding power if so
@@ -733,6 +786,17 @@ impl AST {
                     self.expr_to_string(tokens, function_literal.params),
                     self.expr_to_string(tokens, function_literal.return_type),
                     self.expr_to_string(tokens, function_literal.body),
+                )
+            }
+            ExprVariant::TypeLiteral(type_literal) => {
+                format!(
+                    "(deftype {:?} {}{})",
+                    type_literal.variant,
+                    match type_literal.name {
+                        Some(name) => format!("{} ", tokens.tok_as_str(&name),),
+                        None => "".to_string(),
+                    },
+                    self.expr_to_string(tokens, type_literal.body),
                 )
             }
             _ => "ERR".to_string(),
