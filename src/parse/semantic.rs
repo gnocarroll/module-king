@@ -48,6 +48,21 @@ impl AST {
         }));
     }
 
+    // function to attempt pattern matching between identifier(s) in pattern and type
+    // also should add any new identifiers to scope
+    // ret should indicate what problems occurred if any
+    fn pattern_matching(
+        &mut self,
+        ctx: &mut SemanticContext,
+        scope: u32,
+        ident_pattern: u32,
+
+        // may be absent (so errors will be recorded if necessary)
+        type_pattern: Option<u32>,
+    ) -> Result<(), ()> {
+        Ok(())
+    }
+
     fn semantic_analyze_operation(&mut self, ctx: &mut SemanticContext, scope: u32, expr: u32) {
         let operation = match &self.exprs[expr as usize].variant {
             ExprVariant::Operation(operation) => operation.clone(),
@@ -73,10 +88,12 @@ impl AST {
                         }
                     }
                     TokenType::Colon => {
+                        let old_analyzing_now = ctx.analyzing_now;
+
                         if let Some(pattern) = operation.operand1 {
                             ctx.analyzing_now = AnalyzingNow::Pattern;
                             self.semantic_analyze_expr(ctx, scope, pattern);
-                            ctx.analyzing_now = AnalyzingNow::FuncParams;
+                            ctx.analyzing_now = old_analyzing_now;
                         }
                         else {
                             self.missing_operand(expr, 1);
@@ -85,15 +102,27 @@ impl AST {
                         if let Some(pattern) = operation.operand2 {
                             ctx.analyzing_now = AnalyzingNow::Type;
                             self.semantic_analyze_expr(ctx, scope, pattern);
-                            ctx.analyzing_now = AnalyzingNow::FuncParams;
+                            ctx.analyzing_now = old_analyzing_now;
                         }
                         else {
                             self.missing_operand(expr, 2);
                         }
                         
-                        if let (Some(pattern), param_type) = (operation.operand1, operation.operand2) {
+                        let mut finalized = false;
 
+                        if let (Some(pattern), param_type) = (operation.operand1, operation.operand2) {
+                            if self.pattern_matching(ctx, scope, pattern, param_type).is_ok() {
+                                finalized = true;
+                            }
                         }
+
+                        let unit_type = self.get_builtin_type_id(UNIT_TYPE);
+
+                        let expr_mut = &mut self.exprs[expr as usize];
+
+                        expr_mut.etype = unit_type;
+                        expr_mut.expr_returns = ExprReturns::Unit;
+                        expr_mut.finalized = finalized;
                     }
                     TokenType::Eq | TokenType::ColonEq => {
 
