@@ -3,7 +3,8 @@ use std::collections::HashMap;
 use crate::{
     constants::{FLOAT_TYPE, INTEGER_TYPE, STRING_TYPE, UNIT_TYPE},
     parse::{
-        AST, ExprReturns, ExprVariant, FunctionLiteral, Identifier, IdentifierVariant, Member, MemberVariant, Scope, ScopeVariant, TokenOrString, Tokens, TypeVariant, Visibility
+        AST, ExprReturns, ExprVariant, FunctionLiteral, Identifier, IdentifierVariant, Member,
+        MemberVariant, Scope, ScopeVariant, TokenOrString, Tokens, TypeVariant, Visibility,
     },
 };
 
@@ -37,6 +38,10 @@ impl AST {
         let member = self.get_builtin_type(name);
 
         self.members[member as usize].module_or_type
+    }
+
+    fn semantic_analyze_operation(&mut self, ctx: &mut SemanticContext, scope: u32, expr: u32) {
+        
     }
 
     fn semantic_analyze_func(&mut self, ctx: &mut SemanticContext, scope: u32, expr: u32) {
@@ -154,6 +159,9 @@ impl AST {
             }
             ExprVariant::TypeLiteral(_) => {
                 self.semantic_analyze_type_literal(ctx, scope, expr);
+            }
+            ExprVariant::Operation(_) => {
+                self.semantic_analyze_operation(ctx, scope, expr);
             }
             _ => (),
         }
