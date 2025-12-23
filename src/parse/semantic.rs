@@ -4,7 +4,7 @@ use crate::{
     constants::{FLOAT_TYPE, INTEGER_TYPE, STRING_TYPE, UNIT_TYPE},
     parse::{
         AST, ExprReturns, ExprVariant, FunctionLiteral, Identifier, IdentifierVariant, Member,
-        MemberVariant, Scope, ScopeVariant, TokenOrString, Tokens, TypeVariant, Visibility,
+        MemberVariant, Scope, ScopeVariant, TokenOrString, Tokens, TypeVariant, Visibility, errors::{MissingOperand, SemanticError},
     }, scan::TokenType,
 };
 
@@ -13,7 +13,8 @@ enum AnalyzingNow {
     Type,
     TypeBody,
     FuncParams,
-    Block,
+    Pattern, // e.g. (x, y) so certain ops not permitted
+    Expr, // if specification is unnecessary
 }
 
 struct SemanticContext<'a> {
@@ -49,11 +50,26 @@ impl AST {
         match ctx.analyzing_now {
             AnalyzingNow::FuncParams => {
                 match operation.op {
-                    TokenType::Semicolon => {
+                    TokenType::Comma => {
+                        if let Some(lhs) = operation.operand1 {
+                            // scope remains same and still analyzing func params
+                            self.semantic_analyze_expr(ctx, scope, lhs);
+                        }
+                        else {
+                            // should be param on lhs
+                            self.semantic_errors.push(SemanticError::MissingOperand(MissingOperand {
+                                operation: expr,
+                                operand_missing: 1,
+                            }));
+                        }
 
+                        // it is fine for rhs to be missing e.g. function f(0 : Integer,) ...
+                        if let Some(rhs) = operation.operand2 {
+                            self.semantic_analyze_expr(ctx, scope, rhs);
+                        }
                     }
                     TokenType::Colon => {
-                        
+                        ctx.analyzing_now = AnalyzingNow::Pattern;
                     }
                     TokenType::Eq | TokenType::ColonEq => {
 
@@ -64,7 +80,7 @@ impl AST {
                 }
             }
             _ => {
-                
+
             }
         }
     }
@@ -91,7 +107,7 @@ impl AST {
         ctx.analyzing_now = AnalyzingNow::Type;
         self.semantic_analyze_expr(ctx, func_scope, func_literal.return_type);
 
-        ctx.analyzing_now = AnalyzingNow::Block;
+        ctx.analyzing_now = AnalyzingNow::Expr;
         self.semantic_analyze_expr(ctx, func_scope, func_literal.body);
     }
 
@@ -272,7 +288,7 @@ impl AST {
 
             let mut ctx = SemanticContext {
                 tokens: tokens,
-                analyzing_now: AnalyzingNow::Block,
+                analyzing_now: AnalyzingNow::Expr,
             };
 
             let global_scope = self.scope_push(Scope {

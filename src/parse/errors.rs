@@ -32,7 +32,7 @@ pub struct ExpectedExprReturns {
 
 #[derive(Clone)]
 pub struct InvalidOperation {
-    pub operation: Expr,
+    pub operation: u32, // expr id
     pub msg: String,
 }
 
@@ -44,7 +44,7 @@ pub struct ExpectedType {
 
 #[derive(Clone)]
 pub struct MissingOperand {
-    pub operation: Expr,
+    pub operation: u32, // expr id
 
     // for this member do 1-indexed
     pub operand_missing: u32,
