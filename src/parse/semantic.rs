@@ -4,7 +4,7 @@ use crate::{
     constants::{ERROR_TYPE, FLOAT_TYPE, INTEGER_TYPE, STRING_TYPE, UNIT_TYPE},
     parse::{
         AST, ExprReturns, ExprVariant, FunctionLiteral, Identifier, IdentifierVariant, Member,
-        MemberVariant, Scope, ScopeVariant, TokenOrString, Tokens, TypeVariant, Visibility, errors::{MissingOperand, SemanticError},
+        MemberVariant, Scope, ScopeVariant, TokenOrString, Tokens, TypeVariant, Visibility, errors::{InvalidOperation, MissingOperand, SemanticError},
     }, scan::TokenType,
 };
 
@@ -45,6 +45,13 @@ impl AST {
         self.semantic_errors.push(SemanticError::MissingOperand(MissingOperand {
             operation: expr,
             operand_missing: operand,
+        }));
+    }
+
+    fn invalid_operation(&mut self, expr: u32, msg: &'static str) {
+        self.semantic_errors.push(SemanticError::InvalidOperation(InvalidOperation {
+            operation: expr,
+            msg,
         }));
     }
 
@@ -125,10 +132,13 @@ impl AST {
                         expr_mut.finalized = finalized;
                     }
                     TokenType::Eq | TokenType::ColonEq => {
-
+                        // arg with default provided
                     }
                     _ => {
-
+                        self.invalid_operation(
+                            expr,
+                            "cannot perform this operation in/for a function parameter",
+                        );
                     }
                 }
             }

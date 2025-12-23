@@ -33,7 +33,7 @@ pub struct ExpectedExprReturns {
 #[derive(Clone)]
 pub struct InvalidOperation {
     pub operation: u32, // expr id
-    pub msg: String,
+    pub msg: &'static str,
 }
 
 #[derive(Clone)]
