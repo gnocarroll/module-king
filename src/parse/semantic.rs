@@ -3,13 +3,30 @@ use std::collections::HashMap;
 use crate::{
     constants::{FLOAT_TYPE, INTEGER_TYPE, STRING_TYPE, UNIT_TYPE},
     parse::{
-        AST, ExprVariant, FunctionLiteral, Identifier, IdentifierVariant, Member, MemberVariant, Scope, ScopeVariant, TokenOrString, Tokens, TypeVariant, Visibility
+        AST, ExprReturns, ExprVariant, FunctionLiteral, Identifier, IdentifierVariant, Member, MemberVariant, Scope, ScopeVariant, TokenOrString, Tokens, TypeVariant, Visibility
     },
 };
+
+#[derive(Clone, Copy, PartialEq)]
+enum ParsingNow {
+    Type,
+    TypeBody,
+    FuncParams,
+    Block,
+}
+
+struct SemanticContext<'a> {
+    tokens: &'a Tokens<'a>,
+    parsing_now: ParsingNow,
+}
 
 impl AST {
     fn get_builtin_type(&mut self, name: &str) -> u32 {
         if let Some(member) = self.scope_search(0, name) {
+            if self.members[member as usize].variant != MemberVariant::Type {
+                panic!("Not a type: {member}")
+            }
+
             member
         } else {
             panic!("Builtin type not found: {name}");
@@ -17,14 +34,12 @@ impl AST {
     }
 
     fn get_builtin_type_id(&mut self, name: &str) -> u32 {
-        if let Some(member) = self.scope_search(0, name) {
-            member
-        } else {
-            panic!("Builtin type not found: {name}");
-        }
+        let member = self.get_builtin_type(name);
+
+        self.members[member as usize].module_or_type
     }
 
-    fn semantic_analyze_func(&mut self, tokens: &Tokens, scope: u32, expr: u32) {
+    fn semantic_analyze_func(&mut self, ctx: &SemanticContext, scope: u32, expr: u32) {
         let func_literal = match &self.exprs[expr as usize].variant {
             ExprVariant::FunctionLiteral(f) => f.clone(),
             _ => panic!(),
@@ -40,12 +55,19 @@ impl AST {
             members: HashMap::new(),
         });
 
-        for child_expr in [func_literal.params, func_literal.body, func_literal.return_type] {
-            self.semantic_analyze_expr(tokens, func_scope, child_expr);
-        }
+        // params being finalized will indicate that they are determined
+
+        self.semantic_analyze_expr(ctx, func_scope, func_literal.params);
+
+
+        self.semantic_analyze_expr(ctx, func_scope, func_literal.return_type);
+
+
+
+        self.semantic_analyze_expr(ctx, func_scope, func_literal.body);
     }
 
-    fn semantic_analyze_type_literal(&mut self, tokens: &Tokens, scope: u32, expr: u32) {
+    fn semantic_analyze_type_literal(&mut self, ctx: &SemanticContext, scope: u32, expr: u32) {
         let type_literal = match &self.exprs[expr as usize].variant {
             ExprVariant::TypeLiteral(t) => t.clone(),
             _ => panic!(),
@@ -62,13 +84,25 @@ impl AST {
             members: HashMap::new(),
         });
 
-        self.semantic_analyze_expr(tokens, type_scope, type_literal.body);
+        self.semantic_analyze_expr(ctx, type_scope, type_literal.body);
 
+        // type of named type literal is Unit (cannot assign it to something)
+        // type of unnamed type literal is whatever type in question is
 
+        let (expr_type, expr_returns) = match type_literal.name {
+            Some(_) => (self.get_builtin_type_id(UNIT_TYPE), ExprReturns::Unit),
+            None => (type_scope, ExprReturns::Type),
+        };
+
+        let expr_mut = &mut self.exprs[expr as usize];
+
+        expr_mut.etype = expr_type;
+        expr_mut.expr_returns = expr_returns;
+        expr_mut.finalized = true;
     }
 
     // semantic analysis on particular expression
-    fn semantic_analyze_expr(&mut self, tokens: &Tokens, scope: u32, expr: u32) {
+    fn semantic_analyze_expr(&mut self, ctx: &SemanticContext, scope: u32, expr: u32) {
         match &self.expr(expr).variant {
             ExprVariant::Unit
             | ExprVariant::IntegerLiteral(_)
@@ -94,7 +128,7 @@ impl AST {
                 expr.finalized = true;
             }
             ExprVariant::Identifier(ident) => {
-                let name = tokens.tok_as_str(&ident.name);
+                let name = ctx.tokens.tok_as_str(&ident.name);
 
                 if let Some(member) = self.scope_search(scope, name) {
                     let member = &self.members[member as usize];
@@ -118,10 +152,10 @@ impl AST {
                 }
             }
             ExprVariant::FunctionLiteral(_) => {
-                self.semantic_analyze_func(tokens, scope, expr);
+                self.semantic_analyze_func(ctx, scope, expr);
             }
             ExprVariant::TypeLiteral(_) => {
-                self.semantic_analyze_type_literal(tokens, scope, expr);
+                self.semantic_analyze_type_literal(ctx, scope, expr);
             }
             _ => (),
         }
@@ -157,9 +191,9 @@ impl AST {
         return self.members.len() as u32 - 1;
     }
 
-    fn scope_add_member(&mut self, tokens: &Tokens, scope: u32, member: u32) {
+    fn scope_add_member(&mut self, ctx: &SemanticContext, scope: u32, member: u32) {
         let member_name = match &self.members[member as usize].name {
-            TokenOrString::Token(t) => tokens.tok_as_str(t),
+            TokenOrString::Token(t) => ctx.tokens.tok_as_str(t),
             TokenOrString::String(s) => s.as_str(),
         };
 
@@ -171,7 +205,7 @@ impl AST {
     // return is the id of the Scope which represents the type
     fn scope_add_member_type(
         &mut self,
-        tokens: &Tokens,
+        ctx: &SemanticContext,
         scope: u32,
         name: TokenOrString,
         variant: TypeVariant,
@@ -195,7 +229,7 @@ impl AST {
             module_or_type: type_id,
         });
 
-        self.scope_add_member(tokens, scope, member_id);
+        self.scope_add_member(ctx, scope, member_id);
 
         type_id
     }
@@ -204,6 +238,11 @@ impl AST {
     pub fn do_semantic_analysis(&mut self, tokens: &Tokens, module_name: &str) {
         if let Some(expr) = self.root_expr {
             // create global scope and add built-ins
+
+            let ctx = SemanticContext {
+                tokens: tokens,
+                parsing_now: ParsingNow::Block,
+            };
 
             let global_scope = self.scope_push(Scope {
                 name: Some(TokenOrString::String("GLOBAL".to_string())),
@@ -220,7 +259,7 @@ impl AST {
                 (STRING_TYPE, TypeVariant::String),
             ] {
                 self.scope_add_member_type(
-                    tokens,
+                    &ctx,
                     global_scope,
                     TokenOrString::String(name.to_string()),
                     variant,
@@ -239,7 +278,7 @@ impl AST {
 
             // analyze root expr and provided new scope as scope
 
-            self.semantic_analyze_expr(tokens, module_scope, expr);
+            self.semantic_analyze_expr(&ctx, module_scope, expr);
         };
     }
 }

@@ -83,6 +83,14 @@ enum ExprVariant {
     TypeLiteral(TypeLiteral),
 }
 
+#[derive(Clone, Copy, PartialEq)]
+enum ExprReturns {
+    Unit,
+    Value,
+    Type,
+    Module,
+}
+
 struct Expr {
     // token indices range for expression (end_tok is not inclusive)
     pub tok: u32,
@@ -92,6 +100,8 @@ struct Expr {
     pub etype: u32,
 
     pub variant: ExprVariant,
+
+    pub expr_returns: ExprReturns,
 
     // start off false and then set to true if/when semantic analysis is
     // successfully completed for Expr
@@ -105,6 +115,7 @@ impl Default for Expr {
             end_tok: 0,
             etype: 0,
             variant: ExprVariant::Unit,
+            expr_returns: ExprReturns::Unit,
             finalized: false,
         }
     }

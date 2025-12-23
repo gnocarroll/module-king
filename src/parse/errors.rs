@@ -1,6 +1,6 @@
 // error structs for syntax, semantic analysis
 
-use crate::scan::{Token, TokenType};
+use crate::{parse::ExprReturns, scan::{Token, TokenType}};
 
 #[derive(Clone, Copy)]
 pub struct ExpectedToken {
@@ -20,6 +20,9 @@ pub enum ParseError {
     NameMismatch(NameMismatch),
 }
 
-pub struct SemanticError {
-    msg: String,
+#[derive(Clone)]
+pub struct ExpectedExprReturns {
+    pub expr: u32,
+    pub expected: ExprReturns,
+    pub found: ExprReturns,
 }
