@@ -39,7 +39,7 @@ impl AST {
         self.members[member as usize].module_or_type
     }
 
-    fn semantic_analyze_func(&mut self, ctx: &SemanticContext, scope: u32, expr: u32) {
+    fn semantic_analyze_func(&mut self, ctx: &mut SemanticContext, scope: u32, expr: u32) {
         let func_literal = match &self.exprs[expr as usize].variant {
             ExprVariant::FunctionLiteral(f) => f.clone(),
             _ => panic!(),
@@ -57,17 +57,17 @@ impl AST {
 
         // params being finalized will indicate that they are determined
 
+        ctx.parsing_now = ParsingNow::FuncParams;
         self.semantic_analyze_expr(ctx, func_scope, func_literal.params);
 
-
+        ctx.parsing_now = ParsingNow::Type;
         self.semantic_analyze_expr(ctx, func_scope, func_literal.return_type);
 
-
-
+        ctx.parsing_now = ParsingNow::Block;
         self.semantic_analyze_expr(ctx, func_scope, func_literal.body);
     }
 
-    fn semantic_analyze_type_literal(&mut self, ctx: &SemanticContext, scope: u32, expr: u32) {
+    fn semantic_analyze_type_literal(&mut self, ctx: &mut SemanticContext, scope: u32, expr: u32) {
         let type_literal = match &self.exprs[expr as usize].variant {
             ExprVariant::TypeLiteral(t) => t.clone(),
             _ => panic!(),
@@ -102,7 +102,7 @@ impl AST {
     }
 
     // semantic analysis on particular expression
-    fn semantic_analyze_expr(&mut self, ctx: &SemanticContext, scope: u32, expr: u32) {
+    fn semantic_analyze_expr(&mut self, ctx: &mut SemanticContext, scope: u32, expr: u32) {
         match &self.expr(expr).variant {
             ExprVariant::Unit
             | ExprVariant::IntegerLiteral(_)
@@ -191,7 +191,7 @@ impl AST {
         return self.members.len() as u32 - 1;
     }
 
-    fn scope_add_member(&mut self, ctx: &SemanticContext, scope: u32, member: u32) {
+    fn scope_add_member(&mut self, ctx: &mut SemanticContext, scope: u32, member: u32) {
         let member_name = match &self.members[member as usize].name {
             TokenOrString::Token(t) => ctx.tokens.tok_as_str(t),
             TokenOrString::String(s) => s.as_str(),
@@ -205,7 +205,7 @@ impl AST {
     // return is the id of the Scope which represents the type
     fn scope_add_member_type(
         &mut self,
-        ctx: &SemanticContext,
+        ctx: &mut SemanticContext,
         scope: u32,
         name: TokenOrString,
         variant: TypeVariant,
@@ -239,7 +239,7 @@ impl AST {
         if let Some(expr) = self.root_expr {
             // create global scope and add built-ins
 
-            let ctx = SemanticContext {
+            let mut ctx = SemanticContext {
                 tokens: tokens,
                 parsing_now: ParsingNow::Block,
             };
@@ -259,7 +259,7 @@ impl AST {
                 (STRING_TYPE, TypeVariant::String),
             ] {
                 self.scope_add_member_type(
-                    &ctx,
+                    &mut ctx,
                     global_scope,
                     TokenOrString::String(name.to_string()),
                     variant,
@@ -278,7 +278,7 @@ impl AST {
 
             // analyze root expr and provided new scope as scope
 
-            self.semantic_analyze_expr(&ctx, module_scope, expr);
+            self.semantic_analyze_expr(&mut ctx, module_scope, expr);
         };
     }
 }
