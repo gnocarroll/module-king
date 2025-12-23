@@ -8,7 +8,7 @@ use crate::{
 };
 
 #[derive(Clone, Copy, PartialEq)]
-enum ParsingNow {
+enum AnalzyingNow {
     Type,
     TypeBody,
     FuncParams,
@@ -17,7 +17,7 @@ enum ParsingNow {
 
 struct SemanticContext<'a> {
     tokens: &'a Tokens<'a>,
-    parsing_now: ParsingNow,
+    analyzing_now: AnalzyingNow,
 }
 
 impl AST {
@@ -55,15 +55,13 @@ impl AST {
             members: HashMap::new(),
         });
 
-        // params being finalized will indicate that they are determined
-
-        ctx.parsing_now = ParsingNow::FuncParams;
+        ctx.analyzing_now = AnalzyingNow::FuncParams;
         self.semantic_analyze_expr(ctx, func_scope, func_literal.params);
 
-        ctx.parsing_now = ParsingNow::Type;
+        ctx.analyzing_now = AnalzyingNow::Type;
         self.semantic_analyze_expr(ctx, func_scope, func_literal.return_type);
 
-        ctx.parsing_now = ParsingNow::Block;
+        ctx.analyzing_now = AnalzyingNow::Block;
         self.semantic_analyze_expr(ctx, func_scope, func_literal.body);
     }
 
@@ -241,7 +239,7 @@ impl AST {
 
             let mut ctx = SemanticContext {
                 tokens: tokens,
-                parsing_now: ParsingNow::Block,
+                analyzing_now: AnalzyingNow::Block,
             };
 
             let global_scope = self.scope_push(Scope {
