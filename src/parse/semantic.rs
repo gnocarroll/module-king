@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    constants::{FLOAT_TYPE, INTEGER_TYPE, STRING_TYPE, UNIT_TYPE},
+    constants::{ERROR_TYPE, FLOAT_TYPE, INTEGER_TYPE, STRING_TYPE, UNIT_TYPE},
     parse::{
         AST, ExprReturns, ExprVariant, FunctionLiteral, Identifier, IdentifierVariant, Member,
         MemberVariant, Scope, ScopeVariant, TokenOrString, Tokens, TypeVariant, Visibility, errors::{MissingOperand, SemanticError},
@@ -41,6 +41,13 @@ impl AST {
         self.members[member as usize].module_or_type
     }
 
+    fn missing_operand(&mut self, expr: u32, operand: u32) {
+        self.semantic_errors.push(SemanticError::MissingOperand(MissingOperand {
+            operation: expr,
+            operand_missing: operand,
+        }));
+    }
+
     fn semantic_analyze_operation(&mut self, ctx: &mut SemanticContext, scope: u32, expr: u32) {
         let operation = match &self.exprs[expr as usize].variant {
             ExprVariant::Operation(operation) => operation.clone(),
@@ -57,10 +64,7 @@ impl AST {
                         }
                         else {
                             // should be param on lhs
-                            self.semantic_errors.push(SemanticError::MissingOperand(MissingOperand {
-                                operation: expr,
-                                operand_missing: 1,
-                            }));
+                            self.missing_operand(expr, 1);
                         }
 
                         // it is fine for rhs to be missing e.g. function f(0 : Integer,) ...
@@ -69,7 +73,27 @@ impl AST {
                         }
                     }
                     TokenType::Colon => {
-                        ctx.analyzing_now = AnalyzingNow::Pattern;
+                        if let Some(pattern) = operation.operand1 {
+                            ctx.analyzing_now = AnalyzingNow::Pattern;
+                            self.semantic_analyze_expr(ctx, scope, pattern);
+                            ctx.analyzing_now = AnalyzingNow::FuncParams;
+                        }
+                        else {
+                            self.missing_operand(expr, 1);
+                        }
+
+                        if let Some(pattern) = operation.operand2 {
+                            ctx.analyzing_now = AnalyzingNow::Type;
+                            self.semantic_analyze_expr(ctx, scope, pattern);
+                            ctx.analyzing_now = AnalyzingNow::FuncParams;
+                        }
+                        else {
+                            self.missing_operand(expr, 2);
+                        }
+                        
+                        if let (Some(pattern), param_type) = (operation.operand1, operation.operand2) {
+
+                        }
                     }
                     TokenType::Eq | TokenType::ColonEq => {
 
@@ -300,6 +324,7 @@ impl AST {
             });
 
             for (name, variant) in [
+                (ERROR_TYPE, TypeVariant::Error),
                 (INTEGER_TYPE, TypeVariant::Integer),
                 (FLOAT_TYPE, TypeVariant::Float),
                 (UNIT_TYPE, TypeVariant::Unit),

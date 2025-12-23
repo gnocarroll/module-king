@@ -12,6 +12,7 @@ use crate::{
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum TypeVariant {
+    Error, // e.g. type could not be determined, other problem
     Unit,
     String,
     Integer,
