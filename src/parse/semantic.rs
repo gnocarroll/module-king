@@ -5,11 +5,11 @@ use crate::{
     parse::{
         AST, ExprReturns, ExprVariant, FunctionLiteral, Identifier, IdentifierVariant, Member,
         MemberVariant, Scope, ScopeVariant, TokenOrString, Tokens, TypeVariant, Visibility,
-    },
+    }, scan::TokenType,
 };
 
 #[derive(Clone, Copy, PartialEq)]
-enum AnalzyingNow {
+enum AnalyzingNow {
     Type,
     TypeBody,
     FuncParams,
@@ -18,7 +18,7 @@ enum AnalzyingNow {
 
 struct SemanticContext<'a> {
     tokens: &'a Tokens<'a>,
-    analyzing_now: AnalzyingNow,
+    analyzing_now: AnalyzingNow,
 }
 
 impl AST {
@@ -41,7 +41,23 @@ impl AST {
     }
 
     fn semantic_analyze_operation(&mut self, ctx: &mut SemanticContext, scope: u32, expr: u32) {
-        
+        let operation = match &self.exprs[expr as usize].variant {
+            ExprVariant::Operation(operation) => operation.clone(),
+            _ => panic!(),
+        };
+
+        match ctx.analyzing_now {
+            AnalyzingNow::FuncParams => {
+                match operation.op {
+                    TokenType::Semicolon => {
+
+                    }
+                    TokenType::Colon => {
+                        
+                    }
+                }
+            }
+        }
     }
 
     fn semantic_analyze_func(&mut self, ctx: &mut SemanticContext, scope: u32, expr: u32) {
@@ -60,13 +76,13 @@ impl AST {
             members: HashMap::new(),
         });
 
-        ctx.analyzing_now = AnalzyingNow::FuncParams;
+        ctx.analyzing_now = AnalyzingNow::FuncParams;
         self.semantic_analyze_expr(ctx, func_scope, func_literal.params);
 
-        ctx.analyzing_now = AnalzyingNow::Type;
+        ctx.analyzing_now = AnalyzingNow::Type;
         self.semantic_analyze_expr(ctx, func_scope, func_literal.return_type);
 
-        ctx.analyzing_now = AnalzyingNow::Block;
+        ctx.analyzing_now = AnalyzingNow::Block;
         self.semantic_analyze_expr(ctx, func_scope, func_literal.body);
     }
 
@@ -247,7 +263,7 @@ impl AST {
 
             let mut ctx = SemanticContext {
                 tokens: tokens,
-                analyzing_now: AnalzyingNow::Block,
+                analyzing_now: AnalyzingNow::Block,
             };
 
             let global_scope = self.scope_push(Scope {

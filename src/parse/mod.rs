@@ -62,6 +62,7 @@ struct Identifier {
     pub variant: IdentifierVariant,
 }
 
+#[derive(Clone)]
 struct Operation {
     pub op: TokenType,
     pub operand1: Option<u32>,
