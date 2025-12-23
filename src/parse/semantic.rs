@@ -55,6 +55,27 @@ impl AST {
         }));
     }
 
+    // ret: member id of instance
+    fn scope_add_instance(
+        &mut self,
+        ctx: &mut SemanticContext,
+        scope: u32,
+        name: TokenOrString,
+        type_id: Option<u32>,
+    ) -> u32 {
+        let type_id = match type_id {
+            Some(id) => id,
+            None => self.get_builtin_type_id(ERROR_TYPE),
+        };
+
+        self.member_push(Member {
+            name, 
+            visibility: Visibility::Private,
+            variant: MemberVariant::Instance,
+            module_or_type: type_id,
+        })
+    }
+
     // function to attempt pattern matching between identifier(s) in pattern and type
     // also should add any new identifiers to scope
     // ret should indicate what problems occurred if any
@@ -67,6 +88,20 @@ impl AST {
         // may be absent (so errors will be recorded if necessary)
         type_pattern: Option<u32>,
     ) -> Result<(), ()> {
+        match self.exprs[ident_pattern as usize].variant {
+            ExprVariant::Identifier(ident) => {
+                self.scope_add_instance(
+                    ctx,
+                    scope,
+                    TokenOrString::Token(ident.name),
+                    type_pattern,
+                );
+            }
+            _ => {
+
+            }
+        }
+
         Ok(())
     }
 
