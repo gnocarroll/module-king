@@ -56,19 +56,21 @@ enum IdentifierVariant {
     Member, // e.g. for point.x would be "x"
 }
 
+#[derive(Clone, Copy)]
 struct Identifier {
     pub name: Token,
 
     pub variant: IdentifierVariant,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 struct Operation {
     pub op: TokenType,
     pub operand1: Option<u32>,
     pub operand2: Option<u32>,
 }
 
+#[derive(Clone)]
 enum ExprVariant {
     Unit,
     IntegerLiteral(u64),
@@ -92,6 +94,7 @@ enum ExprReturns {
     Module,
 }
 
+#[derive(Clone)]
 struct Expr {
     // token indices range for expression (end_tok is not inclusive)
     pub tok: u32,

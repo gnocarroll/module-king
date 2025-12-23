@@ -45,7 +45,7 @@ static OP_INFO_TABLE: &[&[OperatorInfo]] = &[
     &[OperatorInfo {
         ttype: TokenType::Semicolon,
         variant: Infix,
-        assoc: Assoc::Left,
+        assoc: Assoc::Right,
         is_rhs_optional: true,
     }],
     &[

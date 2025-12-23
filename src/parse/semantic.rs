@@ -55,7 +55,16 @@ impl AST {
                     TokenType::Colon => {
                         
                     }
+                    TokenType::Eq | TokenType::ColonEq => {
+
+                    }
+                    _ => {
+
+                    }
                 }
+            }
+            _ => {
+                
             }
         }
     }
