@@ -40,12 +40,29 @@ enum ScopeVariant {
     Type(TypeVariant),
 }
 
+// destructuring from given type using a certain pattern
+// e.g. to pattern (x, y) from type (u32, u32)
+#[derive(Clone, Copy)]
+struct Destructure {
+    // pattern i.d. (see Pattern struct)
+    dest_pattern: u32,
+
+    // type (i.e. scope) id
+    src_type: u32,
+}
+
 #[derive(Clone)]
 struct FunctionLiteral {
     pub name: Option<Token>,
     pub params: u32,
     pub return_type: u32,
     pub body: u32,
+
+    // for semantic analysis stage more expressions will be added
+    // for ironed-out params
+
+    pub params_start: u32,
+    pub params_stop: u32,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -85,6 +102,8 @@ enum ExprVariant {
     FunctionLiteral(FunctionLiteral),
 
     TypeLiteral(TypeLiteral),
+
+    Destructure(Destructure),
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -185,14 +204,23 @@ struct Scope {
     pub members: HashMap<String, u32>,
 }
 
+#[derive(Clone, Copy)]
+struct PatternRange {
+    start: u32,
+
+    // not inclusive
+    stop: u32,
+}
+
 #[derive(Clone)]
 enum Pattern {
+    Missing, // piece of pattern that should be there but is not
     IgnoreOne, // _
     IgnoreMultiple, // ..
     Binding((Token, u32)), // e.g. rest @ ..
     
     // tuple is range of patterns, last is not inclusive
-    Tuple((u32, u32)),
+    Tuple(PatternRange),
     Ident(Token),
 
     // expr id, should be statically computable I guess
@@ -202,11 +230,11 @@ enum Pattern {
     // data structure
     Struct((
         Option<Token>, // type name (optional)
-        Vec<u32>, // Named pattern Token -> Pattern (u32)
+        PatternRange,
     )),
 
     // same as tuple really but uses []
-    Slice((u32, u32)),
+    Slice(PatternRange),
 }
 
 struct Tokens<'a> {
