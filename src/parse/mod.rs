@@ -185,6 +185,21 @@ struct Scope {
     pub members: HashMap<String, u32>,
 }
 
+enum Pattern {
+    IgnoreOne, // _
+    IgnoreMultiple, // ..
+    NamedPattern((Token, Box<Pattern>)), // e.g. rest @ ..
+    Tuple(Vec<Token>),
+    Ident(Token),
+    Struct((
+        Option<Token>, // type name (optional)
+        Vec<(Token, Box<Pattern>)>,
+    )),
+
+    // usize is array length
+    Slice((Box<Pattern>, usize)),
+}
+
 struct Tokens<'a> {
     file_str: &'a str,
     tokens: &'a Vec<Token>,
