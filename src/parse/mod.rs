@@ -185,19 +185,28 @@ struct Scope {
     pub members: HashMap<String, u32>,
 }
 
+#[derive(Clone)]
 enum Pattern {
     IgnoreOne, // _
     IgnoreMultiple, // ..
-    NamedPattern((Token, Box<Pattern>)), // e.g. rest @ ..
-    Tuple(Vec<Token>),
+    Binding((Token, u32)), // e.g. rest @ ..
+    
+    // tuple is range of patterns, last is not inclusive
+    Tuple((u32, u32)),
     Ident(Token),
+
+    // expr id, should be statically computable I guess
+    Value(u32),
+
+    // for struct simply leave out ignored fields from this
+    // data structure
     Struct((
         Option<Token>, // type name (optional)
-        Vec<(Token, Box<Pattern>)>,
+        Vec<u32>, // Named pattern Token -> Pattern (u32)
     )),
 
-    // usize is array length
-    Slice((Box<Pattern>, usize)),
+    // same as tuple really but uses []
+    Slice((u32, u32)),
 }
 
 struct Tokens<'a> {
@@ -296,9 +305,12 @@ pub struct AST {
     // exprs used in initial parsing and semantic analysis stage
     exprs: Vec<Expr>,
 
-    // scopes, members not used until semantic analysis stage
+    // exprs are main thing for parsing so e.g. scopes members are for
+    // semantic analysis
     scopes: Vec<Scope>,
     members: Vec<Member>,
+
+    patterns: Vec<Pattern>,
 
     parse_errors: Vec<ParseError>,
     semantic_errors: Vec<SemanticError>,
