@@ -75,7 +75,7 @@ struct Destructure {
     src_type: u32,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 struct FunctionLiteral {
     pub name: Option<Token>,
     pub params: u32,

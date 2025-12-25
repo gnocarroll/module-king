@@ -280,6 +280,7 @@ impl AST {
                 params: params,
                 return_type: return_type,
                 body: body,
+                ..Default::default()
             }),
             ..Default::default()
         })

@@ -141,9 +141,9 @@ impl AST {
 
         let mut finalized = false;
 
-        if let (Some(pattern), param_type) = (operand1, operand2) {
+        if let Some(pattern) = operand1 {
             if self
-                .pattern_matching(ctx, scope, pattern, param_type)
+                .pattern_matching(ctx, scope, pattern, operand2)
                 .is_ok()
             {
                 finalized = true;
