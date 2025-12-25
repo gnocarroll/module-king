@@ -50,10 +50,18 @@ pub struct MissingOperand {
     pub operand_missing: u32,
 }
 
+// maybe in the future should add more context
+// i.e. why is expr unexpected there
+#[derive(Clone)]
+pub struct UnexpectedExpr {
+    pub expr: u32,
+}
+
 #[derive(Clone)]
 pub enum SemanticError {
     ExpectedExprReturns(ExpectedExprReturns),
     InvalidOperation(InvalidOperation),
     ExpectedType(ExpectedType),
     MissingOperand(MissingOperand),
+    UnexpectedExpr(UnexpectedExpr),
 }

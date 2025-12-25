@@ -3,17 +3,27 @@ use std::collections::HashMap;
 use crate::{
     constants::{ERROR_TYPE, FLOAT_TYPE, INTEGER_TYPE, STRING_TYPE, UNIT_TYPE},
     parse::{
-        AST, ExprReturns, ExprVariant, FunctionLiteral, Identifier, IdentifierVariant, Member, MemberVariant, Scope, ScopeVariant, TokenOrString, Tokens, Type, TypeVariant, Visibility, errors::{InvalidOperation, MissingOperand, SemanticError}
-    }, scan::TokenType,
+        AST, ExprReturns, ExprVariant, FunctionLiteral, Identifier, IdentifierVariant, Member,
+        MemberVariant, Operation, Scope, ScopeVariant, TokenOrString, Tokens, Type, TypeVariant,
+        Visibility,
+        errors::{InvalidOperation, MissingOperand, SemanticError, UnexpectedExpr},
+    },
+    scan::TokenType,
 };
+
+#[derive(Clone, Copy, PartialEq)]
+enum IsEnum {
+    Enum,
+    Other,
+}
 
 #[derive(Clone, Copy, PartialEq)]
 enum AnalyzingNow {
     Type,
-    TypeBody,
+    TypeBody(IsEnum),
     FuncParams,
     Pattern, // e.g. (x, y) so certain ops not permitted
-    Expr, // if specification is unnecessary
+    Expr,    // if specification is unnecessary
 }
 
 struct SemanticContext<'a> {
@@ -41,17 +51,19 @@ impl AST {
     }
 
     fn missing_operand(&mut self, expr: u32, operand: u32) {
-        self.semantic_errors.push(SemanticError::MissingOperand(MissingOperand {
-            operation: expr,
-            operand_missing: operand,
-        }));
+        self.semantic_errors
+            .push(SemanticError::MissingOperand(MissingOperand {
+                operation: expr,
+                operand_missing: operand,
+            }));
     }
 
     fn invalid_operation(&mut self, expr: u32, msg: &'static str) {
-        self.semantic_errors.push(SemanticError::InvalidOperation(InvalidOperation {
-            operation: expr,
-            msg,
-        }));
+        self.semantic_errors
+            .push(SemanticError::InvalidOperation(InvalidOperation {
+                operation: expr,
+                msg,
+            }));
     }
 
     // ret: member id of instance
@@ -68,7 +80,7 @@ impl AST {
         };
 
         self.member_push(Member {
-            name, 
+            name,
             visibility: Visibility::Private,
             variant: MemberVariant::Instance,
             module_or_type: type_id,
@@ -89,19 +101,151 @@ impl AST {
     ) -> Result<(), ()> {
         match self.exprs[ident_pattern as usize].variant {
             ExprVariant::Identifier(ident) => {
-                self.scope_add_instance(
-                    ctx,
-                    scope,
-                    TokenOrString::Token(ident.name),
-                    type_pattern,
-                );
+                self.scope_add_instance(ctx, scope, TokenOrString::Token(ident.name), type_pattern);
             }
-            _ => {
-
-            }
+            _ => {}
         }
 
         Ok(())
+    }
+
+    fn semantic_analyze_operation_func_params(
+        &mut self,
+        ctx: &mut SemanticContext,
+        scope: u32,
+        expr: u32,
+        operation: Operation,
+    ) {
+        match operation.op {
+            TokenType::Comma => {
+                if let Some(lhs) = operation.operand1 {
+                    // scope remains same and still analyzing func params
+                    self.semantic_analyze_expr(ctx, scope, lhs);
+                } else {
+                    // should be param on lhs
+                    self.missing_operand(expr, 1);
+                }
+
+                // it is fine for rhs to be missing e.g. function f(0 : Integer,) ...
+                if let Some(rhs) = operation.operand2 {
+                    self.semantic_analyze_expr(ctx, scope, rhs);
+                }
+            }
+            TokenType::Colon => {
+                let old_analyzing_now = ctx.analyzing_now;
+
+                if let Some(pattern) = operation.operand1 {
+                    ctx.analyzing_now = AnalyzingNow::Pattern;
+                    self.semantic_analyze_expr(ctx, scope, pattern);
+                    ctx.analyzing_now = old_analyzing_now;
+                } else {
+                    self.missing_operand(expr, 1);
+                }
+
+                if let Some(pattern) = operation.operand2 {
+                    ctx.analyzing_now = AnalyzingNow::Type;
+                    self.semantic_analyze_expr(ctx, scope, pattern);
+                    ctx.analyzing_now = old_analyzing_now;
+                } else {
+                    self.missing_operand(expr, 2);
+                }
+
+                let mut finalized = false;
+
+                if let (Some(pattern), param_type) = (operation.operand1, operation.operand2) {
+                    if self
+                        .pattern_matching(ctx, scope, pattern, param_type)
+                        .is_ok()
+                    {
+                        finalized = true;
+                    }
+                }
+
+                let unit_type = self.get_builtin_type_id(UNIT_TYPE);
+
+                let expr_mut = &mut self.exprs[expr as usize];
+
+                expr_mut.type_or_module = unit_type;
+                expr_mut.expr_returns = ExprReturns::Unit;
+                expr_mut.finalized = finalized;
+            }
+            TokenType::Eq | TokenType::ColonEq => {
+                // arg with default provided
+            }
+            _ => {
+                self.invalid_operation(
+                    expr,
+                    "cannot perform this operation in/for a function parameter",
+                );
+            }
+        }
+    }
+
+    fn semantic_analyze_operation_type_body(
+        &mut self,
+        ctx: &mut SemanticContext,
+        scope: u32,
+        expr: u32,
+        operation: Operation,
+    ) {
+        match operation.op {
+            TokenType::Begin => {
+                // Block
+                let child_expr = operation
+                    .operand1
+                    .expect("Block should always contain Expr");
+
+                match self.exprs[child_expr as usize].variant {
+                    ExprVariant::Operation(Operation {
+                        op: TokenType::Begin,
+                        ..
+                    }) => {
+                        self.semantic_errors.push(SemanticError::InvalidOperation(
+                            InvalidOperation {
+                                operation: child_expr,
+                                msg: "no nested blocks in type body",
+                            },
+                        ));
+                        return;
+                    }
+                    _ => (),
+                }
+
+                self.semantic_analyze_expr(ctx, scope, child_expr);
+            }
+            TokenType::Semicolon | TokenType::Comma => {
+                match (operation.op, ctx.analyzing_now) {
+                    (TokenType::Semicolon, AnalyzingNow::TypeBody(IsEnum::Enum))
+                    | (TokenType::Comma, AnalyzingNow::TypeBody(IsEnum::Other)) => {
+                        self.invalid_operation(
+                            expr,
+                            "only enums should have comma-separated members",
+                        );
+                    }
+                    _ => (),
+                }
+
+                self.semantic_analyze_expr(
+                    ctx,
+                    scope,
+                    operation
+                        .operand1
+                        .expect("LHS should always be present here"),
+                );
+
+                // also analyze rhs if not Unit
+
+                let rhs = operation
+                    .operand2
+                    .expect("RHS should always be present here");
+
+                match self.exprs[rhs as usize].variant {
+                    ExprVariant::Unit => (),
+                    _ => self.semantic_analyze_expr(ctx, scope, rhs),
+                }
+            }
+            _ => {}
+        }
     }
 
     fn semantic_analyze_operation(&mut self, ctx: &mut SemanticContext, scope: u32, expr: u32) {
@@ -112,73 +256,12 @@ impl AST {
 
         match ctx.analyzing_now {
             AnalyzingNow::FuncParams => {
-                match operation.op {
-                    TokenType::Comma => {
-                        if let Some(lhs) = operation.operand1 {
-                            // scope remains same and still analyzing func params
-                            self.semantic_analyze_expr(ctx, scope, lhs);
-                        }
-                        else {
-                            // should be param on lhs
-                            self.missing_operand(expr, 1);
-                        }
-
-                        // it is fine for rhs to be missing e.g. function f(0 : Integer,) ...
-                        if let Some(rhs) = operation.operand2 {
-                            self.semantic_analyze_expr(ctx, scope, rhs);
-                        }
-                    }
-                    TokenType::Colon => {
-                        let old_analyzing_now = ctx.analyzing_now;
-
-                        if let Some(pattern) = operation.operand1 {
-                            ctx.analyzing_now = AnalyzingNow::Pattern;
-                            self.semantic_analyze_expr(ctx, scope, pattern);
-                            ctx.analyzing_now = old_analyzing_now;
-                        }
-                        else {
-                            self.missing_operand(expr, 1);
-                        }
-
-                        if let Some(pattern) = operation.operand2 {
-                            ctx.analyzing_now = AnalyzingNow::Type;
-                            self.semantic_analyze_expr(ctx, scope, pattern);
-                            ctx.analyzing_now = old_analyzing_now;
-                        }
-                        else {
-                            self.missing_operand(expr, 2);
-                        }
-                        
-                        let mut finalized = false;
-
-                        if let (Some(pattern), param_type) = (operation.operand1, operation.operand2) {
-                            if self.pattern_matching(ctx, scope, pattern, param_type).is_ok() {
-                                finalized = true;
-                            }
-                        }
-
-                        let unit_type = self.get_builtin_type_id(UNIT_TYPE);
-
-                        let expr_mut = &mut self.exprs[expr as usize];
-
-                        expr_mut.type_or_module = unit_type;
-                        expr_mut.expr_returns = ExprReturns::Unit;
-                        expr_mut.finalized = finalized;
-                    }
-                    TokenType::Eq | TokenType::ColonEq => {
-                        // arg with default provided
-                    }
-                    _ => {
-                        self.invalid_operation(
-                            expr,
-                            "cannot perform this operation in/for a function parameter",
-                        );
-                    }
-                }
+                self.semantic_analyze_operation_func_params(ctx, scope, expr, operation);
             }
-            _ => {
-
+            AnalyzingNow::TypeBody(_) => {
+                self.semantic_analyze_operation_type_body(ctx, scope, expr, operation);
             }
+            _ => {}
         }
     }
 
@@ -214,8 +297,6 @@ impl AST {
             _ => panic!(),
         };
 
-        self.scope_add_member_type(ctx, scope, name, variant)
-
         let type_scope = self.scope_push(Scope {
             name: match type_literal.name {
                 Some(t) => Some(TokenOrString::Token(t)),
@@ -229,12 +310,22 @@ impl AST {
 
         let type_id = self.type_push_scope(type_scope);
 
+        // if it is a named type add it to scope
+        if type_literal.name.is_some() {
+            self.scope_add_member_type_from_id(ctx, scope, type_id);
+        }
+
         let old_analyzing_now = ctx.analyzing_now;
 
-        ctx.analyzing_now = AnalyzingNow::TypeBody;
+        // analyze body of type and use scope created for type
+
+        // enum parsing is different (comma-separated values)
+        ctx.analyzing_now = AnalyzingNow::TypeBody(match type_literal.variant {
+            TypeVariant::Enum => IsEnum::Enum,
+            _ => IsEnum::Other,
+        });
         self.semantic_analyze_expr(ctx, type_scope, type_literal.body);
         ctx.analyzing_now = old_analyzing_now;
-
 
         // type of named type literal is Unit (cannot assign it to something)
         // type of unnamed type literal is whatever type in question is
@@ -249,6 +340,19 @@ impl AST {
         expr_mut.type_or_module = expr_type;
         expr_mut.expr_returns = expr_returns;
         expr_mut.finalized = true;
+    }
+
+    fn test_analyzing_now(
+        &self,
+        analyzing_now: AnalyzingNow,
+        allowed: &[AnalyzingNow],
+        expr: u32,
+    ) -> Result<(), UnexpectedExpr> {
+        if allowed.iter().any(|curr| *curr == analyzing_now) {
+            Ok(())
+        } else {
+            Err(UnexpectedExpr { expr })
+        }
     }
 
     // semantic analysis on particular expression
@@ -302,9 +406,27 @@ impl AST {
                 }
             }
             ExprVariant::FunctionLiteral(_) => {
+                if self
+                    .test_analyzing_now(ctx.analyzing_now, &[AnalyzingNow::Expr], expr)
+                    .is_err()
+                {
+                    return;
+                }
+
                 self.semantic_analyze_func(ctx, scope, expr);
             }
             ExprVariant::TypeLiteral(_) => {
+                if self
+                    .test_analyzing_now(
+                        ctx.analyzing_now,
+                        &[AnalyzingNow::Expr, AnalyzingNow::Type],
+                        expr,
+                    )
+                    .is_err()
+                {
+                    return;
+                }
+
                 self.semantic_analyze_type_literal(ctx, scope, expr);
             }
             ExprVariant::Operation(_) => {
@@ -369,12 +491,7 @@ impl AST {
             .insert(member_name.to_string(), member);
     }
 
-    fn type_create(
-        &mut self,
-        scope: u32,
-        name: TokenOrString,
-        variant: TypeVariant,
-    ) -> u32 {
+    fn type_create(&mut self, scope: u32, name: TokenOrString, variant: TypeVariant) -> u32 {
         let scope_id = self.scope_push(Scope {
             name: Some(name.clone()),
             variant: ScopeVariant::Type(variant),
@@ -395,14 +512,12 @@ impl AST {
         type_id: u32,
     ) -> u32 {
         let name = match self.types[type_id as usize] {
-            Type::Scope(scope) => {
-                self.scopes[scope as usize].name.clone()
-            }
-            _ => None
+            Type::Scope(scope) => self.scopes[scope as usize].name.clone(),
+            _ => None,
         };
 
         let member_id = self.member_push(Member {
-            name: name.expect("TYPE LACKING A NAME"),
+            name: name.expect("CURRENTLY CAN ONLY ADD NAMED TYPE AS SCOPE MEMBER"),
             visibility: Visibility::Private,
             variant: MemberVariant::Type,
             module_or_type: type_id,
