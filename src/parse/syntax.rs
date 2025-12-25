@@ -677,6 +677,17 @@ impl AST {
                     operand_to_string(operation.operand2),
                 )
             }
+            ExprVariant::If(if_expr) | ExprVariant::Elif(if_expr) => {
+                format!(
+                    "(if {} then {}{})",
+                    self.expr_to_string(tokens, if_expr.cond),
+                    self.expr_to_string(tokens, if_expr.body),
+                    match if_expr.else_expr {
+                        Some(expr) => format!(" else {}", self.expr_to_string(tokens, expr)),
+                        None => "".to_string(),
+                    }
+                )
+            }
             ExprVariant::FunctionLiteral(function_literal) => {
                 format!(
                     "(defun {}{} => {} = {})",
