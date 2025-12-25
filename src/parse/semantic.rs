@@ -225,25 +225,29 @@ impl AST {
                     _ => (),
                 }
 
-                self.semantic_analyze_expr(
-                    ctx,
-                    scope,
-                    operation
-                        .operand1
-                        .expect("LHS should always be present here"),
-                );
+                for operand in [operation.operand1, operation.operand2] {
+                    // if second operand is Unit then ignore it (otherwise would cause error)
+                    
+                    if operand == operation.operand2
+                        && match self.exprs
+                            [operation.operand2.expect("RHS should be present") as usize]
+                            .variant
+                        {
+                            ExprVariant::Unit => true,
+                            _ => false,
+                        }
+                    {
+                        break;
+                    }
 
-                // also analyze rhs if not Unit
-
-                let rhs = operation
-                    .operand2
-                    .expect("RHS should always be present here");
-
-                match self.exprs[rhs as usize].variant {
-                    ExprVariant::Unit => (),
-                    _ => self.semantic_analyze_expr(ctx, scope, rhs),
+                    self.semantic_analyze_expr(
+                        ctx,
+                        scope,
+                        operand.expect("both operands should always be present here"),
+                    );
                 }
             }
+            TokenType::Colon => {}
             _ => {}
         }
     }
@@ -362,6 +366,13 @@ impl AST {
             | ExprVariant::IntegerLiteral(_)
             | ExprVariant::FloatLiteral(_)
             | ExprVariant::StringLiteral(_) => {
+                if self
+                    .test_analyzing_now(ctx.analyzing_now, &[AnalyzingNow::Expr], expr)
+                    .is_err()
+                {
+                    return;
+                }
+
                 // find built-in type id and set type of expr
 
                 let type_name = match self.expr(expr).variant {
