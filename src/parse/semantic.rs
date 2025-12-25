@@ -214,6 +214,8 @@ impl AST {
             _ => panic!(),
         };
 
+        self.scope_add_member_type(ctx, scope, name, variant)
+
         let type_scope = self.scope_push(Scope {
             name: match type_literal.name {
                 Some(t) => Some(TokenOrString::Token(t)),
@@ -225,14 +227,21 @@ impl AST {
             members: HashMap::new(),
         });
 
+        let type_id = self.type_push_scope(type_scope);
+
+        let old_analyzing_now = ctx.analyzing_now;
+
+        ctx.analyzing_now = AnalyzingNow::TypeBody;
         self.semantic_analyze_expr(ctx, type_scope, type_literal.body);
+        ctx.analyzing_now = old_analyzing_now;
+
 
         // type of named type literal is Unit (cannot assign it to something)
         // type of unnamed type literal is whatever type in question is
 
         let (expr_type, expr_returns) = match type_literal.name {
             Some(_) => (self.get_builtin_type_id(UNIT_TYPE), ExprReturns::Unit),
-            None => (type_scope, ExprReturns::Type),
+            None => (type_id, ExprReturns::Type),
         };
 
         let expr_mut = &mut self.exprs[expr as usize];
@@ -335,6 +344,14 @@ impl AST {
         self.types.len() as u32 - 1
     }
 
+    fn type_push_scope(&mut self, scope: u32) -> u32 {
+        let type_id = self.type_push(Type::Scope(scope));
+
+        self.scopes[scope as usize].refers_to = Some(type_id);
+
+        type_id
+    }
+
     fn member_push(&mut self, member: Member) -> u32 {
         self.members.push(member);
 
@@ -352,18 +369,12 @@ impl AST {
             .insert(member_name.to_string(), member);
     }
 
-    // return is the id of the Scope which represents the type
-    fn scope_add_member_type(
+    fn type_create(
         &mut self,
-        ctx: &mut SemanticContext,
         scope: u32,
         name: TokenOrString,
         variant: TypeVariant,
     ) -> u32 {
-        if scope >= self.scopes.len() as u32 {
-            panic!("Scope DNE in add_member_type");
-        }
-
         let scope_id = self.scope_push(Scope {
             name: Some(name.clone()),
             variant: ScopeVariant::Type(variant),
@@ -372,7 +383,45 @@ impl AST {
             members: HashMap::new(),
         });
 
-        let type_id = self.type_push(Type::Scope(scope_id));
+        self.type_push(Type::Scope(scope_id))
+    }
+
+    // provide scope, type id to add type to scope as a member
+    // ret: member id
+    fn scope_add_member_type_from_id(
+        &mut self,
+        ctx: &mut SemanticContext,
+        scope: u32,
+        type_id: u32,
+    ) -> u32 {
+        let name = match self.types[type_id as usize] {
+            Type::Scope(scope) => {
+                self.scopes[scope as usize].name.clone()
+            }
+            _ => None
+        };
+
+        let member_id = self.member_push(Member {
+            name: name.expect("TYPE LACKING A NAME"),
+            visibility: Visibility::Private,
+            variant: MemberVariant::Type,
+            module_or_type: type_id,
+        });
+
+        self.scope_add_member(ctx, scope, member_id);
+
+        member_id
+    }
+
+    // return is the id of the Scope which represents the type
+    fn scope_add_member_type(
+        &mut self,
+        ctx: &mut SemanticContext,
+        scope: u32,
+        name: TokenOrString,
+        variant: TypeVariant,
+    ) -> u32 {
+        let type_id = self.type_create(scope, name.clone(), variant);
 
         let member_id = self.member_push(Member {
             name: name,
