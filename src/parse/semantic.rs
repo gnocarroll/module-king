@@ -79,12 +79,16 @@ impl AST {
             None => self.get_builtin_type_id(ERROR_TYPE),
         };
 
-        self.member_push(Member {
+        let member_id = self.member_push(Member {
             name,
             visibility: Visibility::Private,
             variant: MemberVariant::Instance,
             module_or_type: type_id,
-        })
+        });
+
+        self.scope_add_member(ctx, scope, member_id);
+
+        member_id
     }
 
     // function to attempt pattern matching between identifier(s) in pattern and type
@@ -107,6 +111,52 @@ impl AST {
         }
 
         Ok(())
+    }
+
+    fn analyze_instance_creation(
+        &mut self,
+        ctx: &mut SemanticContext,
+        scope: u32,
+        expr: u32,
+        operand1: Option<u32>,
+        operand2: Option<u32>,
+    ) {
+        let old_analyzing_now = ctx.analyzing_now;
+
+        if let Some(pattern) = operand1 {
+            ctx.analyzing_now = AnalyzingNow::Pattern;
+            self.semantic_analyze_expr(ctx, scope, pattern);
+            ctx.analyzing_now = old_analyzing_now;
+        } else {
+            self.missing_operand(expr, 1);
+        }
+
+        if let Some(pattern) = operand2 {
+            ctx.analyzing_now = AnalyzingNow::Type;
+            self.semantic_analyze_expr(ctx, scope, pattern);
+            ctx.analyzing_now = old_analyzing_now;
+        } else {
+            self.missing_operand(expr, 2);
+        }
+
+        let mut finalized = false;
+
+        if let (Some(pattern), param_type) = (operand1, operand2) {
+            if self
+                .pattern_matching(ctx, scope, pattern, param_type)
+                .is_ok()
+            {
+                finalized = true;
+            }
+        }
+
+        let unit_type = self.get_builtin_type_id(UNIT_TYPE);
+
+        let expr_mut = &mut self.exprs[expr as usize];
+
+        expr_mut.type_or_module = unit_type;
+        expr_mut.expr_returns = ExprReturns::Unit;
+        expr_mut.finalized = finalized;
     }
 
     fn semantic_analyze_operation_func_params(
@@ -132,42 +182,13 @@ impl AST {
                 }
             }
             TokenType::Colon => {
-                let old_analyzing_now = ctx.analyzing_now;
-
-                if let Some(pattern) = operation.operand1 {
-                    ctx.analyzing_now = AnalyzingNow::Pattern;
-                    self.semantic_analyze_expr(ctx, scope, pattern);
-                    ctx.analyzing_now = old_analyzing_now;
-                } else {
-                    self.missing_operand(expr, 1);
-                }
-
-                if let Some(pattern) = operation.operand2 {
-                    ctx.analyzing_now = AnalyzingNow::Type;
-                    self.semantic_analyze_expr(ctx, scope, pattern);
-                    ctx.analyzing_now = old_analyzing_now;
-                } else {
-                    self.missing_operand(expr, 2);
-                }
-
-                let mut finalized = false;
-
-                if let (Some(pattern), param_type) = (operation.operand1, operation.operand2) {
-                    if self
-                        .pattern_matching(ctx, scope, pattern, param_type)
-                        .is_ok()
-                    {
-                        finalized = true;
-                    }
-                }
-
-                let unit_type = self.get_builtin_type_id(UNIT_TYPE);
-
-                let expr_mut = &mut self.exprs[expr as usize];
-
-                expr_mut.type_or_module = unit_type;
-                expr_mut.expr_returns = ExprReturns::Unit;
-                expr_mut.finalized = finalized;
+                self.analyze_instance_creation(
+                    ctx,
+                    scope,
+                    expr,
+                    operation.operand1,
+                    operation.operand2,
+                );
             }
             TokenType::Eq | TokenType::ColonEq => {
                 // arg with default provided
