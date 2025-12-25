@@ -119,7 +119,7 @@ struct If {
     pub body: u32,
 
     // expr to go to if cond is false
-    pub else_expr: u32,
+    pub else_expr: Option<u32>,
 }
 
 #[derive(Clone)]

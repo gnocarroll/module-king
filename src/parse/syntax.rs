@@ -2,10 +2,7 @@ use operator::OperatorVariant::*;
 
 use crate::{
     parse::{
-        AST, Expr, ExprVariant, FunctionLiteral, Identifier, IdentifierVariant, Operation, Tokens,
-        TypeLiteral, TypeVariant,
-        errors::{ExpectedToken, NameMismatch, ParseError},
-        operator,
+        AST, Expr, ExprVariant, FunctionLiteral, Identifier, IdentifierVariant, If, Operation, Tokens, TypeLiteral, TypeVariant, errors::{ExpectedToken, NameMismatch, ParseError}, operator
     },
     scan::{Token, TokenType},
 };
@@ -99,6 +96,27 @@ impl AST {
         })
     }
 
+    fn expr_if(
+        &mut self,
+        cond: u32,
+        body: u32,
+        else_expr: Option<u32>,
+        is_elif: bool,
+    ) -> u32 {
+        let if_struct = If { cond, body, else_expr };
+
+        self.expr_push(Expr {
+            tok: self.expr(cond).tok - 1,
+            end_tok: self.expr(body).end_tok,
+            variant: if is_elif {
+                ExprVariant::Elif(if_struct)
+            } else {
+                ExprVariant::If(if_struct)
+            },
+            ..Default::default()
+        })
+    }
+
     fn expect(&mut self, tokens: &mut Tokens, ttype: TokenType) -> Result<Token, ExpectedToken> {
         let ret = tokens.expect(ttype);
 
@@ -148,7 +166,107 @@ impl AST {
     }
 
     fn parse_if(&mut self, tokens: &mut Tokens) -> u32 {
-        let tok_idx = tokens.idx();
+        let set_else_arm = |
+            ast: &mut AST,
+            target: Option<u32>,
+            else_expr: u32,
+        | {
+            if let Some(target) = target {
+                match &mut ast.exprs[target as usize].variant {
+                    ExprVariant::If(expr_ref)
+                    | ExprVariant::Elif(expr_ref) => {
+                        expr_ref.else_expr = Some(else_expr);
+                    }
+                    _ => panic!("target should always be if or elif"),
+                }
+            }
+        };
+        
+        let mut ret = 0;
+
+        // will need to set else arm of if/elif from previous loop
+        let mut prev_expr = None;
+
+        // indicates current loop is elif (as opposed to if)
+        let mut is_elif = false;
+        
+        loop {
+            // consume if/elif token
+            tokens.next();
+
+            let cond = self.parse_expr(tokens);
+
+            let _ = tokens.expect(TokenType::Then);
+
+            let body = self.parse_expr(tokens);
+
+            // else_expr is set later
+            let if_expr = self.expr_if(
+                cond,
+                body,
+                None,
+                is_elif,
+            );
+
+            // the first if expr is returned from this function
+            if !is_elif {
+                ret = if_expr;
+            }
+
+            match tokens.peek().ttype {
+                TokenType::Elif => (), // => do another loop
+
+                // otherwise loop will be terminating because of else, end, or invalid token
+                TokenType::Else => {
+                    tokens.next();
+
+                    let else_expr = self.parse_expr(tokens);
+
+                    set_else_arm(self, Some(if_expr), else_expr);
+
+                    if self.expect_sequence(tokens, &[TokenType::End, TokenType::If]).is_err() {
+                        tokens.sync(&[TokenType::Semicolon]);
+                    }
+
+                    break;
+                }
+                TokenType::End => {
+                    tokens.next();
+                    let _ = self.expect(tokens, TokenType::If);
+                    break;
+                }
+                _ => {
+                    // this will cause sensible error message about expecting end token
+                    let _ = self.expect(tokens, TokenType::End);
+                    
+                    let peek = tokens.sync(&[TokenType::End, TokenType::Semicolon]);
+
+                    match peek.ttype {
+                        TokenType::End => {
+                            tokens.next();
+
+                            if tokens.peek().ttype != TokenType::Semicolon {
+                                tokens.next();
+                            }
+                        }
+                        _ => (),
+                    }
+
+                    break;
+                }
+            }
+
+            // set else arm of previous if/elif to current if expr
+
+            set_else_arm(self, prev_expr, if_expr);
+
+            prev_expr = Some(if_expr);
+
+            // loops after first are elif
+            is_elif = true;
+        }
+
+        ret
     }
 
     // NOTE: this function assumes "function" is upcoming token so that should
