@@ -147,6 +147,10 @@ impl AST {
         }
     }
 
+    fn parse_if(&mut self, tokens: &mut Tokens) -> u32 {
+        let tok_idx = tokens.idx();
+    }
+
     // NOTE: this function assumes "function" is upcoming token so that should
     // have been checked at call site
     fn parse_function(&mut self, tokens: &mut Tokens) -> u32 {
@@ -391,6 +395,7 @@ impl AST {
                     ..Default::default()
                 })
             }
+            TokenType::If => self.parse_if(tokens),
             TokenType::Function => self.parse_function(tokens),
             // One of these tokens indicates type literal
             TokenType::KWInteger

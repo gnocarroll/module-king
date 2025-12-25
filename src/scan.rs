@@ -65,6 +65,8 @@ pub enum TokenType {
     Global,
 
     If,
+    Then,
+    Elif,
     Else,
     Loop,
     While,
@@ -371,6 +373,8 @@ impl TokenType {
             Global => Text("global"),
 
             If => Text("if"),
+            Then => Text("then"),
+            Elif => Text("elif"),
             Else => Text("else"),
             Loop => Text("loop"),
             While => Text("while"),

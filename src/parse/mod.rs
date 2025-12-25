@@ -114,6 +114,15 @@ struct Operation {
 }
 
 #[derive(Clone)]
+struct If {
+    pub cond: u32,
+    pub body: u32,
+
+    // expr to go to if cond is false
+    pub else_expr: u32,
+}
+
+#[derive(Clone)]
 enum ExprVariant {
     Unit,
     IntegerLiteral(u64),
@@ -123,6 +132,14 @@ enum ExprVariant {
     Identifier(Identifier),
 
     Operation(Operation),
+
+    // without separate categories then these would be recorded the same
+    // if ... else if
+    // if ... elif
+    // this lang has separate elif like Python rather than e.g. C where it is
+    // really just all if and else case
+    If(If),
+    Elif(If),
 
     FunctionLiteral(FunctionLiteral),
 
