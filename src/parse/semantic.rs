@@ -162,7 +162,7 @@ impl AST {
 
                         let expr_mut = &mut self.exprs[expr as usize];
 
-                        expr_mut.etype = unit_type;
+                        expr_mut.type_or_module = unit_type;
                         expr_mut.expr_returns = ExprReturns::Unit;
                         expr_mut.finalized = finalized;
                     }
@@ -238,7 +238,7 @@ impl AST {
 
         let expr_mut = &mut self.exprs[expr as usize];
 
-        expr_mut.etype = expr_type;
+        expr_mut.type_or_module = expr_type;
         expr_mut.expr_returns = expr_returns;
         expr_mut.finalized = true;
     }
@@ -266,7 +266,7 @@ impl AST {
 
                 let expr = self.expr_mut(expr);
 
-                expr.etype = type_id;
+                expr.type_or_module = type_id;
                 expr.finalized = true;
             }
             ExprVariant::Identifier(ident) => {
@@ -284,7 +284,7 @@ impl AST {
 
                     let expr = self.expr_mut(expr);
 
-                    expr.etype = etype;
+                    expr.type_or_module = etype;
 
                     if let ExprVariant::Identifier(ident) = &mut expr.variant {
                         ident.variant = ident_variant;

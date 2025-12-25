@@ -33,6 +33,22 @@ struct TypeLiteral {
     pub body: u32,
 }
 
+#[derive(Clone)]
+enum Type {
+    // link to scope containing type information e.g. members
+    Scope(u32),
+
+    // for tuple with > 2 elements second u32 will link to a RestOfTuple
+    Tuple((u32, Option<u32>)),
+
+    // use this inside above Tuple to indicate later pieces of it like
+    // a linked list
+    RestOfTuple((u32, u32)),
+
+    // args, ret type (args can be tuple)
+    Function((u32, u32)),
+}
+
 #[derive(Clone, Copy)]
 enum ScopeVariant {
     Scope, // e.g. scope for a for loop or other block
@@ -42,12 +58,12 @@ enum ScopeVariant {
 
 // destructuring from given type using a certain pattern
 // e.g. to pattern (x, y) from type (u32, u32)
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct Destructure {
     // pattern i.d. (see Pattern struct)
     dest_pattern: u32,
 
-    // type (i.e. scope) id
+    // type id
     src_type: u32,
 }
 
@@ -55,12 +71,13 @@ struct Destructure {
 struct FunctionLiteral {
     pub name: Option<Token>,
     pub params: u32,
+
+    // return type is an expr id rather than Type struct
     pub return_type: u32,
     pub body: u32,
 
     // for semantic analysis stage more expressions will be added
     // for ironed-out params
-
     pub params_start: u32,
     pub params_stop: u32,
 }
@@ -121,7 +138,7 @@ struct Expr {
     pub end_tok: u32,
 
     // ID of language type (or module if expr is module)
-    pub etype: u32,
+    pub type_or_module: u32,
 
     pub variant: ExprVariant,
 
@@ -137,7 +154,7 @@ impl Default for Expr {
         Expr {
             tok: 0,
             end_tok: 0,
-            etype: 0,
+            type_or_module: 0,
             variant: ExprVariant::Unit,
             expr_returns: ExprReturns::Unit,
             finalized: false,
@@ -204,23 +221,17 @@ struct Scope {
     pub members: HashMap<String, u32>,
 }
 
-#[derive(Clone, Copy)]
-struct PatternRange {
-    start: u32,
-
-    // not inclusive
-    stop: u32,
-}
-
 #[derive(Clone)]
 enum Pattern {
-    Missing, // piece of pattern that should be there but is not
-    IgnoreOne, // _
-    IgnoreMultiple, // ..
+    Missing,               // piece of pattern that should be there but is not
+    IgnoreOne,             // _
+    IgnoreMultiple,        // ..
     Binding((Token, u32)), // e.g. rest @ ..
-    
-    // tuple is range of patterns, last is not inclusive
-    Tuple(PatternRange),
+
+    // lhs, (optional) rhs
+    Tuple((u32, Option<u32>)),
+    RestOfTuple((u32, u32)),
+
     Ident(Token),
 
     // expr id, should be statically computable I guess
@@ -228,13 +239,22 @@ enum Pattern {
 
     // for struct simply leave out ignored fields from this
     // data structure
-    Struct((
-        Option<Token>, // type name (optional)
-        PatternRange,
+    Struct(
+        (
+            Option<Token>, // type name (optional)
+            u32, // at least one addition pattern inside struct pattern
+            Option<u32>, // next pattern
+        ),
+    ),
+
+    RestOfStruct((
+        u32,
+        u32, // next ptr
     )),
 
     // same as tuple really but uses []
-    Slice(PatternRange),
+    Slice((u32, Option<u32>)),
+    RestOfSlice((u32, u32)),
 }
 
 struct Tokens<'a> {
@@ -336,6 +356,7 @@ pub struct AST {
     // exprs are main thing for parsing so e.g. scopes members are for
     // semantic analysis
     scopes: Vec<Scope>,
+    types: Vec<Type>,
     members: Vec<Member>,
 
     patterns: Vec<Pattern>,

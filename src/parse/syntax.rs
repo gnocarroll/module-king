@@ -23,7 +23,6 @@ impl AST {
         self.expr_push(Expr {
             tok: tok_idx,
             end_tok: tok_idx,
-            etype: 0,
             variant: ExprVariant::Unit,
             ..Default::default()
         })
@@ -39,7 +38,6 @@ impl AST {
         self.expr_push(Expr {
             tok: self.expr(lhs).tok,
             end_tok: self.expr(rhs).end_tok,
-            etype: 0,
             variant: ExprVariant::Operation(Operation {
                 op: op.ttype,
                 operand1: Some(lhs),
@@ -53,7 +51,6 @@ impl AST {
         self.expr_push(Expr {
             tok: self.expr(lhs).tok,
             end_tok: self.expr(rhs).end_tok + if found_end { 1 } else { 0 },
-            etype: 0,
             variant: ExprVariant::Operation(Operation {
                 op: op.ttype,
                 operand1: Some(lhs),
@@ -67,7 +64,6 @@ impl AST {
         self.expr_push(Expr {
             tok: self.expr(rhs).tok - 1,
             end_tok: self.expr(rhs).end_tok,
-            etype: 0,
             variant: ExprVariant::Operation(Operation {
                 op: op.ttype,
                 operand1: Some(rhs),
@@ -81,7 +77,6 @@ impl AST {
         self.expr_push(Expr {
             tok: self.expr(rhs).tok,
             end_tok: self.expr(rhs).end_tok + 1,
-            etype: 0,
             variant: ExprVariant::Operation(Operation {
                 op: op.ttype,
                 operand1: Some(rhs),
@@ -95,7 +90,6 @@ impl AST {
         self.expr_push(Expr {
             tok: self.expr(rhs).tok - 1,
             end_tok: self.expr(rhs).end_tok + if found_end { 1 } else { 0 },
-            etype: 0,
             variant: ExprVariant::Operation(Operation {
                 op: op.ttype,
                 operand1: Some(rhs),
@@ -281,7 +275,6 @@ impl AST {
         self.expr_push(Expr {
             tok: tok_idx,
             end_tok: tokens.idx(), // TODO: correct
-            etype: 0,
             variant: ExprVariant::FunctionLiteral(FunctionLiteral {
                 name: name,
                 params: params,
@@ -352,7 +345,6 @@ impl AST {
         self.expr_push(Expr {
             tok: tok_idx,
             end_tok: tokens.idx(),
-            etype: 0,
             variant: ExprVariant::TypeLiteral(TypeLiteral {
                 name,
                 variant,
@@ -375,7 +367,6 @@ impl AST {
                 self.expr_push(Expr {
                     tok: tok_idx,
                     end_tok: tok_idx + 1,
-                    etype: 0,
                     variant: match tok.ttype {
                         TokenType::Integer => ExprVariant::IntegerLiteral(
                             tokens
