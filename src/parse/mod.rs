@@ -38,6 +38,14 @@ enum Type {
     // link to scope containing type information e.g. members
     Scope(u32),
 
+    // u32 is type id
+    Ref(u32),
+    Ptr(u32),
+
+    // lhs is type, rhs is (optional) expr
+    // e.g. [Integer; 5] -> Integer, 5
+    Slice((u32, u32)),
+
     // for tuple with > 2 elements second u32 will link to a RestOfTuple
     Tuple((u32, Option<u32>)),
 

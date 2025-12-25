@@ -3,8 +3,7 @@ use std::collections::HashMap;
 use crate::{
     constants::{ERROR_TYPE, FLOAT_TYPE, INTEGER_TYPE, STRING_TYPE, UNIT_TYPE},
     parse::{
-        AST, ExprReturns, ExprVariant, FunctionLiteral, Identifier, IdentifierVariant, Member,
-        MemberVariant, Scope, ScopeVariant, TokenOrString, Tokens, TypeVariant, Visibility, errors::{InvalidOperation, MissingOperand, SemanticError},
+        AST, ExprReturns, ExprVariant, FunctionLiteral, Identifier, IdentifierVariant, Member, MemberVariant, Scope, ScopeVariant, TokenOrString, Tokens, Type, TypeVariant, Visibility, errors::{InvalidOperation, MissingOperand, SemanticError}
     }, scan::TokenType,
 };
 
@@ -327,7 +326,13 @@ impl AST {
     fn scope_push(&mut self, scope: Scope) -> u32 {
         self.scopes.push(scope);
 
-        return self.scopes.len() as u32 - 1;
+        self.scopes.len() as u32 - 1
+    }
+
+    fn type_push(&mut self, lang_type: Type) -> u32 {
+        self.types.push(lang_type);
+
+        self.types.len() as u32 - 1
     }
 
     fn member_push(&mut self, member: Member) -> u32 {
@@ -359,13 +364,15 @@ impl AST {
             panic!("Scope DNE in add_member_type");
         }
 
-        let type_id = self.scope_push(Scope {
+        let scope_id = self.scope_push(Scope {
             name: Some(name.clone()),
             variant: ScopeVariant::Type(variant),
             parent_scope: scope,
             refers_to: None,
             members: HashMap::new(),
         });
+
+        let type_id = self.type_push(Type::Scope(scope_id));
 
         let member_id = self.member_push(Member {
             name: name,
