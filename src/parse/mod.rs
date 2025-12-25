@@ -405,9 +405,8 @@ pub fn parse_file(file_name: &str, file_str: &str, tokens: &Vec<Token>) -> AST {
         println!("{}", ast.expr_to_string(&tokens, expr));
     }
 
-    // TODO: semantic analysis
-
-    ast.do_semantic_analysis(&tokens, file_name);
+    // reenable later to test
+    // ast.do_semantic_analysis(&tokens, file_name);
 
     ast
 }

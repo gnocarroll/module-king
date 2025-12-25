@@ -213,6 +213,10 @@ impl AST {
                 ret = if_expr;
             }
 
+            // set else arm of previous if/elif to current if expr
+
+            set_else_arm(self, prev_expr, if_expr);
+
             match tokens.peek().ttype {
                 TokenType::Elif => (), // => do another loop
 
@@ -255,10 +259,6 @@ impl AST {
                     break;
                 }
             }
-
-            // set else arm of previous if/elif to current if expr
-
-            set_else_arm(self, prev_expr, if_expr);
 
             prev_expr = Some(if_expr);
 
