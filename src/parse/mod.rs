@@ -77,6 +77,7 @@ struct Destructure {
 
 #[derive(Clone, Default)]
 struct FunctionLiteral {
+    pub name: Option<Token>,
     pub params: u32,
 
     // return type is an expr id rather than Type struct

@@ -278,6 +278,15 @@ impl AST {
 
         let tok = tokens.peek();
 
+        let name = match tok.ttype {
+            TokenType::Identifier => {
+                tokens.next();
+
+                Some(tok)
+            }
+            _ => None
+        };
+
         // having this in lambda makes it easy to jump ahead if failure occurs
         // it is Temu goto
         let attempt_parse_func = |ast: &mut AST, tokens: &mut Tokens| {
@@ -369,6 +378,7 @@ impl AST {
             tok: tok_idx,
             end_tok: tokens.idx(), // TODO: correct
             variant: ExprVariant::FunctionLiteral(FunctionLiteral {
+                name: name,
                 params: params,
                 return_type: return_type,
                 body: body,
@@ -658,9 +668,12 @@ impl AST {
             }
             ExprVariant::FunctionLiteral(function_literal) => {
                 format!(
-                    "(defun {}{} => {} = {})",
+                    "(function {}{} => {} = {})",
                     match function_literal.name {
-                        Some(name) => format!("{} ", tokens.tok_as_str(&name),),
+                        Some(tok) => format!(
+                            "{} ",
+                            tokens.tok_as_str(&tok),
+                        ),
                         None => "".to_string(),
                     },
                     self.expr_to_string(tokens, function_literal.params),
