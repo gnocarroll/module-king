@@ -71,6 +71,7 @@ pub enum TokenType {
     Loop,
     While,
     For,
+    Do,
 
     Return,
     Goto,
@@ -379,6 +380,7 @@ impl TokenType {
             Loop => Text("loop"),
             While => Text("while"),
             For => Text("for"),
+            Do => Text("do"),
 
             Return => Text("return"),
             Goto => Text("goto"),

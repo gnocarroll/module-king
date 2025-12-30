@@ -264,7 +264,9 @@ impl AST {
                     );
                 }
             }
-            TokenType::Colon => {}
+            TokenType::Colon => {
+                self.analyze_instance_creation(ctx, scope, expr, operation.operand1, operation.operand2);
+            }
             _ => {}
         }
     }

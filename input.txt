@@ -1,1 +1,3 @@
-.5
+function Inc(x: Integer) Integer do begin
+
+end function;

@@ -309,23 +309,13 @@ impl AST {
                 );
             }
 
-            // optional "=>" before return type
-
-            if tokens.peek().ttype == TokenType::DArrow {
-                tokens.next();
-            }
-
             // prevent consumption of Eq after return type (if it is present)
 
-            let return_type = ast.parse_expr_bp(
-                tokens,
-                match operator::get_bp(TokenType::Eq, Infix) {
-                    Some((l_bp, _)) => l_bp + 1,
-                    _ => panic!("semicolon is not infix op?"),
-                },
-            );
+            let return_type = ast.parse_expr(tokens);
 
-            if ast.expect(tokens, TokenType::Eq).is_err() {
+            // "do" token will precede function body
+
+            if ast.expect(tokens, TokenType::Do).is_err() {
                 return (false, params, return_type, ast.expr_unit(tokens.idx()));
             }
 
