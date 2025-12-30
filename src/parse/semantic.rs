@@ -235,15 +235,11 @@ impl AST {
                 self.semantic_analyze_expr(ctx, scope, child_expr);
             }
             TokenType::Semicolon | TokenType::Comma => {
-                match (operation.op, ctx.analyzing_now) {
-                    (TokenType::Semicolon, AnalyzingNow::TypeBody(IsEnum::Enum))
-                    | (TokenType::Comma, AnalyzingNow::TypeBody(IsEnum::Other)) => {
-                        self.invalid_operation(
-                            expr,
-                            "only enums should have comma-separated members",
-                        );
-                    }
-                    _ => (),
+                if operation.op == TokenType::Semicolon {
+                    self.invalid_operation(
+                        expr,
+                        "members of type should be comma-separated",
+                    );
                 }
 
                 for operand in [operation.operand1, operation.operand2] {
