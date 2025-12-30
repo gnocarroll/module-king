@@ -278,17 +278,9 @@ impl AST {
 
         let tok = tokens.peek();
 
-        let name = match tok.ttype {
-            TokenType::Identifier => {
-                tokens.next();
-                Some(tok)
-            }
-            _ => None,
-        };
-
         // having this in lambda makes it easy to jump ahead if failure occurs
         // it is Temu goto
-        let attempt_parse_func = |ast: &mut AST, tokens: &mut Tokens, name: Option<Token>| {
+        let attempt_parse_func = |ast: &mut AST, tokens: &mut Tokens| {
             if ast.expect(tokens, TokenType::LParen).is_err() {
                 return (
                     false,
@@ -339,18 +331,7 @@ impl AST {
                 ..
             }) = ast.expr(body).variant
             {
-                if let Some(name_tok) = name {
-                    let result = ast.expect(tokens, TokenType::Identifier);
-
-                    if let Ok(t) = result {
-                        // compare start, end function names
-                        let _ = ast.test_name_match(tokens, name_tok, t);
-                    }
-
-                    result.is_ok()
-                } else {
-                    ast.expect(tokens, TokenType::Function).is_ok()
-                }
+                ast.expect(tokens, TokenType::Function).is_ok()
             } else {
                 true
             };
@@ -358,7 +339,7 @@ impl AST {
             (success, params, return_type, body)
         };
 
-        let (success, params, return_type, body) = attempt_parse_func(self, tokens, name);
+        let (success, params, return_type, body) = attempt_parse_func(self, tokens);
 
         // if problem occurred during function parsing try to
         // recover by skipping ahead to one of these ttypes
@@ -388,7 +369,6 @@ impl AST {
             tok: tok_idx,
             end_tok: tokens.idx(), // TODO: correct
             variant: ExprVariant::FunctionLiteral(FunctionLiteral {
-                name: name,
                 params: params,
                 return_type: return_type,
                 body: body,
