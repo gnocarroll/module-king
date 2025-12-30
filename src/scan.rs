@@ -82,8 +82,7 @@ pub enum TokenType {
     KWInteger,
     KWFloat,
     Function,
-    Struct,
-    Class,
+    Record,
     Enum,
     Variant,
 
@@ -390,8 +389,7 @@ impl TokenType {
             KWInteger => Text("integer"),
             KWFloat => Text("float"),
             Function => Text("function"),
-            Struct => Text("struct"),
-            Class => Text("class"),
+            Record => Text("record"),
             Enum => Text("enum"),
             Variant => Text("variant"),
 

@@ -17,7 +17,7 @@ enum TypeVariant {
     String,
     Integer,
     Float,
-    Struct,  // class keyword can also be used for this
+    Record,  // class keyword can also be used for this
     Enum,    // simple C enum
     Variant, // tagged union (can have fields which are just tag)
 }

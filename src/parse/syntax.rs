@@ -405,8 +405,7 @@ impl AST {
         let variant = match type_variant_tok.ttype {
             TokenType::KWInteger => TypeVariant::Integer,
             TokenType::KWFloat => TypeVariant::Float,
-            TokenType::Struct => TypeVariant::Struct,
-            TokenType::Class => TypeVariant::Struct,
+            TokenType::Record => TypeVariant::Record,
             TokenType::Enum => TypeVariant::Enum,
             TokenType::Variant => TypeVariant::Variant,
             _ => panic!("unexpected ttype for beginning of type literal"),
@@ -508,8 +507,7 @@ impl AST {
             // One of these tokens indicates type literal
             TokenType::KWInteger
             | TokenType::KWFloat
-            | TokenType::Struct
-            | TokenType::Class
+            | TokenType::Record
             | TokenType::Enum
             | TokenType::Variant => self.parse_type_literal(tokens),
             // if no atom or other (e.g. prefix) expr is found return Unit
