@@ -95,6 +95,19 @@ impl AST {
             ..Default::default()
         })
     }
+    
+    fn expr_prefix_around(&mut self, op: Token, lhs: u32, rhs: u32) -> u32 {
+        self.expr_push(Expr {
+            tok: self.expr(lhs).tok - 1,
+            end_tok: self.expr(rhs).end_tok,
+            variant: ExprVariant::Operation(Operation {
+                op: op.ttype,
+                operand1: Some(lhs),
+                operand2: Some(rhs),
+            }),
+            ..Default::default()
+        })
+    }
 
     fn expr_if(
         &mut self,
@@ -521,31 +534,44 @@ impl AST {
 
         // around "operator" e.g. parens like this (1)
 
-        match operator::get_bp(tok.ttype, Around) {
-            Some(_) => {
-                tokens.next();
+        for op_variant in [Around, PrefixAround] {
+            match operator::get_bp(tok.ttype, op_variant) {
+                Some((_, r_bp)) => {
+                    tokens.next();
 
-                let rhs = self.parse_expr(tokens);
+                    let lhs = self.parse_expr(tokens);
 
-                let mut found_end = false;
+                    let mut found_end = false;
 
-                match tokens.expect(match tok.ttype {
-                    TokenType::LParen => TokenType::RParen,
-                    TokenType::LBrace => TokenType::RBrace,
-                    TokenType::Begin => TokenType::End,
-                    _ => panic!("unexpected ttype for Around"),
-                }) {
-                    Ok(_) => {
-                        found_end = true;
+                    match tokens.expect(match tok.ttype {
+                        TokenType::LParen => TokenType::RParen,
+                        TokenType::LBrace => TokenType::RBrace,
+                        TokenType::Begin => TokenType::End,
+                        TokenType::Type => TokenType::Is,
+                        _ => panic!("unexpected ttype for Around"),
+                    }) {
+                        Ok(_) => {
+                            found_end = true;
+                        }
+                        Err(e) => {
+                            self.parse_errors.push(ParseError::ExpectedToken(e));
+                        }
                     }
-                    Err(e) => {
-                        self.parse_errors.push(ParseError::ExpectedToken(e));
+
+                    if op_variant == Around {
+                        return self.expr_around(tok, lhs, found_end);
+                    }
+                    else {
+                        let rhs = self.parse_expr_bp(
+                            tokens,
+                            r_bp,
+                        );
+
+                        return self.expr_prefix_around(tok, lhs, rhs);
                     }
                 }
-
-                return self.expr_around(tok, rhs, found_end);
+                _ => {}
             }
-            _ => {}
         }
 
         self.parse_atom(tokens)
@@ -681,12 +707,8 @@ impl AST {
             }
             ExprVariant::TypeLiteral(type_literal) => {
                 format!(
-                    "(deftype {:?} {}{})",
+                    "(type {:?} {})",
                     type_literal.variant,
-                    match type_literal.name {
-                        Some(name) => format!("{} ", tokens.tok_as_str(&name),),
-                        None => "".to_string(),
-                    },
                     self.expr_to_string(tokens, type_literal.body),
                 )
             }

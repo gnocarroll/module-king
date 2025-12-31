@@ -8,6 +8,7 @@
 #[repr(u8)]
 pub enum OperatorVariant {
     Prefix,
+    PrefixAround, // e.g. type ... is
     Postfix,
     Infix,
     Around,        // e.g. paren
@@ -352,6 +353,12 @@ static OP_INFO_TABLE: &[&[OperatorInfo]] = &[
         OperatorInfo {
             ttype: TokenType::Star,
             variant: Prefix,
+            assoc: Assoc::Right,
+            is_rhs_optional: false,
+        },
+        OperatorInfo {
+            ttype: TokenType::Type,
+            variant: PrefixAround,
             assoc: Assoc::Right,
             is_rhs_optional: false,
         },

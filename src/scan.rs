@@ -59,6 +59,7 @@ pub enum TokenType {
 
     Type,
     Subtype,
+    Is,
     With,
     Begin,
     End,
@@ -370,6 +371,7 @@ impl TokenType {
             
             Type => Text("type"),
             Subtype => Text("subtype"),
+            Is => Text("is"),
             With => Text("with"),
             Begin => Text("begin"),
             End => Text("end"),

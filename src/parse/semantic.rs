@@ -235,11 +235,15 @@ impl AST {
                 self.semantic_analyze_expr(ctx, scope, child_expr);
             }
             TokenType::Semicolon | TokenType::Comma => {
-                if operation.op == TokenType::Semicolon {
-                    self.invalid_operation(
-                        expr,
-                        "members of type should be comma-separated",
-                    );
+                match (operation.op, ctx.analyzing_now) {
+                    (TokenType::Semicolon, AnalyzingNow::TypeBody(IsEnum::Enum))
+                    | (TokenType::Comma, AnalyzingNow::TypeBody(IsEnum::Other)) => {
+                        self.invalid_operation(
+                            expr,
+                            "members of enum should be comma-separated, otherwise use semicolons",
+                        );
+                    }
+                    _ => (),
                 }
 
                 for operand in [operation.operand1, operation.operand2] {
@@ -321,10 +325,7 @@ impl AST {
         };
 
         let type_scope = self.scope_push(Scope {
-            name: match type_literal.name {
-                Some(t) => Some(TokenOrString::Token(t)),
-                None => None,
-            },
+            name: None,
             variant: ScopeVariant::Type(type_literal.variant),
             parent_scope: scope,
             refers_to: None,
@@ -332,11 +333,6 @@ impl AST {
         });
 
         let type_id = self.type_push_scope(type_scope);
-
-        // if it is a named type add it to scope
-        if type_literal.name.is_some() {
-            self.scope_add_member_type_from_id(ctx, scope, type_id);
-        }
 
         let old_analyzing_now = ctx.analyzing_now;
 
@@ -353,15 +349,10 @@ impl AST {
         // type of named type literal is Unit (cannot assign it to something)
         // type of unnamed type literal is whatever type in question is
 
-        let (expr_type, expr_returns) = match type_literal.name {
-            Some(_) => (self.get_builtin_type_id(UNIT_TYPE), ExprReturns::Unit),
-            None => (type_id, ExprReturns::Type),
-        };
-
         let expr_mut = &mut self.exprs[expr as usize];
 
-        expr_mut.type_or_module = expr_type;
-        expr_mut.expr_returns = expr_returns;
+        expr_mut.type_or_module = type_id;
+        expr_mut.expr_returns = ExprReturns::Type;
         expr_mut.finalized = true;
     }
 
