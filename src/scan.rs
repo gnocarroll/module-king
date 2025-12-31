@@ -57,6 +57,9 @@ pub enum TokenType {
     MinusMinus,
     DArrow,
 
+    Type,
+    Subtype,
+    With,
     Begin,
     End,
     Import,
@@ -364,7 +367,10 @@ impl TokenType {
             PlusPlus => Text("++"),
             MinusMinus => Text("--"),
             DArrow => Text("=>"),
-                
+            
+            Type => Text("type"),
+            Subtype => Text("subtype"),
+            With => Text("with"),
             Begin => Text("begin"),
             End => Text("end"),
             Import => Text("import"),

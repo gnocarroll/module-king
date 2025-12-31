@@ -388,59 +388,60 @@ impl AST {
         })
     }
 
-    fn parse_type_literal(&mut self, tokens: &mut Tokens) -> u32 {
+    fn parse_number_type_literal(&mut self, tokens: &mut Tokens) -> u32 {
+        let tok_idx = tokens.idx();
+        
+        let variant = match tokens.next().ttype {
+            TokenType::KWInteger => TypeVariant::Integer,
+            TokenType::KWFloat => TypeVariant::Float,
+            _ => panic!("unexpected ttype for beginning of type literal"),
+        };
+
+        let body = self.expr_unit(tok_idx + 1);
+
+        self.expr_push(Expr {
+            tok: tok_idx,
+            end_tok: tokens.idx(),
+            variant: ExprVariant::TypeLiteral(TypeLiteral {
+                variant,
+                body,
+            }),
+            ..Default::default()
+        })
+    }
+
+    fn parse_record_literal(&mut self, tokens: &mut Tokens) -> u32 {
         let tok_idx = tokens.idx();
         let type_variant_tok = tokens.next();
 
         let variant = match type_variant_tok.ttype {
-            TokenType::KWInteger => TypeVariant::Integer,
-            TokenType::KWFloat => TypeVariant::Float,
             TokenType::Record => TypeVariant::Record,
-            TokenType::Enum => TypeVariant::Enum,
             TokenType::Variant => TypeVariant::Variant,
             _ => panic!("unexpected ttype for beginning of type literal"),
         };
 
-        let name = {
-            let tok = tokens.peek();
-
-            match tok.ttype {
-                TokenType::Identifier => {
-                    tokens.next();
-                    Some(tok)
-                }
-                _ => None,
-            }
-        };
-
-        let _ = tokens.expect(TokenType::Eq);
-
         // don't want to consume semicolon as part of body
 
-        let body = self.parse_expr_bp(
+        let body = self.parse_expr(tokens);
+
+        if self.expect_sequence(
             tokens,
-            match operator::get_bp(TokenType::Semicolon, Infix) {
-                Some((l_bp, _)) => l_bp + 1,
-                _ => panic!("semicolon is not infix op?"),
-            },
-        );
+            &[TokenType::End, type_variant_tok.ttype],
+        ).is_err() {
+            let tok = tokens.sync(&[TokenType::Semicolon, TokenType::End, type_variant_tok.ttype]);
 
-        // if body is a block check for correct terminating token
+            match tok.ttype {
+                TokenType::End => {
+                    tokens.next();
 
-        if let ExprVariant::Operation(Operation {
-            op: TokenType::Begin,
-            ..
-        }) = self.expr(body).variant
-        {
-            if let Some(name_tok) = name {
-                let result = self.expect(tokens, TokenType::Identifier);
-
-                if let Ok(t) = result {
-                    // compare start, end function names
-                    let _ = self.test_name_match(tokens, name_tok, t);
+                    if tokens.peek().ttype == type_variant_tok.ttype {
+                        tokens.next();
+                    }
                 }
-            } else {
-                let _ = self.expect(tokens, type_variant_tok.ttype).is_ok();
+                val @ _ if val == type_variant_tok.ttype => {
+                    tokens.next();
+                }
+                _ => (),
             }
         }
 
@@ -448,7 +449,6 @@ impl AST {
             tok: tok_idx,
             end_tok: tokens.idx(),
             variant: ExprVariant::TypeLiteral(TypeLiteral {
-                name,
                 variant,
                 body,
             }),
@@ -494,12 +494,10 @@ impl AST {
             }
             TokenType::If => self.parse_if(tokens),
             TokenType::Function => self.parse_function(tokens),
-            // One of these tokens indicates type literal
             TokenType::KWInteger
-            | TokenType::KWFloat
-            | TokenType::Record
-            | TokenType::Enum
-            | TokenType::Variant => self.parse_type_literal(tokens),
+            | TokenType::KWFloat => self.parse_number_type_literal(tokens),
+            TokenType::Record
+            | TokenType::Variant => self.parse_record_literal(tokens),
             // if no atom or other (e.g. prefix) expr is found return Unit
             _ => self.expr_unit(tok_idx),
         }

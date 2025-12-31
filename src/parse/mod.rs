@@ -25,8 +25,6 @@ enum TypeVariant {
 #[derive(Clone)]
 struct TypeLiteral {
     // may be empty str if type literal does not provide name
-    pub name: Option<Token>,
-
     pub variant: TypeVariant,
 
     // body is an Expr
