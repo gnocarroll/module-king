@@ -64,4 +64,19 @@ pub enum SemanticError {
     ExpectedType(ExpectedType),
     MissingOperand(MissingOperand),
     UnexpectedExpr(UnexpectedExpr),
+    PatternError(PatternError),
+}
+
+#[derive(Clone, Copy)]
+pub struct ExprAndType {
+    pub expr: u32,
+    pub type_id: u32,
+}
+
+
+#[derive(Clone)]
+pub enum PatternError {
+    ParenMismatch(ExprAndType),
+    TypeMissing(u32),
+    IdentMissing(u32),
 }

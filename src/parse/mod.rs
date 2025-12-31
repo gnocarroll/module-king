@@ -248,8 +248,13 @@ struct Scope {
 }
 
 #[derive(Clone)]
-enum Pattern {
-    Missing,               // piece of pattern that should be there but is not
+struct Pattern {
+    type_id: u32,
+    variant: PatternVariant,
+}
+
+#[derive(Clone)]
+enum PatternVariant {
     IgnoreOne,             // _
     IgnoreMultiple,        // ..
     Binding((Token, u32)), // e.g. rest @ ..

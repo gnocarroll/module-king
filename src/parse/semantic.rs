@@ -1,12 +1,9 @@
-use std::collections::HashMap;
+use std::{collections::HashMap};
 
 use crate::{
     constants::{ERROR_TYPE, FLOAT_TYPE, INTEGER_TYPE, STRING_TYPE, UNIT_TYPE},
     parse::{
-        AST, ExprReturns, ExprVariant, FunctionLiteral, Identifier, IdentifierVariant, Member,
-        MemberVariant, Operation, Scope, ScopeVariant, TokenOrString, Tokens, Type, TypeVariant,
-        Visibility,
-        errors::{InvalidOperation, MissingOperand, SemanticError, UnexpectedExpr},
+        AST, ExprReturns, ExprVariant, FunctionLiteral, Identifier, IdentifierVariant, Member, MemberVariant, Operation, Pattern, PatternVariant, Scope, ScopeVariant, TokenOrString, Tokens, Type, TypeVariant, Visibility, errors::{ExprAndType, InvalidOperation, MissingOperand, PatternError, SemanticError, UnexpectedExpr}
     },
     scan::TokenType,
 };
@@ -44,26 +41,44 @@ impl AST {
         }
     }
 
+    fn pattern_push(&mut self, pattern: Pattern) -> u32 {
+        self.patterns.push(pattern);
+
+        self.patterns.len() as u32 - 1
+    }
+
+    fn pattern_error_push(&mut self, pattern_error: PatternError) {
+        self.semantic_errors.push(SemanticError::PatternError(pattern_error))
+    }
+
     fn get_builtin_type_id(&mut self, name: &str) -> u32 {
         let member = self.get_builtin_type(name);
 
         self.members[member as usize].module_or_type
     }
 
-    fn missing_operand(&mut self, expr: u32, operand: u32) {
+    fn missing_operand(&mut self, expr: u32, operand: u32) -> SemanticError {
+        let ret  = SemanticError::MissingOperand(MissingOperand {
+            operation: expr,
+            operand_missing: operand,
+        });
+        
         self.semantic_errors
-            .push(SemanticError::MissingOperand(MissingOperand {
-                operation: expr,
-                operand_missing: operand,
-            }));
+            .push(ret.clone());
+
+        ret
     }
 
-    fn invalid_operation(&mut self, expr: u32, msg: &'static str) {
+    fn invalid_operation(&mut self, expr: u32, msg: &'static str) -> SemanticError {
+        let ret = SemanticError::InvalidOperation(InvalidOperation {
+            operation: expr,
+            msg,
+        });
+
         self.semantic_errors
-            .push(SemanticError::InvalidOperation(InvalidOperation {
-                operation: expr,
-                msg,
-            }));
+            .push(ret.clone());
+
+        ret
     }
 
     // ret: member id of instance
@@ -98,21 +113,99 @@ impl AST {
         &mut self,
         ctx: &mut SemanticContext,
         scope: u32,
-        ident_pattern: u32,
+        ident_expr: u32,
 
         // may be absent (so errors will be recorded if necessary)
-        type_pattern: Option<u32>,
-    ) -> Result<(), ()> {
-        match self.exprs[ident_pattern as usize].variant {
+        type_id: u32,
+    ) -> Result<u32, PatternError> {
+        let mut ident_expr = ident_expr;
+
+        let mut ident_has_parens = false;
+
+        while match self.exprs[ident_expr as usize].variant {
+            ExprVariant::Operation(Operation { op: TokenType::LParen, operand1: Some(expr), operand2: None }) => {
+                ident_has_parens = true;
+                ident_expr = expr;
+
+                true
+            }
+            _ => false
+        } {}
+
+        let type_val = self.types[type_id as usize].clone();
+
+        match self.exprs[ident_expr as usize].variant {
             ExprVariant::Identifier(ident) => {
-                self.scope_add_instance(ctx, scope, TokenOrString::Token(ident.name), type_pattern);
+                return Ok(self.pattern_push(Pattern { type_id: type_id, variant: PatternVariant::Ident(ident.name) }))
+            }
+            // Tuple
+            ExprVariant::Operation(Operation{ op: TokenType::Comma, operand1: lhs, operand2: rhs}) => {
+                match type_val {
+                    Type::Tuple((lhs_type, rhs_type)) => {
+                        if !ident_has_parens {
+                            return Err(PatternError::ParenMismatch(ExprAndType { expr: ident_expr, type_id }));
+                        }
+
+                        let lhs = lhs.expect("should have lhs");
+                        let rhs = rhs.expect("should have rhs");
+
+                        if rhs_type.is_some() && self.exprs[rhs as usize].is_unit() {
+                            return Err(PatternError::IdentMissing(rhs_type.expect("impossible")));
+                        } else if rhs_type.is_none() && !self.exprs[rhs as usize].is_unit() {
+                            return Err(PatternError::TypeMissing(rhs));
+                        }
+
+                        // first pattern match on lhs of tuple
+                        let lhs_pattern = self.pattern_matching(
+                            ctx,
+                            scope,
+                            lhs,
+                            lhs_type,
+                        )?;
+
+                        let rhs_pattern = if let Some(rhs_type) = rhs_type {
+                            Some(self.pattern_matching(ctx, scope, rhs, rhs_type)?)
+                        } else {
+                            None
+                        };
+
+                        return Ok(self.pattern_push(Pattern {
+                            type_id,
+                            variant: PatternVariant::Tuple((lhs_pattern, rhs_pattern))
+                        }));
+                    }
+                    Type::RestOfTuple((lhs_type, rhs_type)) => {
+                        if ident_has_parens {
+                            return Err(PatternError::ParenMismatch(ExprAndType { expr: ident_expr, type_id }));
+                        }
+
+                        let lhs = lhs.expect("should have lhs");
+                        let rhs = rhs.expect("should have rhs");
+
+                        if self.exprs[rhs as usize].is_unit() {
+                            return Err(PatternError::IdentMissing(rhs_type));
+                        }
+
+                        // first pattern match on lhs of tuple
+                        let lhs_pattern = self.pattern_matching(ctx, scope, lhs, lhs_type)?;
+
+                        let rhs_pattern = self.pattern_matching(ctx, scope, rhs, rhs_type)?;
+
+                        return Ok(self.pattern_push(Pattern {
+                            type_id,
+                            variant: PatternVariant::RestOfTuple((lhs_pattern, rhs_pattern))
+                        }));
+                    }
+                    _ => (),
+                }
             }
             _ => {}
         }
 
-        Ok(())
+        Ok(0)
     }
 
+    // ret pattern
     fn analyze_instance_creation(
         &mut self,
         ctx: &mut SemanticContext,
@@ -120,15 +213,16 @@ impl AST {
         expr: u32,
         operand1: Option<u32>,
         operand2: Option<u32>,
-    ) {
+    ) -> Result<u32, SemanticError> {
         let old_analyzing_now = ctx.analyzing_now;
+        let mut err: Option<SemanticError> = None;
 
         if let Some(pattern) = operand1 {
             ctx.analyzing_now = AnalyzingNow::Pattern;
             self.semantic_analyze_expr(ctx, scope, pattern);
             ctx.analyzing_now = old_analyzing_now;
         } else {
-            self.missing_operand(expr, 1);
+            err = Some(self.missing_operand(expr, 1));
         }
 
         if let Some(pattern) = operand2 {
@@ -136,17 +230,33 @@ impl AST {
             self.semantic_analyze_expr(ctx, scope, pattern);
             ctx.analyzing_now = old_analyzing_now;
         } else {
-            self.missing_operand(expr, 2);
+            err = Some(self.missing_operand(expr, 2));
         }
 
         let mut finalized = false;
+        let mut pattern  = 0;
 
-        if let Some(pattern) = operand1 {
-            if self
-                .pattern_matching(ctx, scope, pattern, operand2)
-                .is_ok()
-            {
-                finalized = true;
+        if let (Some(ident_expr), Some(type_expr)) = (operand1, operand2) {
+            let type_expr_ref = &self.exprs[type_expr as usize];
+
+            if type_expr_ref.finalized && type_expr_ref.expr_returns == ExprReturns::Type {
+                let type_id = type_expr_ref.type_or_module;
+
+                // use pattern matching on our operation of the form
+                // ident_expr : type
+                // type_id is id of said type
+
+                let pattern_result = self.pattern_matching(ctx, scope, ident_expr, type_id);
+
+                match pattern_result {
+                    Ok(value) => {
+                        finalized = true;
+                        pattern = value;
+                    }
+                    Err(e) => {
+                        err = Some(SemanticError::PatternError(e))
+                    }
+                }
             }
         }
 
@@ -157,6 +267,12 @@ impl AST {
         expr_mut.type_or_module = unit_type;
         expr_mut.expr_returns = ExprReturns::Unit;
         expr_mut.finalized = finalized;
+
+        if let Some(err) = err {
+            return Err(err);
+        }
+
+        Ok(pattern)
     }
 
     fn analyze_operation_func_params(
