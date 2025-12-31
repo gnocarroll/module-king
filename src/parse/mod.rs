@@ -123,6 +123,8 @@ struct If {
 #[derive(Clone)]
 enum ExprVariant {
     Unit,
+    Underscore,
+    DollarNumber(u64),
     IntegerLiteral(u64),
     FloatLiteral(f64),
     StringLiteral(Token),

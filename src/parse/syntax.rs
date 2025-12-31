@@ -25,6 +25,32 @@ impl AST {
         })
     }
 
+    fn expr_underscore(&mut self, tok_idx: u32) -> u32 {
+        self.expr_push(Expr {
+            tok: tok_idx,
+            end_tok: tok_idx + 1,
+            variant: ExprVariant::Underscore,
+            ..Default::default()
+        })
+    }
+
+    fn expr_dollar_number(&mut self, tokens: &Tokens, tok_idx: u32, tok: &Token) -> u32 {
+        let mut chars = tokens.tok_as_str(tok).chars();
+
+        chars.next();
+
+        let val = chars.as_str().parse::<u64>().expect(
+            "DollarNumber scanning broken",
+        );
+        
+        self.expr_push(Expr {
+            tok: tok_idx,
+            end_tok: tok_idx + 1,
+            variant: ExprVariant::DollarNumber(val),
+            ..Default::default()
+        })
+    }
+
     fn expr_push(&mut self, expr: Expr) -> u32 {
         self.exprs.push(expr);
 
@@ -475,6 +501,14 @@ impl AST {
         let tok = tokens.peek();
 
         match tok.ttype {
+            TokenType::Underscore => {
+                tokens.next();
+                self.expr_underscore(tok_idx)
+            }
+            TokenType::DollarNumber => {
+                tokens.next();
+
+            }
             // single token (e.g. integer) literals or ident
             TokenType::Integer | TokenType::Float | TokenType::String | TokenType::Identifier => {
                 tokens.next();

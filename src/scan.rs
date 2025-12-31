@@ -56,9 +56,11 @@ pub enum TokenType {
     PlusPlus,
     MinusMinus,
     DArrow,
+    PipeGt,
+    Underscore,
 
     Type,
-    Subtype,
+    New,
     Is,
     With,
     Begin,
@@ -90,6 +92,7 @@ pub enum TokenType {
     Enum,
     Variant,
 
+    DollarNumber,
     Identifier,
     Integer,
     Float,
@@ -274,6 +277,23 @@ fn scan_string(s: &str) -> usize {
     ret
 }
 
+fn scan_dollar_number(s: &str) -> usize {
+    let mut chars = s.chars();
+
+    match chars.next() {
+        Some('$') => (),
+        _ => return 0,
+    }
+
+    let ret = 1 + scan_integer(chars.as_str());
+
+    if ret == 1 {
+        return 0;
+    }
+
+    ret
+}
+
 fn scan_ws_and_comments(s: &str) -> usize {
     let mut len: usize = 0;
     let mut chars = s.chars();
@@ -368,9 +388,11 @@ impl TokenType {
             PlusPlus => Text("++"),
             MinusMinus => Text("--"),
             DArrow => Text("=>"),
+            PipeGt => Text("|>"),
+            Underscore => Text("_"),
             
             Type => Text("type"),
-            Subtype => Text("subtype"),
+            New => Text("new"),
             Is => Text("is"),
             With => Text("with"),
             Begin => Text("begin"),
@@ -401,6 +423,7 @@ impl TokenType {
             Enum => Text("enum"),
             Variant => Text("variant"),
 
+            DollarNumber => Proc(scan_dollar_number),
             Identifier => Proc(scan_identifier),
             Integer => Proc(scan_integer),
             Float => Proc(scan_float),

@@ -49,16 +49,16 @@ static OP_INFO_TABLE: &[&[OperatorInfo]] = &[
         assoc: Assoc::Right,
         is_rhs_optional: true,
     }],
+    &[OperatorInfo {
+        ttype: TokenType::With,
+        variant: Infix,
+        assoc: Assoc::Left,
+        is_rhs_optional: false,
+    }],
     &[
         // parens e.g. (5) are thought of as operator
         OperatorInfo {
             ttype: TokenType::LParen,
-            variant: Around,
-            assoc: Assoc::Left,
-            is_rhs_optional: true,
-        },
-        OperatorInfo {
-            ttype: TokenType::LBrace,
             variant: Around,
             assoc: Assoc::Left,
             is_rhs_optional: true,
@@ -70,6 +70,12 @@ static OP_INFO_TABLE: &[&[OperatorInfo]] = &[
             is_rhs_optional: true,
         },
     ],
+    &[OperatorInfo {
+        ttype: TokenType::PipeGt,
+        variant: Infix,
+        assoc: Assoc::Right,
+        is_rhs_optional: false,
+    }],
     &[
         OperatorInfo {
             ttype: TokenType::Return,
@@ -353,6 +359,12 @@ static OP_INFO_TABLE: &[&[OperatorInfo]] = &[
         OperatorInfo {
             ttype: TokenType::Star,
             variant: Prefix,
+            assoc: Assoc::Right,
+            is_rhs_optional: false,
+        },
+        OperatorInfo {
+            ttype: TokenType::LBrace,
+            variant: PrefixAround,
             assoc: Assoc::Right,
             is_rhs_optional: false,
         },
