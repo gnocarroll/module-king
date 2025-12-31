@@ -124,6 +124,7 @@ struct If {
 enum ExprVariant {
     Unit,
     Underscore,
+    KWType, // the keyword "type" e.g. type(x)
     DollarNumber(u64),
     IntegerLiteral(u64),
     FloatLiteral(f64),

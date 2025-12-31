@@ -159,7 +159,7 @@ impl AST {
         expr_mut.finalized = finalized;
     }
 
-    fn semantic_analyze_operation_func_params(
+    fn analyze_operation_func_params(
         &mut self,
         ctx: &mut SemanticContext,
         scope: u32,
@@ -202,7 +202,7 @@ impl AST {
         }
     }
 
-    fn semantic_analyze_operation_type_body(
+    fn analyze_operation_type_body(
         &mut self,
         ctx: &mut SemanticContext,
         scope: u32,
@@ -275,20 +275,44 @@ impl AST {
         }
     }
 
-    fn semantic_analyze_operation(&mut self, ctx: &mut SemanticContext, scope: u32, expr: u32) {
+    fn analyze_type_def(&mut self, ctx: &mut SemanticContext, scope: u32, name: u32, value: u32) {
+
+    }
+
+    fn analyze_operation(&mut self, ctx: &mut SemanticContext, scope: u32, expr: u32) {
         let operation = match &self.exprs[expr as usize].variant {
             ExprVariant::Operation(operation) => operation.clone(),
             _ => panic!(),
         };
 
+        let mut return_early = true;
+
         match ctx.analyzing_now {
             AnalyzingNow::FuncParams => {
-                self.semantic_analyze_operation_func_params(ctx, scope, expr, operation);
+                self.analyze_operation_func_params(ctx, scope, expr, operation);
             }
             AnalyzingNow::TypeBody(_) => {
-                self.semantic_analyze_operation_type_body(ctx, scope, expr, operation);
+                self.analyze_operation_type_body(ctx, scope, expr, operation);
             }
-            _ => {}
+            _ => {
+                return_early = false;
+            }
+        }
+
+        if return_early {
+            return;
+        }
+
+        match operation.op {
+            TokenType::Type => {
+                self.analyze_type_def(
+                    ctx,
+                    scope,
+                    operation.operand1.expect("typedef missing lhs"),
+                    operation.operand2.expect("typedef missing rhs"),
+                );
+            }
+            _ => (),
         }
     }
 
@@ -451,7 +475,7 @@ impl AST {
                 self.semantic_analyze_type_literal(ctx, scope, expr);
             }
             ExprVariant::Operation(_) => {
-                self.semantic_analyze_operation(ctx, scope, expr);
+                self.analyze_operation(ctx, scope, expr);
             }
             _ => (),
         }

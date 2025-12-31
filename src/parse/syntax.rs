@@ -34,6 +34,15 @@ impl AST {
         })
     }
 
+    fn expr_kwtype(&mut self, tok_idx: u32) -> u32 {
+        self.expr_push(Expr {
+            tok: tok_idx,
+            end_tok: tok_idx + 1,
+            variant: ExprVariant::KWType,
+            ..Default::default()
+        })
+    }
+
     fn expr_dollar_number(&mut self, tokens: &Tokens, tok_idx: u32, tok: &Token) -> u32 {
         let mut chars = tokens.tok_as_str(tok).chars();
 
@@ -507,7 +516,7 @@ impl AST {
             }
             TokenType::DollarNumber => {
                 tokens.next();
-
+                self.expr_dollar_number(tokens, tok_idx, &tok)
             }
             // single token (e.g. integer) literals or ident
             TokenType::Integer | TokenType::Float | TokenType::String | TokenType::Identifier => {
@@ -552,6 +561,7 @@ impl AST {
 
     fn parse_lhs(&mut self, tokens: &mut Tokens) -> u32 {
         let tok = tokens.peek();
+        let tok_idx = tokens.idx();
 
         // see if you have prefix op
 
@@ -572,6 +582,11 @@ impl AST {
             match operator::get_bp(tok.ttype, op_variant) {
                 Some((_, r_bp)) => {
                     tokens.next();
+
+                    // for typedef (the Type operator) next token must be identifier
+                    if tok.ttype == TokenType::Type && tokens.peek().ttype != TokenType::Identifier {
+                        return self.expr_kwtype(tok_idx);
+                    }
 
                     let lhs = self.parse_expr(tokens);
 
