@@ -26,6 +26,9 @@ enum AnalyzingNow {
 struct SemanticContext<'a> {
     tokens: &'a Tokens<'a>,
     analyzing_now: AnalyzingNow,
+
+    // scope id of current function
+    curr_func: Option<u32>,
 }
 
 impl AST {
@@ -104,6 +107,74 @@ impl AST {
         self.scope_add_member(ctx, scope, member_id);
 
         member_id
+    }
+
+    fn scope_create_members_from_pattern(&mut self, ctx: &mut SemanticContext, scope: u32, pattern: u32) {
+        let mut pattern_stack = vec![pattern];
+
+        while let Some(pattern) = pattern_stack.last() {
+            let pattern = *pattern;
+
+            let pattern_ref = &self.patterns[pattern as usize];
+
+            let type_id = pattern_ref.type_id;
+
+            match pattern_ref.variant {
+                PatternVariant::Ident(token) => {
+                    // instance is added from identifier piece of pattern
+                    self.scope_add_instance(
+                        ctx,
+                        scope,
+                        TokenOrString::Token(token),
+                        Some(type_id),
+                    );
+                }
+                PatternVariant::Tuple((lhs, rhs)) | PatternVariant::Slice((lhs, rhs)) => {
+                    if let Some(rhs) = rhs {
+                        pattern_stack.push(rhs);
+                    }
+
+                    pattern_stack.push(lhs);
+                }
+                PatternVariant::RestOfTuple((lhs, rhs)) | PatternVariant::RestOfSlice((lhs, rhs)) => {
+                    pattern_stack.push(rhs);
+                    pattern_stack.push(lhs);
+                }
+                _ => (),
+            }
+        }
+    }
+
+    // process provided pattern for func params
+    // - append correct param information to func
+    // - add correct instances to function scope
+    fn pattern_process_for_func_params(
+        &mut self,
+        ctx: &mut SemanticContext,
+        pattern: u32,
+    ) {
+        let func_scope = if let Some(curr_func) = ctx.curr_func {
+            curr_func
+        } else {
+            return;
+        };
+
+        let func_expr = if let Some(refers_to) = self.scopes[func_scope as usize].refers_to {
+            refers_to
+        } else {
+            return;
+        };
+
+        // add pattern to vec for func
+
+        match &mut self.exprs[func_expr as usize].variant {
+            ExprVariant::FunctionLiteral(func_literal) => {
+                func_literal.param_info.push(pattern)
+            }
+            _ => ()
+        }
+
+        self.scope_create_members_from_pattern(ctx, func_scope, pattern);
     }
 
     // function to attempt pattern matching between identifier(s) in pattern and type
@@ -205,7 +276,7 @@ impl AST {
         Ok(0)
     }
 
-    // ret pattern
+    // ret pattern or error
     fn analyze_instance_creation(
         &mut self,
         ctx: &mut SemanticContext,
@@ -298,13 +369,15 @@ impl AST {
                 }
             }
             TokenType::Colon => {
-                self.analyze_instance_creation(
+                if let Ok(pattern) = self.analyze_instance_creation(
                     ctx,
                     scope,
                     expr,
                     operation.operand1,
                     operation.operand2,
-                );
+                ) {
+
+                }
             }
             TokenType::Eq | TokenType::ColonEq => {
                 // arg with default provided
@@ -447,6 +520,9 @@ impl AST {
             refers_to: Some(expr), // connect to function literal
             members: HashMap::new(),
         });
+
+        // record current function scope in context
+        ctx.curr_func = Some(func_scope);
 
         ctx.analyzing_now = AnalyzingNow::FuncParams;
         self.semantic_analyze_expr(ctx, func_scope, func_literal.params);
@@ -719,6 +795,7 @@ impl AST {
             let mut ctx = SemanticContext {
                 tokens: tokens,
                 analyzing_now: AnalyzingNow::Expr,
+                curr_func: None,
             };
 
             let global_scope = self.scope_push(Scope {

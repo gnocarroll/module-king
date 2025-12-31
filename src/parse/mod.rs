@@ -62,17 +62,6 @@ enum ScopeVariant {
     Type(TypeVariant),
 }
 
-// destructuring from given type using a certain pattern
-// e.g. to pattern (x, y) from type (u32, u32)
-#[derive(Clone)]
-struct Destructure {
-    // pattern i.d. (see Pattern struct)
-    dest_pattern: u32,
-
-    // type id
-    src_type: u32,
-}
-
 #[derive(Clone, Default)]
 struct FunctionLiteral {
     pub name: Option<Token>,
@@ -82,10 +71,8 @@ struct FunctionLiteral {
     pub return_type: u32,
     pub body: u32,
 
-    // for semantic analysis stage more expressions will be added
-    // for ironed-out params
-    pub params_start: u32,
-    pub params_stop: u32,
+    // for semantic analysis record pattern id for each param
+    pub param_info: Vec<u32>,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -145,8 +132,6 @@ enum ExprVariant {
     FunctionLiteral(FunctionLiteral),
 
     TypeLiteral(TypeLiteral),
-
-    Destructure(Destructure),
 }
 
 #[derive(Clone, Copy, PartialEq)]
