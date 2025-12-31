@@ -767,5 +767,8 @@ impl AST {
 
     pub fn do_syntax_analysis(&mut self, tokens: &mut Tokens) {
         self.root_expr = Some(self.parse_expr(tokens));
+
+        // should be on EOF at this point
+        let _ = self.expect(tokens, TokenType::Eof);
     }
 }

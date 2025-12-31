@@ -3,7 +3,7 @@ pub mod operator;
 mod semantic;
 mod syntax;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Formatter};
 
 use crate::{
     parse::errors::{ExpectedToken, ParseError, SemanticError},
@@ -11,7 +11,7 @@ use crate::{
 };
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-enum TypeVariant {
+pub enum TypeVariant {
     Error, // e.g. type could not be determined, other problem
     Unit,
     String,
@@ -23,7 +23,7 @@ enum TypeVariant {
 }
 
 #[derive(Clone)]
-struct TypeLiteral {
+pub struct TypeLiteral {
     // may be empty str if type literal does not provide name
     pub variant: TypeVariant,
 
@@ -32,7 +32,7 @@ struct TypeLiteral {
 }
 
 #[derive(Clone)]
-enum Type {
+pub enum Type {
     // link to scope containing type information e.g. members
     Scope(u32),
 
@@ -56,14 +56,14 @@ enum Type {
 }
 
 #[derive(Clone, Copy)]
-enum ScopeVariant {
+pub enum ScopeVariant {
     Scope, // e.g. scope for a for loop or other block
     Module,
     Type(TypeVariant),
 }
 
 #[derive(Clone, Default)]
-struct FunctionLiteral {
+pub struct FunctionLiteral {
     pub name: Option<Token>,
     pub params: u32,
 
@@ -183,26 +183,26 @@ impl Expr {
 }
 
 #[derive(Clone, Copy, PartialEq)]
-enum Visibility {
+pub enum Visibility {
     Private,
     Export,
     Global,
 }
 
 #[derive(Clone, Copy, PartialEq)]
-enum MemberVariant {
+pub enum MemberVariant {
     Module,
     Type,
     Instance,
 }
 
 #[derive(Clone)]
-enum TokenOrString {
+pub enum TokenOrString {
     Token(Token),
     String(String),
 }
 
-struct Member {
+pub struct Member {
     pub name: TokenOrString,
     pub visibility: Visibility,
 
@@ -217,7 +217,7 @@ struct Member {
 // a scope may refer to a scope for a code block or
 // - module
 // - type (e.g. Integer)
-struct Scope {
+pub struct Scope {
     // name may be present in the code but could also be from elsewhere
     // e.g. name of file is name of corresponding module
     pub name: Option<TokenOrString>,
@@ -233,13 +233,13 @@ struct Scope {
 }
 
 #[derive(Clone)]
-struct Pattern {
+pub struct Pattern {
     type_id: u32,
     variant: PatternVariant,
 }
 
 #[derive(Clone)]
-enum PatternVariant {
+pub enum PatternVariant {
     IgnoreOne,             // _
     IgnoreMultiple,        // ..
     Binding((Token, u32)), // e.g. rest @ ..
@@ -367,20 +367,51 @@ impl<'a> Tokens<'a> {
 #[derive(Default)]
 pub struct AST {
     // exprs used in initial parsing and semantic analysis stage
-    exprs: Vec<Expr>,
+    pub exprs: Vec<Expr>,
 
     // exprs are main thing for parsing so e.g. scopes members are for
     // semantic analysis
-    scopes: Vec<Scope>,
-    types: Vec<Type>,
-    members: Vec<Member>,
+    pub scopes: Vec<Scope>,
+    pub types: Vec<Type>,
+    pub members: Vec<Member>,
 
-    patterns: Vec<Pattern>,
+    pub patterns: Vec<Pattern>,
 
-    parse_errors: Vec<ParseError>,
-    semantic_errors: Vec<SemanticError>,
+    pub parse_errors: Vec<ParseError>,
+    pub semantic_errors: Vec<SemanticError>,
 
-    root_expr: Option<u32>,
+    pub root_expr: Option<u32>,
+}
+
+impl AST {
+    fn has_errors(&self) -> bool {
+        self.parse_errors.len() > 0 || self.semantic_errors.len() > 0
+    }
+
+    fn display_parse_errors(&self, tokens: &Tokens) {
+        for err in &self.parse_errors {
+            match err {
+                ParseError::ExpectedToken(ExpectedToken { expected, found }) => {
+                    eprintln!(
+                        "Ln {}, Col {}: expected {}, found {} instead",
+                        found.line,
+                        found.column,
+                        expected,
+                        found.ttype,
+                    );
+                }
+                _ => (),
+            };
+        }
+    }
+
+    fn display_semantic_errors(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        for err in &self.semantic_errors {
+            // TODO: print info
+        }
+
+        Ok(())
+    }
 }
 
 // public function to perform syntactic + semantic analysis
@@ -396,8 +427,16 @@ pub fn parse_file(file_name: &str, file_str: &str, tokens: &Vec<Token>) -> AST {
         println!("{}", ast.expr_to_string(&tokens, expr));
     }
 
+    if ast.has_errors() {
+        eprintln!("One or more syntax errors occurred, program will not be compiled.");
+
+        ast.display_parse_errors(&tokens);
+
+        return ast;
+    }
+
     // reenable later to test
-    // ast.do_semantic_analysis(&tokens, file_name);
+    ast.do_semantic_analysis(&tokens, file_name);
 
     ast
 }

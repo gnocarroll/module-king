@@ -5,6 +5,7 @@ use crate::args::{ArgParser, ArgQuantity};
 mod args;
 mod constants;
 mod parse;
+mod run;
 mod scan;
 
 fn main() -> ExitCode {
