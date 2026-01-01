@@ -3,7 +3,7 @@ use std::{collections::HashMap};
 use crate::{
     constants::{ERROR_TYPE, FLOAT_TYPE, INTEGER_TYPE, STRING_TYPE, UNIT_TYPE},
     parse::{
-        AST, ExprReturns, ExprVariant, FunctionLiteral, Identifier, IdentifierVariant, Member, MemberVariant, Operation, Pattern, PatternVariant, Scope, ScopeVariant, TokenOrString, Tokens, Type, TypeVariant, Visibility, errors::{ExprAndType, InvalidOperation, MissingOperand, PatternError, SemanticError, UnexpectedExpr}
+        AST, ExprReturns, ExprVariant, IdentifierVariant, Member, MemberVariant, Operation, Pattern, PatternVariant, Scope, ScopeVariant, TokenOrString, Tokens, Type, TypeVariant, Visibility, errors::{ExprAndType, InvalidOperation, MissingOperand, PatternError, SemanticError, UnexpectedExpr}, operator
     },
     scan::TokenType,
 };
@@ -30,6 +30,8 @@ struct SemanticContext<'a> {
     // scope id of current function
     curr_func: Option<u32>,
 }
+
+use operator::OperatorVariant::*;
 
 impl AST {
     fn get_builtin_type(&mut self, name: &str) -> u32 {
@@ -476,6 +478,15 @@ impl AST {
         op: TokenType,
         operand: u32,
     ) {
+        if operator::get_bp(op, Prefix).is_none()
+            || operator::get_bp(op, Postfix).is_none() {
+            self.semantic_errors.push(SemanticError::InvalidOperation(InvalidOperation {
+                operation: expr,
+                msg: "not a supported unary operator",
+            }));
+            return;
+        }
+
         let operand_type = self.expr(operand).type_or_module;
 
         match self.expr(operand).expr_returns {
@@ -518,16 +529,45 @@ impl AST {
         }
 
         match op {
-            TokenType::Plus | TokenType::Minus => (),
-            _ => {
-                self.semantic_errors.push(SemanticError::InvalidOperation(InvalidOperation {
-                    operation: expr,
-                    msg: "invalid unary operator",
-                }));
-                return;
+            TokenType::Star => {
+                match self.types[operand_type as usize] {
+                    Type::Ptr(type_id) | Type::Ref(type_id) => {
+                        let expr_mut = &mut self.exprs[expr as usize];
+
+                        expr_mut.expr_returns = ExprReturns::Value;
+                        expr_mut.type_or_module = type_id;
+                        expr_mut.finalized = true;
+
+                        return;
+                    }
+                    _ => ()
+                }
             }
+            TokenType::Plus | TokenType::Minus | TokenType::PlusPlus | TokenType::MinusMinus => {
+                let type_variant = match self.types[operand_type as usize] {
+                    Type::Scope(scope) => {
+                        match self.scopes[scope as usize].variant {
+                            ScopeVariant::Type(variant) => Some(variant),
+                            _ => None,
+                        }
+                    }
+                    _ => None,
+                };
+
+                match type_variant {
+                    
+                }
+            }
+            TokenType::Ampersand => {
+
+            }
+            _ => ()
         }
 
+        self.semantic_errors.push(SemanticError::InvalidOperation(InvalidOperation {
+            operation: expr,
+            msg: "this unary operator is not supported for this type",
+        }));
     }
 
     fn analyze_operation_binary(
