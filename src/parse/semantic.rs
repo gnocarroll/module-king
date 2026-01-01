@@ -476,6 +476,57 @@ impl AST {
         op: TokenType,
         operand: u32,
     ) {
+        let operand_type = self.expr(operand).type_or_module;
+
+        match self.expr(operand).expr_returns {
+            ExprReturns::Module => {
+                self.semantic_errors.push(SemanticError::InvalidOperation(InvalidOperation {
+                    operation: expr,
+                    msg: "unary operation may not be applied to a module",
+                }));
+                return;
+            }
+            ExprReturns::Unit => {
+                self.semantic_errors.push(SemanticError::InvalidOperation(InvalidOperation {
+                    operation: expr,
+                    msg: "unary operation may not be applied to Unit",
+                }));
+                return;
+            }
+            ExprReturns::Type => {
+                let type_id = match op {
+                    TokenType::Star => self.type_push(Type::Ptr(operand_type)),
+                    TokenType::Ampersand => self.type_push(Type::Ref(operand_type)),
+                    _ => {
+                        self.semantic_errors.push(SemanticError::InvalidOperation(InvalidOperation {
+                            operation: expr,
+                            msg: "this operation is not supported for types",
+                        }));
+                        return;
+                    }
+                };
+
+                let expr_mut = &mut self.exprs[expr as usize];
+
+                expr_mut.expr_returns = ExprReturns::Type;
+                expr_mut.type_or_module = type_id;
+                expr_mut.finalized = true;
+
+                return;
+            }
+            _ => (),
+        }
+
+        match op {
+            TokenType::Plus | TokenType::Minus => (),
+            _ => {
+                self.semantic_errors.push(SemanticError::InvalidOperation(InvalidOperation {
+                    operation: expr,
+                    msg: "invalid unary operator",
+                }));
+                return;
+            }
+        }
 
     }
 
@@ -488,7 +539,26 @@ impl AST {
         operand1: u32,
         operand2: u32,
     ) {
-        
+        match op {
+            TokenType::Plus => {
+
+            }
+            TokenType::Minus => {
+
+            }
+            TokenType::Star => {
+
+            }
+            TokenType::FSlash => {
+
+            }
+            TokenType::Percent => {
+
+            }
+            _ => {
+                
+            }
+        }
     }
 
     fn analyze_operation(&mut self, ctx: &mut SemanticContext, scope: u32, expr: u32) {
