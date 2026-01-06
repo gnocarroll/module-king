@@ -544,6 +544,8 @@ impl AST {
                 }
             }
             TokenType::Plus | TokenType::Minus | TokenType::PlusPlus | TokenType::MinusMinus => {
+                let err_msg = "this unary operation is only supported for integers and floats";
+                
                 let type_variant = match self.types[operand_type as usize] {
                     Type::Scope(scope) => {
                         match self.scopes[scope as usize].variant {
@@ -554,9 +556,35 @@ impl AST {
                     _ => None,
                 };
 
-                match type_variant {
-                    
+                let type_variant = match type_variant {
+                    Some(v) => v,
+                    None => {
+                        self.semantic_errors.push(SemanticError::InvalidOperation(InvalidOperation {
+                            operation: expr,
+                            msg: err_msg,
+                        }));
+                        return;
+                    }
+                };
+
+                if type_variant != TypeVariant::Integer && type_variant != TypeVariant::Float {
+                    self.semantic_errors.push(SemanticError::InvalidOperation(InvalidOperation {
+                        operation: expr,
+                        msg: err_msg,
+                    }));
+                    return;
                 }
+
+                let (expr_type, expr_returns) = match op {
+                    TokenType::Plus | TokenType::Minus => (operand_type, ExprReturns::Value),
+                    _ => (0, ExprReturns::Unit)
+                };
+
+                let expr_mut = &mut self.exprs[expr as usize];
+
+                expr_mut.type_or_module = expr_type;
+                expr_mut.expr_returns = expr_returns;
+                expr_mut.finalized = true;
             }
             TokenType::Ampersand => {
 
