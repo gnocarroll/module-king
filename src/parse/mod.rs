@@ -155,6 +155,9 @@ struct Expr {
 
     pub expr_returns: ExprReturns,
 
+    // is a variable which implies you can take certain action e.g. take address
+    pub is_var: bool,
+
     // start off false and then set to true if/when semantic analysis is
     // successfully completed for Expr
     pub finalized: bool,
@@ -168,6 +171,7 @@ impl Default for Expr {
             type_or_module: 0,
             variant: ExprVariant::Unit,
             expr_returns: ExprReturns::Unit,
+            is_var: false,
             finalized: false,
         }
     }

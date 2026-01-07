@@ -480,10 +480,7 @@ impl AST {
     ) {
         if operator::get_bp(op, Prefix).is_none()
             || operator::get_bp(op, Postfix).is_none() {
-            self.semantic_errors.push(SemanticError::InvalidOperation(InvalidOperation {
-                operation: expr,
-                msg: "not a supported unary operator",
-            }));
+            self.invalid_operation(expr, "not a supported unary operator");
             return;
         }
 
@@ -491,17 +488,11 @@ impl AST {
 
         match self.expr(operand).expr_returns {
             ExprReturns::Module => {
-                self.semantic_errors.push(SemanticError::InvalidOperation(InvalidOperation {
-                    operation: expr,
-                    msg: "unary operation may not be applied to a module",
-                }));
+                self.invalid_operation(expr, "unary operation may not be applied to a module");
                 return;
             }
             ExprReturns::Unit => {
-                self.semantic_errors.push(SemanticError::InvalidOperation(InvalidOperation {
-                    operation: expr,
-                    msg: "unary operation may not be applied to Unit",
-                }));
+                self.invalid_operation(expr, "unary operation may not be applied to Unit");
                 return;
             }
             ExprReturns::Type => {
@@ -509,10 +500,7 @@ impl AST {
                     TokenType::Star => self.type_push(Type::Ptr(operand_type)),
                     TokenType::Ampersand => self.type_push(Type::Ref(operand_type)),
                     _ => {
-                        self.semantic_errors.push(SemanticError::InvalidOperation(InvalidOperation {
-                            operation: expr,
-                            msg: "this operation is not supported for types",
-                        }));
+                        self.invalid_operation(expr, "this operation is not supported for types");
                         return;
                     }
                 };
@@ -559,19 +547,13 @@ impl AST {
                 let type_variant = match type_variant {
                     Some(v) => v,
                     None => {
-                        self.semantic_errors.push(SemanticError::InvalidOperation(InvalidOperation {
-                            operation: expr,
-                            msg: err_msg,
-                        }));
+                        self.invalid_operation(expr, err_msg);
                         return;
                     }
                 };
 
                 if type_variant != TypeVariant::Integer && type_variant != TypeVariant::Float {
-                    self.semantic_errors.push(SemanticError::InvalidOperation(InvalidOperation {
-                        operation: expr,
-                        msg: err_msg,
-                    }));
+                    self.invalid_operation(expr, err_msg);
                     return;
                 }
 
@@ -587,7 +569,21 @@ impl AST {
                 expr_mut.finalized = true;
             }
             TokenType::Ampersand => {
+                let err_msg = "you may only create a reference to a variable";
 
+                if !self.expr(operand).is_var {
+                    self.invalid_operation(expr, err_msg);
+                    return;
+                }
+
+                // type of finalized type is reference to whatever type operand is
+                let expr_type = self.type_push(Type::Ref(operand_type));
+
+                let expr_mut = &mut self.exprs[expr as usize];
+
+                expr_mut.type_or_module = expr_type;
+                expr_mut.expr_returns = ExprReturns::Value;
+                expr_mut.finalized = true;
             }
             _ => ()
         }
@@ -835,6 +831,7 @@ impl AST {
                         ident.variant = ident_variant;
                     }
 
+                    expr.is_var = true;
                     expr.finalized = true;
                 }
             }
