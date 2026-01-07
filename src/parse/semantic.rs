@@ -1046,6 +1046,7 @@ impl AST {
                 (INTEGER_TYPE, TypeVariant::Integer),
                 (FLOAT_TYPE, TypeVariant::Float),
                 (UNIT_TYPE, TypeVariant::Unit),
+                (BOOLEAN_TYPE, TypeVariant::Enum),
                 (STRING_TYPE, TypeVariant::String),
             ] {
                 self.scope_add_member_type(
@@ -1054,6 +1055,26 @@ impl AST {
                     TokenOrString::String(name.to_string()),
                     variant,
                 );
+            }
+
+            // add false, true to Boolean type
+
+            let boolean_type = self.get_builtin_type_id(BOOLEAN_TYPE);
+
+            match self.types[boolean_type as usize] {
+                Type::Scope(scope) => {
+                    for name in ["false", "true"] {
+                        let member = self.member_push(Member {
+                            name: TokenOrString::String(name.to_string()),
+                            visibility: Visibility::Global,
+                            variant: MemberVariant::Instance,
+                            module_or_type: boolean_type,
+                        });
+
+                        self.scope_add_member(&mut ctx, scope, member);
+                    }
+                }
+                _ => panic!("boolean type malformed"),
             }
 
             // create new scope for module
