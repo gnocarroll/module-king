@@ -1,7 +1,7 @@
 use std::{collections::HashMap};
 
 use crate::{
-    constants::{ERROR_TYPE, FLOAT_TYPE, INTEGER_TYPE, STRING_TYPE, UNIT_TYPE},
+    constants::{BOOLEAN_TYPE, ERROR_TYPE, FLOAT_TYPE, INTEGER_TYPE, STRING_TYPE, UNIT_TYPE},
     parse::{
         AST, ExprReturns, ExprVariant, IdentifierVariant, Member, MemberVariant, Operation, Pattern, PatternVariant, Scope, ScopeVariant, TokenOrString, Tokens, Type, TypeVariant, Visibility, errors::{ExprAndType, InvalidOperation, MissingOperand, PatternError, SemanticError, UnexpectedExpr}, operator
     },
@@ -478,6 +478,10 @@ impl AST {
         op: TokenType,
         operand: u32,
     ) {
+        if !self.expr(operand).finalized {
+            return;
+        }
+
         if operator::get_bp(op, Prefix).is_none()
             || operator::get_bp(op, Postfix).is_none() {
             self.invalid_operation(expr, "not a supported unary operator");
@@ -517,20 +521,6 @@ impl AST {
         }
 
         match op {
-            TokenType::Star => {
-                match self.types[operand_type as usize] {
-                    Type::Ptr(type_id) | Type::Ref(type_id) => {
-                        let expr_mut = &mut self.exprs[expr as usize];
-
-                        expr_mut.expr_returns = ExprReturns::Value;
-                        expr_mut.type_or_module = type_id;
-                        expr_mut.finalized = true;
-
-                        return;
-                    }
-                    _ => ()
-                }
-            }
             TokenType::Plus | TokenType::Minus | TokenType::PlusPlus | TokenType::MinusMinus => {
                 let err_msg = "this unary operation is only supported for integers and floats";
                 
@@ -588,7 +578,54 @@ impl AST {
             TokenType::Star => { // i.e. deref
                 let err_msg = "you may only dereference a pointer or reference";
 
+                let expr_type = match self.types[operand_type as usize] {
+                    Type::Ptr(t) | Type::Ref(t) => t,
+                    _ => {
+                        self.invalid_operation(expr, err_msg);
+                        return;
+                    }
+                };
+
+                let expr_mut = &mut self.exprs[expr as usize];
+
+                expr_mut.type_or_module = expr_type;
+                expr_mut.expr_returns = ExprReturns::Value;
+                expr_mut.finalized = true;
+            }
+            TokenType::Tilde => {
+                let err_msg = "this unary operation is only supported for integers";
                 
+                let type_variant = match self.types[operand_type as usize] {
+                    Type::Scope(scope) => {
+                        match self.scopes[scope as usize].variant {
+                            ScopeVariant::Type(variant) => Some(variant),
+                            _ => None,
+                        }
+                    }
+                    _ => None,
+                };
+
+                let type_variant = match type_variant {
+                    Some(v) => v,
+                    None => {
+                        self.invalid_operation(expr, err_msg);
+                        return;
+                    }
+                };
+
+                if type_variant != TypeVariant::Integer {
+                    self.invalid_operation(expr, err_msg);
+                    return;
+                }
+
+                let expr_mut = &mut self.exprs[expr as usize];
+
+                expr_mut.type_or_module = operand_type;
+                expr_mut.expr_returns = ExprReturns::Value;
+                expr_mut.finalized = true;
+            }
+            TokenType::Bang => {
+                let boolean_type = self.get_builtin_type_id(BOOLEAN_TYPE);
             }
             _ => ()
         }
