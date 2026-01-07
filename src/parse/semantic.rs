@@ -585,6 +585,11 @@ impl AST {
                 expr_mut.expr_returns = ExprReturns::Value;
                 expr_mut.finalized = true;
             }
+            TokenType::Star => { // i.e. deref
+                let err_msg = "you may only dereference a pointer or reference";
+
+                
+            }
             _ => ()
         }
 
