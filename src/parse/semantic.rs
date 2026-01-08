@@ -483,12 +483,27 @@ impl AST {
         }
 
         if operator::get_bp(op, Prefix).is_none()
-            || operator::get_bp(op, Postfix).is_none() {
+            && operator::get_bp(op, Postfix).is_none()
+            && operator::get_bp(op, Around).is_none() {
             self.invalid_operation(expr, "not a supported unary operator");
             return;
         }
 
         let operand_type = self.expr(operand).type_or_module;
+
+        // can surround type or module with parentheses
+
+        if op == TokenType::LParen {
+            let expr_returns = self.expr(operand).expr_returns;
+
+            let expr_mut = &mut self.exprs[expr as usize];
+
+            expr_mut.expr_returns = expr_returns;
+            expr_mut.type_or_module = operand_type;
+            expr_mut.finalized = true;
+
+            return;
+        }
 
         match self.expr(operand).expr_returns {
             ExprReturns::Module => {
@@ -660,6 +675,18 @@ impl AST {
         operand1: u32,
         operand2: u32,
     ) {
+        // both operands must already be finalized
+
+        if !self.expr(operand1).finalized || !self.expr(operand2).finalized {
+            return;
+        }
+
+        if operator::get_bp(op, Infix).is_none()
+            && operator::get_bp(op, PostfixAround).is_none() {
+            self.invalid_operation(expr, "not a supported binary operator");
+            return;
+        }
+
         match op {
             TokenType::Plus => {
 
