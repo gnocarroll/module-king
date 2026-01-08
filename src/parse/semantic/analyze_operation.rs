@@ -370,11 +370,14 @@ impl AST {
         }
 
         match op {
-            TokenType::Plus => {}
-            TokenType::Minus => {}
-            TokenType::Star => {}
-            TokenType::FSlash => {}
-            TokenType::Percent => {}
+            TokenType::Plus
+            | TokenType::Minus
+            | TokenType::Star
+            | TokenType::FSlash
+            | TokenType::Percent
+            | TokenType::StarStar => {
+
+            }
             _ => {}
         }
     }
