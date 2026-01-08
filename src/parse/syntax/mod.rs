@@ -4,7 +4,11 @@ use operator::OperatorVariant::*;
 
 use crate::{
     parse::{
-        AST, Expr, ExprVariant, FunctionLiteral, Identifier, IdentifierVariant, If, Operation, Tokens, TypeLiteral, TypeVariant, ast_contents::ExprID, errors::{ExpectedToken, NameMismatch, ParseError}, operator
+        AST, Expr, ExprVariant, FunctionLiteral, Identifier, IdentifierVariant, Operation, Tokens,
+        TypeLiteral, TypeVariant,
+        ast_contents::ExprID,
+        errors::{ExpectedToken, NameMismatch, ParseError},
+        operator,
     },
     scan::{Token, TokenType},
 };
@@ -58,31 +62,26 @@ impl AST {
         }
     }
 
-    fn parse_if(&mut self, tokens: &mut Tokens) -> u32 {
-        let set_else_arm = |
-            ast: &mut AST,
-            target: Option<u32>,
-            else_expr: u32,
-        | {
+    fn parse_if(&mut self, tokens: &mut Tokens) -> ExprID {
+        let set_else_arm = |ast: &mut AST, target: Option<ExprID>, else_expr: ExprID| {
             if let Some(target) = target {
-                match &mut ast.exprs[target as usize].variant {
-                    ExprVariant::If(expr_ref)
-                    | ExprVariant::Elif(expr_ref) => {
+                match &mut ast.objs.expr_mut(target).variant {
+                    ExprVariant::If(expr_ref) | ExprVariant::Elif(expr_ref) => {
                         expr_ref.else_expr = Some(else_expr);
                     }
                     _ => panic!("target should always be if or elif"),
                 }
             }
         };
-        
-        let mut ret = 0;
+
+        let mut ret = ExprID::default();
 
         // will need to set else arm of if/elif from previous loop
         let mut prev_expr = None;
 
         // indicates current loop is elif (as opposed to if)
         let mut is_elif = false;
-        
+
         loop {
             // consume if/elif token
             tokens.next();
@@ -94,12 +93,7 @@ impl AST {
             let body = self.parse_expr(tokens);
 
             // else_expr is set later
-            let if_expr = self.expr_if(
-                cond,
-                body,
-                None,
-                is_elif,
-            );
+            let if_expr = self.expr_if(cond, body, None, is_elif);
 
             // the first if expr is returned from this function
             if !is_elif {
@@ -121,7 +115,10 @@ impl AST {
 
                     set_else_arm(self, Some(if_expr), else_expr);
 
-                    if self.expect_sequence(tokens, &[TokenType::End, TokenType::If]).is_err() {
+                    if self
+                        .expect_sequence(tokens, &[TokenType::End, TokenType::If])
+                        .is_err()
+                    {
                         tokens.sync(&[TokenType::Semicolon]);
                     }
 
@@ -135,7 +132,7 @@ impl AST {
                 _ => {
                     // this will cause sensible error message about expecting end token
                     let _ = self.expect(tokens, TokenType::End);
-                    
+
                     let peek = tokens.sync(&[TokenType::End, TokenType::Semicolon]);
 
                     match peek.ttype {
@@ -164,7 +161,7 @@ impl AST {
 
     // NOTE: this function assumes "function" is upcoming token so that should
     // have been checked at call site
-    fn parse_function(&mut self, tokens: &mut Tokens) -> u32 {
+    fn parse_function(&mut self, tokens: &mut Tokens) -> ExprID {
         let tok_idx = tokens.idx();
 
         tokens.next();
@@ -177,7 +174,7 @@ impl AST {
 
                 Some(tok)
             }
-            _ => None
+            _ => None,
         };
 
         // having this in lambda makes it easy to jump ahead if failure occurs
@@ -281,9 +278,9 @@ impl AST {
         })
     }
 
-    fn parse_number_type_literal(&mut self, tokens: &mut Tokens) -> u32 {
+    fn parse_number_type_literal(&mut self, tokens: &mut Tokens) -> ExprID {
         let tok_idx = tokens.idx();
-        
+
         let variant = match tokens.next().ttype {
             TokenType::KWInteger => TypeVariant::Integer,
             TokenType::KWFloat => TypeVariant::Float,
@@ -295,15 +292,12 @@ impl AST {
         self.expr_push(Expr {
             tok: tok_idx,
             end_tok: tokens.idx(),
-            variant: ExprVariant::TypeLiteral(TypeLiteral {
-                variant,
-                body,
-            }),
+            variant: ExprVariant::TypeLiteral(TypeLiteral { variant, body }),
             ..Default::default()
         })
     }
 
-    fn parse_record_literal(&mut self, tokens: &mut Tokens) -> u32 {
+    fn parse_record_literal(&mut self, tokens: &mut Tokens) -> ExprID {
         let tok_idx = tokens.idx();
         let type_variant_tok = tokens.next();
 
@@ -317,10 +311,10 @@ impl AST {
 
         let body = self.parse_expr(tokens);
 
-        if self.expect_sequence(
-            tokens,
-            &[TokenType::End, type_variant_tok.ttype],
-        ).is_err() {
+        if self
+            .expect_sequence(tokens, &[TokenType::End, type_variant_tok.ttype])
+            .is_err()
+        {
             let tok = tokens.sync(&[TokenType::Semicolon, TokenType::End, type_variant_tok.ttype]);
 
             match tok.ttype {
@@ -341,16 +335,13 @@ impl AST {
         self.expr_push(Expr {
             tok: tok_idx,
             end_tok: tokens.idx(),
-            variant: ExprVariant::TypeLiteral(TypeLiteral {
-                variant,
-                body,
-            }),
+            variant: ExprVariant::TypeLiteral(TypeLiteral { variant, body }),
             ..Default::default()
         })
     }
 
     // atom e.g. literal like integer
-    fn parse_atom(&mut self, tokens: &mut Tokens) -> u32 {
+    fn parse_atom(&mut self, tokens: &mut Tokens) -> ExprID {
         let tok_idx = tokens.idx();
         let tok = tokens.peek();
 
@@ -395,16 +386,14 @@ impl AST {
             }
             TokenType::If => self.parse_if(tokens),
             TokenType::Function => self.parse_function(tokens),
-            TokenType::KWInteger
-            | TokenType::KWFloat => self.parse_number_type_literal(tokens),
-            TokenType::Record
-            | TokenType::Variant => self.parse_record_literal(tokens),
+            TokenType::KWInteger | TokenType::KWFloat => self.parse_number_type_literal(tokens),
+            TokenType::Record | TokenType::Variant => self.parse_record_literal(tokens),
             // if no atom or other (e.g. prefix) expr is found return Unit
             _ => self.expr_unit(tok_idx),
         }
     }
 
-    fn parse_lhs(&mut self, tokens: &mut Tokens) -> u32 {
+    fn parse_lhs(&mut self, tokens: &mut Tokens) -> ExprID {
         let tok = tokens.peek();
         let tok_idx = tokens.idx();
 
@@ -429,7 +418,8 @@ impl AST {
                     tokens.next();
 
                     // for typedef (the Type operator) next token must be identifier
-                    if tok.ttype == TokenType::Type && tokens.peek().ttype != TokenType::Identifier {
+                    if tok.ttype == TokenType::Type && tokens.peek().ttype != TokenType::Identifier
+                    {
                         return self.expr_kwtype(tok_idx);
                     }
 
@@ -454,12 +444,8 @@ impl AST {
 
                     if op_variant == Around {
                         return self.expr_around(tok, lhs, found_end);
-                    }
-                    else {
-                        let rhs = self.parse_expr_bp(
-                            tokens,
-                            r_bp,
-                        );
+                    } else {
+                        let rhs = self.parse_expr_bp(tokens, r_bp);
 
                         return self.expr_prefix_around(tok, lhs, rhs);
                     }
@@ -472,7 +458,7 @@ impl AST {
     }
 
     // bp is Binding Power (Pratt parsing) and ret is expr id
-    fn parse_expr_bp(&mut self, tokens: &mut Tokens, min_bp: u8) -> u32 {
+    fn parse_expr_bp(&mut self, tokens: &mut Tokens, min_bp: u8) -> ExprID {
         let mut lhs = self.parse_lhs(tokens);
 
         loop {
@@ -543,15 +529,11 @@ impl AST {
     }
 
     // ret expr id
-    fn parse_expr(&mut self, tokens: &mut Tokens) -> u32 {
+    fn parse_expr(&mut self, tokens: &mut Tokens) -> ExprID {
         self.parse_expr_bp(tokens, 0)
     }
 
-    pub fn expr_to_string(&self, tokens: &Tokens, expr: u32) -> String {
-        if expr >= self.exprs.len() as u32 {
-            return "".to_string();
-        }
-
+    pub fn expr_to_string(&self, tokens: &Tokens, expr: ExprID) -> String {
         let expr_ref = self.expr(expr);
 
         match &expr_ref.variant {
@@ -561,7 +543,7 @@ impl AST {
             ExprVariant::StringLiteral(t) => tokens.tok_as_str(&t).to_string(),
             ExprVariant::Identifier(ident) => tokens.tok_as_str(&ident.name).to_string(),
             ExprVariant::Operation(operation) => {
-                let operand_to_string = |operand: Option<u32>| match operand {
+                let operand_to_string = |operand: Option<ExprID>| match operand {
                     Some(id) => format!(" {}", self.expr_to_string(tokens, id),),
                     None => "".to_string(),
                 };
@@ -588,10 +570,7 @@ impl AST {
                 format!(
                     "(function {}{} => {} = {})",
                     match function_literal.name {
-                        Some(tok) => format!(
-                            "{} ",
-                            tokens.tok_as_str(&tok),
-                        ),
+                        Some(tok) => format!("{} ", tokens.tok_as_str(&tok),),
                         None => "".to_string(),
                     },
                     self.expr_to_string(tokens, function_literal.params),

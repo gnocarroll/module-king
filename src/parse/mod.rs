@@ -29,7 +29,7 @@ pub struct TypeLiteral {
     pub variant: TypeVariant,
 
     // body is an Expr
-    pub body: u32,
+    pub body: ExprID,
 }
 
 #[derive(Clone)]
@@ -378,7 +378,7 @@ pub struct AST {
     pub parse_errors: Vec<ParseError>,
     pub semantic_errors: Vec<SemanticError>,
 
-    pub root_expr: Option<u32>,
+    pub root_expr: Option<ExprID>,
 }
 
 impl AST {
