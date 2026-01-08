@@ -7,7 +7,7 @@ mod syntax;
 use std::{collections::HashMap, fmt::Formatter};
 
 use crate::{
-    parse::errors::{ExpectedToken, ParseError, SemanticError},
+    parse::{ast_contents::{ASTContents, ExprID, PatternID}, errors::{ExpectedToken, ParseError, SemanticError}},
     scan::{Token, TokenType},
 };
 
@@ -66,11 +66,11 @@ pub enum ScopeVariant {
 #[derive(Clone, Default)]
 pub struct FunctionLiteral {
     pub name: Option<Token>,
-    pub params: u32,
+    pub params: ExprID,
 
     // return type is an expr id rather than Type struct
-    pub return_type: u32,
-    pub body: u32,
+    pub return_type: ExprID,
+    pub body: ExprID,
 
     // for semantic analysis record pattern id for each param
     pub param_info: Vec<u32>,
@@ -95,17 +95,17 @@ struct Identifier {
 #[derive(Clone, Copy)]
 struct Operation {
     pub op: TokenType,
-    pub operand1: Option<u32>,
-    pub operand2: Option<u32>,
+    pub operand1: Option<ExprID>,
+    pub operand2: Option<ExprID>,
 }
 
 #[derive(Clone)]
 struct If {
-    pub cond: u32,
-    pub body: u32,
+    pub cond: ExprID,
+    pub body: ExprID,
 
     // expr to go to if cond is false
-    pub else_expr: Option<u32>,
+    pub else_expr: Option<ExprID>,
 }
 
 #[derive(Clone)]
@@ -207,6 +207,7 @@ pub enum TokenOrString {
     String(String),
 }
 
+#[derive(Clone)]
 pub struct Member {
     pub name: TokenOrString,
     pub visibility: Visibility,
@@ -222,6 +223,7 @@ pub struct Member {
 // a scope may refer to a scope for a code block or
 // - module
 // - type (e.g. Integer)
+#[derive(Clone)]
 pub struct Scope {
     // name may be present in the code but could also be from elsewhere
     // e.g. name of file is name of corresponding module
@@ -247,35 +249,35 @@ pub struct Pattern {
 pub enum PatternVariant {
     IgnoreOne,             // _
     IgnoreMultiple,        // ..
-    Binding((Token, u32)), // e.g. rest @ ..
+    Binding((Token, PatternID)), // e.g. rest @ ..
 
     // lhs, (optional) rhs
-    Tuple((u32, Option<u32>)),
-    RestOfTuple((u32, u32)),
+    Tuple((PatternID, Option<PatternID>)),
+    RestOfTuple((PatternID, PatternID)),
 
     Ident(Token),
 
     // expr id, should be statically computable I guess
-    Value(u32),
+    Value(ExprID),
 
     // for struct simply leave out ignored fields from this
     // data structure
     Struct(
         (
             Option<Token>, // type name (optional)
-            u32, // at least one addition pattern inside struct pattern
-            Option<u32>, // next pattern
+            PatternID, // at least one addition pattern inside struct pattern
+            Option<PatternID>, // next pattern
         ),
     ),
 
     RestOfStruct((
-        u32,
-        u32, // next ptr
+        PatternID,
+        PatternID, // next ptr
     )),
 
     // same as tuple really but uses []
-    Slice((u32, Option<u32>)),
-    RestOfSlice((u32, u32)),
+    Slice((PatternID, Option<PatternID>)),
+    RestOfSlice((PatternID, PatternID)),
 }
 
 struct Tokens<'a> {
@@ -371,16 +373,7 @@ impl<'a> Tokens<'a> {
 // it simplifies things
 #[derive(Default)]
 pub struct AST {
-    // exprs used in initial parsing and semantic analysis stage
-    pub exprs: Vec<Expr>,
-
-    // exprs are main thing for parsing so e.g. scopes members are for
-    // semantic analysis
-    pub scopes: Vec<Scope>,
-    pub types: Vec<Type>,
-    pub members: Vec<Member>,
-
-    pub patterns: Vec<Pattern>,
+    pub objs: ASTContents,
 
     pub parse_errors: Vec<ParseError>,
     pub semantic_errors: Vec<SemanticError>,

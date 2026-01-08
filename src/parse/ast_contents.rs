@@ -1,5 +1,6 @@
 use crate::parse::{Expr, Member, Pattern, Scope, Type};
 
+#[derive(Clone, Default)]
 pub struct ASTContents {
     // exprs used in initial parsing and semantic analysis stage
     pub exprs: Vec<Expr>,
@@ -13,22 +14,27 @@ pub struct ASTContents {
     pub patterns: Vec<Pattern>,
 }
 
+#[derive(Clone, Copy, Default, PartialEq)]
 pub struct ExprID {
     id: u32,
 }
 
+#[derive(Clone, Copy, Default, PartialEq)]
 pub struct ScopeID {
     id: u32,
 }
 
+#[derive(Clone, Copy, Default, PartialEq)]
 pub struct TypeID {
     id: u32,
 }
 
+#[derive(Clone, Copy, Default, PartialEq)]
 pub struct MemberID {
     id: u32,
 }
 
+#[derive(Clone, Copy, Default, PartialEq)]
 pub struct PatternID {
     id: u32,
 }
