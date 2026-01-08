@@ -369,11 +369,14 @@ impl AST {
             return;
         }
 
+        let boolean_type = self.get_builtin_type_id(BOOLEAN_TYPE);
+
         let operands = [operand1, operand2];
 
         let mut found_module = false;
         let mut operand_is_type = [false, false];
         let mut operand_types = [TypeID::default(), TypeID::default()];
+        let mut type_variants = [TypeVariant::Error, TypeVariant::Error];
 
         for (idx, operand) in operands.iter().enumerate() {
             let expr_returns = self.objs.expr(*operand).expr_returns;
@@ -393,6 +396,20 @@ impl AST {
             };
 
             operand_types[idx] = type_id;
+
+            match self.objs.type_get(type_id) {
+                Type::Scope(scope) => match self.objs.scope(*scope).variant {
+                    ScopeVariant::Type(variant) => {
+                        type_variants[idx] = variant;
+                    }
+                    _ => (),
+                },
+                _ => (),
+            }
+
+            if operand_types[idx] == boolean_type {
+                type_variants[idx] = TypeVariant::Boolean;
+            }
         }
 
         if found_module {
@@ -401,21 +418,54 @@ impl AST {
         }
 
         if !operand_is_type[0] || !operand_is_type[1] {
-            self.invalid_operation(expr, "at least one operand is a type, currently only values supported");
+            self.invalid_operation(
+                expr,
+                "at least one operand is a type, currently only values supported",
+            );
             return;
         }
 
-        match op {
-            TokenType::Plus
-            | TokenType::Minus
-            | TokenType::Star
-            | TokenType::FSlash
-            | TokenType::Percent
-            | TokenType::StarStar => {
+        // returns supported type variants, and if operation returns bool
+        // (e.g. so for less than the boolean returned is TRUE)
 
+        let supported_type_variants = |op: TokenType| -> Option<(&[TypeVariant], bool)> {
+            match op {
+                TokenType::Plus
+                | TokenType::Minus
+                | TokenType::Star
+                | TokenType::FSlash
+                | TokenType::Percent
+                | TokenType::StarStar => Some((&[TypeVariant::Integer, TypeVariant::Float], false)),
+
+                // bit ops
+                TokenType::Pipe
+                | TokenType::Carrot
+                | TokenType::Ampersand
+                | TokenType::LtLt
+                | TokenType::GtGt => Some((&[TypeVariant::Integer], false)),
+
+                // comparison
+                TokenType::Lt | TokenType::Gt | TokenType::Le | TokenType::Ge => {
+                    Some((&[TypeVariant::Integer, TypeVariant::Float], true))
+                }
+
+                // equality ops also support Booleans
+                // comparison
+                TokenType::EqEq | TokenType::BangEq => Some((
+                    &[
+                        TypeVariant::Integer,
+                        TypeVariant::Float,
+                        TypeVariant::Boolean,
+                    ],
+                    true,
+                )),
+
+                // and/or
+                TokenType::And | TokenType::Or => Some((&[TypeVariant::Boolean], true)),
+
+                _ => None,
             }
-            _ => {}
-        }
+        };
     }
 
     pub fn analyze_operation(&mut self, ctx: &mut SemanticContext, scope: ScopeID, expr: ExprID) {

@@ -21,6 +21,10 @@ pub enum TypeVariant {
     Record,  // class keyword can also be used for this
     Enum,    // simple C enum
     Variant, // tagged union (can have fields which are just tag)
+
+    // useful for certain code to have this here, but Boolean
+    // will actually just be a built-in Enum
+    Boolean,
 }
 
 #[derive(Clone)]
