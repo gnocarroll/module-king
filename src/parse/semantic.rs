@@ -1,9 +1,12 @@
-use std::{collections::HashMap};
+use std::collections::HashMap;
 
 use crate::{
     constants::{BOOLEAN_TYPE, ERROR_TYPE, FLOAT_TYPE, INTEGER_TYPE, STRING_TYPE, UNIT_TYPE},
     parse::{
-        AST, ExprReturns, ExprVariant, IdentifierVariant, Member, MemberVariant, Operation, Pattern, PatternVariant, Scope, ScopeVariant, TokenOrString, Tokens, Type, TypeVariant, Visibility, errors::{ExprAndType, InvalidOperation, MissingOperand, PatternError, SemanticError, UnexpectedExpr}, operator
+        AST, ExprReturns, ExprVariant, IdentifierVariant, Member, MemberVariant, ModuleOrType, Operation, Pattern, PatternVariant, Scope, ScopeVariant, TokenOrString, Tokens, Type, TypeVariant, Visibility, ast_contents::{MemberID, PatternID, ScopeID, TypeID}, errors::{
+            ExprAndType, InvalidOperation, MissingOperand, PatternError, SemanticError,
+            UnexpectedExpr,
+        }, operator
     },
     scan::TokenType,
 };
@@ -28,16 +31,16 @@ struct SemanticContext<'a> {
     analyzing_now: AnalyzingNow,
 
     // scope id of current function
-    curr_func: Option<u32>,
+    curr_func: Option<ScopeID>,
 }
 
 use operator::OperatorVariant::*;
 
 impl AST {
-    fn get_builtin_type(&mut self, name: &str) -> u32 {
-        if let Some(member) = self.scope_search(0, name) {
-            if self.members[member as usize].variant != MemberVariant::Type {
-                panic!("Not a type: {member}")
+    fn get_builtin_type(&mut self, name: &str) -> MemberID {
+        if let Some(member) = self.scope_search(ScopeID::default(), name) {
+            if self.objs.member(member).variant != MemberVariant::Type {
+                panic!("Not a type")
             }
 
             member
@@ -46,30 +49,27 @@ impl AST {
         }
     }
 
-    fn pattern_push(&mut self, pattern: Pattern) -> u32 {
-        self.patterns.push(pattern);
-
-        self.patterns.len() as u32 - 1
-    }
-
     fn pattern_error_push(&mut self, pattern_error: PatternError) {
-        self.semantic_errors.push(SemanticError::PatternError(pattern_error))
+        self.semantic_errors
+            .push(SemanticError::PatternError(pattern_error))
     }
 
-    fn get_builtin_type_id(&mut self, name: &str) -> u32 {
+    fn get_builtin_type_id(&mut self, name: &str) -> TypeID {
         let member = self.get_builtin_type(name);
 
-        self.members[member as usize].module_or_type
+        match self.objs.member(member).module_or_type {
+            ModuleOrType::Type(t) => t,
+            _ => panic!("builtin type should not be a module")
+        }
     }
 
     fn missing_operand(&mut self, expr: u32, operand: u32) -> SemanticError {
-        let ret  = SemanticError::MissingOperand(MissingOperand {
+        let ret = SemanticError::MissingOperand(MissingOperand {
             operation: expr,
             operand_missing: operand,
         });
-        
-        self.semantic_errors
-            .push(ret.clone());
+
+        self.semantic_errors.push(ret.clone());
 
         ret
     }
@@ -80,8 +80,7 @@ impl AST {
             msg,
         });
 
-        self.semantic_errors
-            .push(ret.clone());
+        self.semantic_errors.push(ret.clone());
 
         ret
     }
@@ -90,20 +89,20 @@ impl AST {
     fn scope_add_instance(
         &mut self,
         ctx: &mut SemanticContext,
-        scope: u32,
+        scope: ScopeID,
         name: TokenOrString,
-        type_id: Option<u32>,
-    ) -> u32 {
+        type_id: Option<TypeID>,
+    ) -> MemberID {
         let type_id = match type_id {
             Some(id) => id,
             None => self.get_builtin_type_id(ERROR_TYPE),
         };
 
-        let member_id = self.member_push(Member {
+        let member_id = self.objs.member_push(Member {
             name,
             visibility: Visibility::Private,
             variant: MemberVariant::Instance,
-            module_or_type: type_id,
+            module_or_type: ModuleOrType::Type(type_id),
         });
 
         self.scope_add_member(ctx, scope, member_id);
@@ -111,25 +110,25 @@ impl AST {
         member_id
     }
 
-    fn scope_create_members_from_pattern(&mut self, ctx: &mut SemanticContext, scope: u32, pattern: u32) {
+    fn scope_create_members_from_pattern(
+        &mut self,
+        ctx: &mut SemanticContext,
+        scope: ScopeID,
+        pattern: PatternID,
+    ) {
         let mut pattern_stack = vec![pattern];
 
         while let Some(pattern) = pattern_stack.pop() {
             let pattern = pattern;
 
-            let pattern_ref = &self.patterns[pattern as usize];
+            let pattern_ref = self.objs.pattern(pattern);
 
             let type_id = pattern_ref.type_id;
 
             match pattern_ref.variant {
                 PatternVariant::Ident(token) => {
                     // instance is added from identifier piece of pattern
-                    self.scope_add_instance(
-                        ctx,
-                        scope,
-                        TokenOrString::Token(token),
-                        Some(type_id),
-                    );
+                    self.scope_add_instance(ctx, scope, TokenOrString::Token(token), Some(type_id));
                 }
                 PatternVariant::Tuple((lhs, rhs)) | PatternVariant::Slice((lhs, rhs)) => {
                     if let Some(rhs) = rhs {
@@ -138,7 +137,8 @@ impl AST {
 
                     pattern_stack.push(lhs);
                 }
-                PatternVariant::RestOfTuple((lhs, rhs)) | PatternVariant::RestOfSlice((lhs, rhs)) => {
+                PatternVariant::RestOfTuple((lhs, rhs))
+                | PatternVariant::RestOfSlice((lhs, rhs)) => {
                     pattern_stack.push(rhs);
                     pattern_stack.push(lhs);
                 }
@@ -150,18 +150,14 @@ impl AST {
     // process provided pattern for func params
     // - append correct param information to func
     // - add correct instances to function scope
-    fn pattern_process_for_func_params(
-        &mut self,
-        ctx: &mut SemanticContext,
-        pattern: u32,
-    ) {
+    fn pattern_process_for_func_params(&mut self, ctx: &mut SemanticContext, pattern: ScopeID) {
         let func_scope = if let Some(curr_func) = ctx.curr_func {
             curr_func
         } else {
             return;
         };
 
-        let func_expr = if let Some(refers_to) = self.scopes[func_scope as usize].refers_to {
+        let func_expr = if let Some(refers_to) = self.objs.scope(func_scope).refers_to {
             refers_to
         } else {
             return;
@@ -170,10 +166,8 @@ impl AST {
         // add pattern to vec for func
 
         match &mut self.exprs[func_expr as usize].variant {
-            ExprVariant::FunctionLiteral(func_literal) => {
-                func_literal.param_info.push(pattern)
-            }
-            _ => ()
+            ExprVariant::FunctionLiteral(func_literal) => func_literal.param_info.push(pattern),
+            _ => (),
         }
 
         self.scope_create_members_from_pattern(ctx, func_scope, pattern);
@@ -196,27 +190,41 @@ impl AST {
         let mut ident_has_parens = false;
 
         while match self.exprs[ident_expr as usize].variant {
-            ExprVariant::Operation(Operation { op: TokenType::LParen, operand1: Some(expr), operand2: None }) => {
+            ExprVariant::Operation(Operation {
+                op: TokenType::LParen,
+                operand1: Some(expr),
+                operand2: None,
+            }) => {
                 ident_has_parens = true;
                 ident_expr = expr;
 
                 true
             }
-            _ => false
+            _ => false,
         } {}
 
         let type_val = self.types[type_id as usize].clone();
 
         match self.exprs[ident_expr as usize].variant {
             ExprVariant::Identifier(ident) => {
-                return Ok(self.pattern_push(Pattern { type_id: type_id, variant: PatternVariant::Ident(ident.name) }))
+                return Ok(self.pattern_push(Pattern {
+                    type_id: type_id,
+                    variant: PatternVariant::Ident(ident.name),
+                }));
             }
             // Tuple
-            ExprVariant::Operation(Operation{ op: TokenType::Comma, operand1: lhs, operand2: rhs}) => {
+            ExprVariant::Operation(Operation {
+                op: TokenType::Comma,
+                operand1: lhs,
+                operand2: rhs,
+            }) => {
                 match type_val {
                     Type::Tuple((lhs_type, rhs_type)) => {
                         if !ident_has_parens {
-                            return Err(PatternError::ParenMismatch(ExprAndType { expr: ident_expr, type_id }));
+                            return Err(PatternError::ParenMismatch(ExprAndType {
+                                expr: ident_expr,
+                                type_id,
+                            }));
                         }
 
                         let lhs = lhs.expect("should have lhs");
@@ -229,12 +237,7 @@ impl AST {
                         }
 
                         // first pattern match on lhs of tuple
-                        let lhs_pattern = self.pattern_matching(
-                            ctx,
-                            scope,
-                            lhs,
-                            lhs_type,
-                        )?;
+                        let lhs_pattern = self.pattern_matching(ctx, scope, lhs, lhs_type)?;
 
                         let rhs_pattern = if let Some(rhs_type) = rhs_type {
                             Some(self.pattern_matching(ctx, scope, rhs, rhs_type)?)
@@ -244,12 +247,15 @@ impl AST {
 
                         return Ok(self.pattern_push(Pattern {
                             type_id,
-                            variant: PatternVariant::Tuple((lhs_pattern, rhs_pattern))
+                            variant: PatternVariant::Tuple((lhs_pattern, rhs_pattern)),
                         }));
                     }
                     Type::RestOfTuple((lhs_type, rhs_type)) => {
                         if ident_has_parens {
-                            return Err(PatternError::ParenMismatch(ExprAndType { expr: ident_expr, type_id }));
+                            return Err(PatternError::ParenMismatch(ExprAndType {
+                                expr: ident_expr,
+                                type_id,
+                            }));
                         }
 
                         let lhs = lhs.expect("should have lhs");
@@ -266,7 +272,7 @@ impl AST {
 
                         return Ok(self.pattern_push(Pattern {
                             type_id,
-                            variant: PatternVariant::RestOfTuple((lhs_pattern, rhs_pattern))
+                            variant: PatternVariant::RestOfTuple((lhs_pattern, rhs_pattern)),
                         }));
                     }
                     _ => (),
@@ -307,7 +313,7 @@ impl AST {
         }
 
         let mut finalized = false;
-        let mut pattern  = 0;
+        let mut pattern = 0;
 
         if let (Some(ident_expr), Some(type_expr)) = (operand1, operand2) {
             let type_expr_ref = &self.exprs[type_expr as usize];
@@ -326,9 +332,7 @@ impl AST {
                         finalized = true;
                         pattern = value;
                     }
-                    Err(e) => {
-                        err = Some(SemanticError::PatternError(e))
-                    }
+                    Err(e) => err = Some(SemanticError::PatternError(e)),
                 }
             }
         }
@@ -377,9 +381,7 @@ impl AST {
                     expr,
                     operation.operand1,
                     operation.operand2,
-                ) {
-
-                }
+                ) {}
             }
             TokenType::Eq | TokenType::ColonEq => {
                 // arg with default provided
@@ -439,7 +441,7 @@ impl AST {
 
                 for operand in [operation.operand1, operation.operand2] {
                     // if second operand is Unit then ignore it (otherwise would cause error)
-                    
+
                     if operand == operation.operand2
                         && match self.exprs
                             [operation.operand2.expect("RHS should be present") as usize]
@@ -460,14 +462,26 @@ impl AST {
                 }
             }
             TokenType::Colon => {
-                self.analyze_instance_creation(ctx, scope, expr, operation.operand1, operation.operand2);
+                self.analyze_instance_creation(
+                    ctx,
+                    scope,
+                    expr,
+                    operation.operand1,
+                    operation.operand2,
+                );
             }
             _ => {}
         }
     }
 
-    fn analyze_type_def(&mut self, ctx: &mut SemanticContext, scope: u32, expr: u32, name: u32, value: u32) {
-
+    fn analyze_type_def(
+        &mut self,
+        ctx: &mut SemanticContext,
+        scope: u32,
+        expr: u32,
+        name: u32,
+        value: u32,
+    ) {
     }
 
     fn analyze_operation_unary(
@@ -484,7 +498,8 @@ impl AST {
 
         if operator::get_bp(op, Prefix).is_none()
             && operator::get_bp(op, Postfix).is_none()
-            && operator::get_bp(op, Around).is_none() {
+            && operator::get_bp(op, Around).is_none()
+        {
             self.invalid_operation(expr, "not a supported unary operator");
             return;
         }
@@ -538,14 +553,12 @@ impl AST {
         match op {
             TokenType::Plus | TokenType::Minus | TokenType::PlusPlus | TokenType::MinusMinus => {
                 let err_msg = "this unary operation is only supported for integers and floats";
-                
+
                 let type_variant = match self.types[operand_type as usize] {
-                    Type::Scope(scope) => {
-                        match self.scopes[scope as usize].variant {
-                            ScopeVariant::Type(variant) => Some(variant),
-                            _ => None,
-                        }
-                    }
+                    Type::Scope(scope) => match self.scopes[scope as usize].variant {
+                        ScopeVariant::Type(variant) => Some(variant),
+                        _ => None,
+                    },
                     _ => None,
                 };
 
@@ -564,7 +577,7 @@ impl AST {
 
                 let (expr_type, expr_returns) = match op {
                     TokenType::Plus | TokenType::Minus => (operand_type, ExprReturns::Value),
-                    _ => (0, ExprReturns::Unit)
+                    _ => (0, ExprReturns::Unit),
                 };
 
                 let expr_mut = &mut self.exprs[expr as usize];
@@ -590,7 +603,8 @@ impl AST {
                 expr_mut.expr_returns = ExprReturns::Value;
                 expr_mut.finalized = true;
             }
-            TokenType::Star => { // i.e. deref
+            TokenType::Star => {
+                // i.e. deref
                 let err_msg = "you may only dereference a pointer or reference";
 
                 let expr_type = match self.types[operand_type as usize] {
@@ -609,14 +623,12 @@ impl AST {
             }
             TokenType::Tilde => {
                 let err_msg = "this unary operation is only supported for integers";
-                
+
                 let type_variant = match self.types[operand_type as usize] {
-                    Type::Scope(scope) => {
-                        match self.scopes[scope as usize].variant {
-                            ScopeVariant::Type(variant) => Some(variant),
-                            _ => None,
-                        }
-                    }
+                    Type::Scope(scope) => match self.scopes[scope as usize].variant {
+                        ScopeVariant::Type(variant) => Some(variant),
+                        _ => None,
+                    },
                     _ => None,
                 };
 
@@ -657,13 +669,14 @@ impl AST {
                 expr_mut.expr_returns = ExprReturns::Value;
                 expr_mut.finalized = true;
             }
-            _ => ()
+            _ => (),
         }
 
-        self.semantic_errors.push(SemanticError::InvalidOperation(InvalidOperation {
-            operation: expr,
-            msg: "this unary operator is not supported for this type",
-        }));
+        self.semantic_errors
+            .push(SemanticError::InvalidOperation(InvalidOperation {
+                operation: expr,
+                msg: "this unary operator is not supported for this type",
+            }));
     }
 
     fn analyze_operation_binary(
@@ -681,31 +694,18 @@ impl AST {
             return;
         }
 
-        if operator::get_bp(op, Infix).is_none()
-            && operator::get_bp(op, PostfixAround).is_none() {
+        if operator::get_bp(op, Infix).is_none() && operator::get_bp(op, PostfixAround).is_none() {
             self.invalid_operation(expr, "not a supported binary operator");
             return;
         }
 
         match op {
-            TokenType::Plus => {
-
-            }
-            TokenType::Minus => {
-
-            }
-            TokenType::Star => {
-
-            }
-            TokenType::FSlash => {
-
-            }
-            TokenType::Percent => {
-
-            }
-            _ => {
-                
-            }
+            TokenType::Plus => {}
+            TokenType::Minus => {}
+            TokenType::Star => {}
+            TokenType::FSlash => {}
+            TokenType::Percent => {}
+            _ => {}
         }
     }
 
@@ -772,12 +772,12 @@ impl AST {
             (Some(operand1), Some(operand2)) => {
                 self.analyze_operation_binary(ctx, scope, expr, operation.op, operand1, operand2);
             }
-            _ => {
-                self.semantic_errors.push(SemanticError::InvalidOperation(InvalidOperation {
+            _ => self
+                .semantic_errors
+                .push(SemanticError::InvalidOperation(InvalidOperation {
                     operation: expr,
-                    msg: "operation has no operands"
-                }))
-            }
+                    msg: "operation has no operands",
+                })),
         }
     }
 
@@ -952,11 +952,11 @@ impl AST {
 
     // search provided scope for a given name and received Member if said name
     // can be found, also recurse to parent if needed
-    fn scope_search(&mut self, scope: u32, name: &str) -> Option<u32> {
+    fn scope_search(&mut self, scope: ScopeID, name: &str) -> Option<MemberID> {
         let mut scope = scope;
 
         loop {
-            let scope_ref = &self.scopes[scope as usize];
+            let scope_ref = self.objs.scope(scope);
 
             if let Some(member) = scope_ref.members.get(name) {
                 return Some(*member);
@@ -968,45 +968,29 @@ impl AST {
         }
     }
 
-    fn scope_push(&mut self, scope: Scope) -> u32 {
-        self.scopes.push(scope);
+    fn type_push_scope(&mut self, scope: ScopeID) -> TypeID {
+        let type_id = self.objs.type_push(Type::Scope(scope));
 
-        self.scopes.len() as u32 - 1
-    }
-
-    fn type_push(&mut self, lang_type: Type) -> u32 {
-        self.types.push(lang_type);
-
-        self.types.len() as u32 - 1
-    }
-
-    fn type_push_scope(&mut self, scope: u32) -> u32 {
-        let type_id = self.type_push(Type::Scope(scope));
-
-        self.scopes[scope as usize].refers_to = Some(type_id);
+        self.objs.scope_mut(scope).refers_to = Some(type_id);
 
         type_id
     }
 
-    fn member_push(&mut self, member: Member) -> u32 {
-        self.members.push(member);
+    fn scope_add_member(&mut self, ctx: &mut SemanticContext, scope: ScopeID, member: MemberID) {
+        let t_or_s = self.objs.member(member).name.clone();
 
-        return self.members.len() as u32 - 1;
-    }
-
-    fn scope_add_member(&mut self, ctx: &mut SemanticContext, scope: u32, member: u32) {
-        let member_name = match &self.members[member as usize].name {
-            TokenOrString::Token(t) => ctx.tokens.tok_as_str(t),
-            TokenOrString::String(s) => s.as_str(),
+        let member_name = match t_or_s {
+            TokenOrString::Token(t) => ctx.tokens.tok_as_str(&t).to_string(),
+            TokenOrString::String(s) => s,
         };
 
-        self.scopes[scope as usize]
+        self.objs.scope_mut(scope)
             .members
             .insert(member_name.to_string(), member);
     }
 
-    fn type_create(&mut self, scope: u32, name: TokenOrString, variant: TypeVariant) -> u32 {
-        let scope_id = self.scope_push(Scope {
+    fn type_create(&mut self, scope: ScopeID, name: TokenOrString, variant: TypeVariant) -> TypeID {
+        let scope_id = self.objs.scope_push(Scope {
             name: Some(name.clone()),
             variant: ScopeVariant::Type(variant),
             parent_scope: scope,
@@ -1014,7 +998,7 @@ impl AST {
             members: HashMap::new(),
         });
 
-        self.type_push(Type::Scope(scope_id))
+        self.objs.type_push(Type::Scope(scope_id))
     }
 
     // provide scope, type id to add type to scope as a member
@@ -1022,19 +1006,19 @@ impl AST {
     fn scope_add_member_type_from_id(
         &mut self,
         ctx: &mut SemanticContext,
-        scope: u32,
-        type_id: u32,
-    ) -> u32 {
-        let name = match self.types[type_id as usize] {
-            Type::Scope(scope) => self.scopes[scope as usize].name.clone(),
+        scope: ScopeID,
+        type_id: TypeID,
+    ) -> MemberID {
+        let name = match self.objs.type_get(type_id) {
+            Type::Scope(scope) => self.objs.scope(*scope).name.clone(),
             _ => None,
         };
 
-        let member_id = self.member_push(Member {
+        let member_id = self.objs.member_push(Member {
             name: name.expect("CURRENTLY CAN ONLY ADD NAMED TYPE AS SCOPE MEMBER"),
             visibility: Visibility::Private,
             variant: MemberVariant::Type,
-            module_or_type: type_id,
+            module_or_type: ModuleOrType::Type(type_id),
         });
 
         self.scope_add_member(ctx, scope, member_id);
@@ -1046,17 +1030,17 @@ impl AST {
     fn scope_add_member_type(
         &mut self,
         ctx: &mut SemanticContext,
-        scope: u32,
+        scope: ScopeID,
         name: TokenOrString,
         variant: TypeVariant,
-    ) -> u32 {
+    ) -> TypeID {
         let type_id = self.type_create(scope, name.clone(), variant);
 
-        let member_id = self.member_push(Member {
+        let member_id = self.objs.member_push(Member {
             name: name,
             visibility: Visibility::Private,
             variant: MemberVariant::Type,
-            module_or_type: type_id,
+            module_or_type: ModuleOrType::Type(type_id),
         });
 
         self.scope_add_member(ctx, scope, member_id);
@@ -1075,10 +1059,10 @@ impl AST {
                 curr_func: None,
             };
 
-            let global_scope = self.scope_push(Scope {
+            let global_scope = self.objs.scope_push(Scope {
                 name: Some(TokenOrString::String("GLOBAL".to_string())),
                 variant: ScopeVariant::Module,
-                parent_scope: 0,
+                parent_scope: ScopeID::default(),
                 refers_to: None,
                 members: HashMap::new(),
             });
@@ -1103,7 +1087,7 @@ impl AST {
 
             let boolean_type = self.get_builtin_type_id(BOOLEAN_TYPE);
 
-            match self.types[boolean_type as usize] {
+            match self.objs.type_get(boolean_type) {
                 Type::Scope(scope) => {
                     for name in ["false", "true"] {
                         let member = self.member_push(Member {

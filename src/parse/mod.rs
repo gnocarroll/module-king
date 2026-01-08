@@ -7,7 +7,7 @@ mod syntax;
 use std::{collections::HashMap, fmt::Formatter};
 
 use crate::{
-    parse::{ast_contents::{ASTContents, ExprID, PatternID}, errors::{ExpectedToken, ParseError, SemanticError}},
+    parse::{ast_contents::{ASTContents, ExprID, MemberID, PatternID, ScopeID, TypeID}, errors::{ExpectedToken, ParseError, SemanticError}},
     scan::{Token, TokenType},
 };
 
@@ -35,25 +35,25 @@ pub struct TypeLiteral {
 #[derive(Clone)]
 pub enum Type {
     // link to scope containing type information e.g. members
-    Scope(u32),
+    Scope(ScopeID),
 
     // u32 is type id
-    Ref(u32),
-    Ptr(u32),
+    Ref(TypeID),
+    Ptr(TypeID),
 
     // lhs is type, rhs is (optional) expr
     // e.g. [Integer; 5] -> Integer, 5
-    Slice((u32, u32)),
+    Slice((TypeID, TypeID)),
 
     // for tuple with > 2 elements second u32 will link to a RestOfTuple
-    Tuple((u32, Option<u32>)),
+    Tuple((TypeID, Option<TypeID>)),
 
     // use this inside above Tuple to indicate later pieces of it like
     // a linked list
-    RestOfTuple((u32, u32)),
+    RestOfTuple((TypeID, TypeID)),
 
     // args, ret type (args can be tuple)
-    Function((u32, u32)),
+    Function((TypeID, TypeID)),
 }
 
 #[derive(Clone, Copy)]
@@ -208,16 +208,21 @@ pub enum TokenOrString {
 }
 
 #[derive(Clone)]
+pub enum ModuleOrType {
+    Module(ScopeID),
+    Type(TypeID),
+}
+
+#[derive(Clone)]
 pub struct Member {
     pub name: TokenOrString,
     pub visibility: Visibility,
 
     pub variant: MemberVariant,
 
-    // this refers to:
-    // - the scope which this member owns if it is a module or type
-    // - the type of this member if this member is an instance
-    pub module_or_type: u32,
+    // if this member is a module => module
+    // instance or type => type
+    pub module_or_type: ModuleOrType,
 }
 
 // a scope may refer to a scope for a code block or
@@ -230,18 +235,18 @@ pub struct Scope {
     pub name: Option<TokenOrString>,
     pub variant: ScopeVariant,
 
-    pub parent_scope: u32,
+    pub parent_scope: ScopeID,
 
     // refers to what this scope belongs to e.g. function
     // (if present)
-    pub refers_to: Option<u32>,
+    pub refers_to: Option<TypeID>,
 
-    pub members: HashMap<String, u32>,
+    pub members: HashMap<String, MemberID>,
 }
 
 #[derive(Clone)]
 pub struct Pattern {
-    type_id: u32,
+    type_id: TypeID,
     variant: PatternVariant,
 }
 
