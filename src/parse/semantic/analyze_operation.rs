@@ -460,7 +460,7 @@ impl AST {
             return;
         }
 
-        if !operand_is_type[0] || !operand_is_type[1] {
+        if operand_is_type[0] || operand_is_type[1] {
             self.invalid_operation(
                 expr,
                 "at least one operand is a type, currently only values supported",

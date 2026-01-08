@@ -1,4 +1,4 @@
-mod ast_contents;
+pub mod ast_contents;
 mod errors;
 pub mod operator;
 mod semantic;

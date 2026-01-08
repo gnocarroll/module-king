@@ -446,6 +446,10 @@ impl AST {
 
                 let expr = self.expr_mut(expr);
 
+                if type_name != UNIT_TYPE {
+                    expr.expr_returns = ExprReturns::Value;
+                }
+
                 expr.type_or_module = type_id;
                 expr.finalized = true;
             }

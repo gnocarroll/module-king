@@ -1,3 +1,6 @@
+// ID structs in this module enable use of strongly-typed IDs
+// replacing previous use of u32 for various AST objects
+
 use crate::parse::{Expr, Member, Pattern, Scope, Type};
 
 #[derive(Clone, Default)]
