@@ -424,12 +424,17 @@ impl AST {
         }
     }
 
-    fn display_semantic_errors(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+    fn display_semantic_errors(&self, tokens: &Tokens) {
         for err in &self.semantic_errors {
-            // TODO: print info
+            match err {
+                SemanticError::InvalidOperation(invalid_op) => {
+                    eprintln!("invalid op");
+                }
+                _ => {
+                    eprintln!("Displaying not implemented for this kind of semantic error.")
+                },
+            }
         }
-
-        Ok(())
     }
 }
 
@@ -456,6 +461,14 @@ pub fn parse_file(file_name: &str, file_str: &str, tokens: &Vec<Token>) -> AST {
 
     // reenable later to test
     ast.do_semantic_analysis(&tokens, file_name);
+
+    if ast.has_errors() {
+        eprintln!("One or more semantic errors occurred, program will not be compiled.");
+
+        ast.display_semantic_errors(&tokens);
+
+        return ast;
+    }
 
     ast
 }

@@ -23,6 +23,12 @@ fn main() -> ExitCode {
         }
     }
 
+    println!("ARGS");
+
+    for arg in std::env::args() {
+        println!("{arg}");
+    }
+
     // skip executable name in args
 
     let args = match arg_parser.parse_args(std::env::args().skip(1)) {
@@ -32,6 +38,8 @@ fn main() -> ExitCode {
             return 1.into();
         }
     };
+
+    println!("nargs: {}", args.len());
 
     for (arg, vec) in &args {
         print!("{arg}:");

@@ -5,12 +5,12 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "type": "lldb",
+            "type": "lldb-dap",
             "request": "launch",
             "name": "Debug",
-            "program": "${fileDirname}/../target/debug/${fileBasenameNoExtension}",
+            "program": "${fileDirname}/../target/debug/module-king",
             "args": ["input.txt"],
-            "cwd": "${workspaceRoot}",
+            "cwd": "${workspaceRoot}"
         }
     ]
 }
