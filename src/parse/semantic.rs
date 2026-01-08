@@ -827,19 +827,19 @@ impl AST {
         }
     }
 
-    fn semantic_analyze_func(&mut self, ctx: &mut SemanticContext, scope: u32, expr: u32) {
-        let func_literal = match &self.exprs[expr as usize].variant {
+    fn semantic_analyze_func(&mut self, ctx: &mut SemanticContext, scope: ScopeID, expr: ExprID) {
+        let func_literal = match &self.objs.expr(expr).variant {
             ExprVariant::FunctionLiteral(f) => f.clone(),
             _ => panic!(),
         };
 
         // create function scope as child of parent then use it later on
 
-        let func_scope = self.scope_push(Scope {
+        let func_scope = self.objs.scope_push(Scope {
             name: None,
             variant: ScopeVariant::Scope,
             parent_scope: scope,
-            refers_to: Some(expr), // connect to function literal
+            refers_to: Some(ScopeRefersTo::Expr(expr)), // connect to function literal
             members: HashMap::new(),
         });
 
@@ -856,13 +856,13 @@ impl AST {
         self.analyze_expr(ctx, func_scope, func_literal.body);
     }
 
-    fn semantic_analyze_type_literal(&mut self, ctx: &mut SemanticContext, scope: u32, expr: u32) {
-        let type_literal = match &self.exprs[expr as usize].variant {
+    fn semantic_analyze_type_literal(&mut self, ctx: &mut SemanticContext, scope: ScopeID, expr: ExprID) {
+        let type_literal = match &self.objs.expr(expr).variant {
             ExprVariant::TypeLiteral(t) => t.clone(),
             _ => panic!(),
         };
 
-        let type_scope = self.scope_push(Scope {
+        let type_scope = self.objs.scope_push(Scope {
             name: None,
             variant: ScopeVariant::Type(type_literal.variant),
             parent_scope: scope,
@@ -887,9 +887,9 @@ impl AST {
         // type of named type literal is Unit (cannot assign it to something)
         // type of unnamed type literal is whatever type in question is
 
-        let expr_mut = &mut self.exprs[expr as usize];
+        let expr_mut = self.objs.expr_mut(expr);
 
-        expr_mut.type_or_module = type_id;
+        expr_mut.type_or_module = TypeOrModule::Type(type_id);
         expr_mut.expr_returns = ExprReturns::Type;
         expr_mut.finalized = true;
     }
@@ -933,7 +933,7 @@ impl AST {
 
                 let member = self.get_builtin_type(type_name);
 
-                let type_id = self.members[member as usize].module_or_type;
+                let type_id = self.objs.member(member).type_or_module.clone();
 
                 let expr = self.expr_mut(expr);
 
@@ -944,9 +944,9 @@ impl AST {
                 let name = ctx.tokens.tok_as_str(&ident.name);
 
                 if let Some(member) = self.scope_search(scope, name) {
-                    let member = &self.members[member as usize];
+                    let member = self.objs.member(member);
 
-                    let etype = member.module_or_type;
+                    let etype = member.type_or_module.clone();
                     let ident_variant = match member.variant {
                         MemberVariant::Module => IdentifierVariant::Module,
                         MemberVariant::Type => IdentifierVariant::Type,
@@ -1017,7 +1017,7 @@ impl AST {
     fn type_push_scope(&mut self, scope: ScopeID) -> TypeID {
         let type_id = self.objs.type_push(Type::Scope(scope));
 
-        self.objs.scope_mut(scope).refers_to = Some(type_id);
+        self.objs.scope_mut(scope).refers_to = Some(ScopeRefersTo::Type(type_id));
 
         type_id
     }
@@ -1134,14 +1134,14 @@ impl AST {
 
             let boolean_type = self.get_builtin_type_id(BOOLEAN_TYPE);
 
-            match self.objs.type_get(boolean_type) {
+            match self.objs.type_get(boolean_type).clone() {
                 Type::Scope(scope) => {
                     for name in ["false", "true"] {
-                        let member = self.member_push(Member {
+                        let member = self.objs.member_push(Member {
                             name: TokenOrString::String(name.to_string()),
                             visibility: Visibility::Global,
                             variant: MemberVariant::Instance,
-                            type_or_module: boolean_type,
+                            type_or_module: TypeOrModule::Type(boolean_type),
                         });
 
                         self.scope_add_member(&mut ctx, scope, member);
@@ -1152,7 +1152,7 @@ impl AST {
 
             // create new scope for module
 
-            let module_scope = self.scope_push(Scope {
+            let module_scope = self.objs.scope_push(Scope {
                 name: Some(TokenOrString::String(module_name.to_string())),
                 variant: ScopeVariant::Module,
                 parent_scope: global_scope,
