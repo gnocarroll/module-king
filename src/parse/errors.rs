@@ -1,6 +1,6 @@
 // error structs for syntax, semantic analysis
 
-use crate::{parse::{Expr, ExprReturns, Operation}, scan::{Token, TokenType}};
+use crate::{parse::{Expr, ExprReturns, Operation, ast_contents::{ExprID, TypeID}}, scan::{Token, TokenType}};
 
 #[derive(Clone, Copy)]
 pub struct ExpectedToken {
@@ -25,26 +25,26 @@ pub enum ParseError {
 // this should be recorded
 #[derive(Clone)]
 pub struct ExpectedExprReturns {
-    pub expr: u32,
+    pub expr: ExprID,
     pub expected: ExprReturns,
     pub found: ExprReturns,
 }
 
 #[derive(Clone)]
 pub struct InvalidOperation {
-    pub operation: u32, // expr id
+    pub operation: ExprID, // expr id
     pub msg: &'static str,
 }
 
 #[derive(Clone)]
 pub struct ExpectedType {
-    pub expected: u32,
-    pub found: u32,
+    pub expected: TypeID,
+    pub found: TypeID,
 }
 
 #[derive(Clone)]
 pub struct MissingOperand {
-    pub operation: u32, // expr id
+    pub operation: ExprID, // expr id
 
     // for this member do 1-indexed
     pub operand_missing: u32,
@@ -54,7 +54,7 @@ pub struct MissingOperand {
 // i.e. why is expr unexpected there
 #[derive(Clone)]
 pub struct UnexpectedExpr {
-    pub expr: u32,
+    pub expr: ExprID,
 }
 
 #[derive(Clone)]
@@ -69,14 +69,15 @@ pub enum SemanticError {
 
 #[derive(Clone, Copy)]
 pub struct ExprAndType {
-    pub expr: u32,
-    pub type_id: u32,
+    pub expr: ExprID,
+    pub type_id: TypeID,
 }
 
 
 #[derive(Clone)]
 pub enum PatternError {
     ParenMismatch(ExprAndType),
-    TypeMissing(u32),
-    IdentMissing(u32),
+    TypeMissing(ExprID),
+    IdentMissing(TypeID),
+    MatchingUnsupported(ExprID),
 }

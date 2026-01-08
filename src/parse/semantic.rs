@@ -3,9 +3,8 @@ use std::collections::HashMap;
 use crate::{
     constants::{BOOLEAN_TYPE, ERROR_TYPE, FLOAT_TYPE, INTEGER_TYPE, STRING_TYPE, UNIT_TYPE},
     parse::{
-        AST, ExprReturns, ExprVariant, IdentifierVariant, Member, MemberVariant, ModuleOrType, Operation, Pattern, PatternVariant, Scope, ScopeVariant, TokenOrString, Tokens, Type, TypeVariant, Visibility, ast_contents::{MemberID, PatternID, ScopeID, TypeID}, errors::{
-            ExprAndType, InvalidOperation, MissingOperand, PatternError, SemanticError,
-            UnexpectedExpr,
+        AST, ExprReturns, ExprVariant, IdentifierVariant, Member, MemberVariant, Operation, Pattern, PatternVariant, Scope, ScopeRefersTo, ScopeVariant, TokenOrString, Tokens, Type, TypeOrModule, TypeVariant, Visibility, ast_contents::{ExprID, MemberID, PatternID, ScopeID, TypeID}, errors::{
+            ExpectedExprReturns, ExprAndType, InvalidOperation, MissingOperand, PatternError, SemanticError, UnexpectedExpr
         }, operator
     },
     scan::TokenType,
@@ -57,13 +56,13 @@ impl AST {
     fn get_builtin_type_id(&mut self, name: &str) -> TypeID {
         let member = self.get_builtin_type(name);
 
-        match self.objs.member(member).module_or_type {
-            ModuleOrType::Type(t) => t,
-            _ => panic!("builtin type should not be a module")
+        match self.objs.member(member).type_or_module {
+            TypeOrModule::Type(t) => t,
+            _ => panic!("builtin type should not be a module"),
         }
     }
 
-    fn missing_operand(&mut self, expr: u32, operand: u32) -> SemanticError {
+    fn missing_operand(&mut self, expr: ExprID, operand: u32) -> SemanticError {
         let ret = SemanticError::MissingOperand(MissingOperand {
             operation: expr,
             operand_missing: operand,
@@ -74,7 +73,7 @@ impl AST {
         ret
     }
 
-    fn invalid_operation(&mut self, expr: u32, msg: &'static str) -> SemanticError {
+    fn invalid_operation(&mut self, expr: ExprID, msg: &'static str) -> SemanticError {
         let ret = SemanticError::InvalidOperation(InvalidOperation {
             operation: expr,
             msg,
@@ -102,7 +101,7 @@ impl AST {
             name,
             visibility: Visibility::Private,
             variant: MemberVariant::Instance,
-            module_or_type: ModuleOrType::Type(type_id),
+            type_or_module: TypeOrModule::Type(type_id),
         });
 
         self.scope_add_member(ctx, scope, member_id);
@@ -150,22 +149,23 @@ impl AST {
     // process provided pattern for func params
     // - append correct param information to func
     // - add correct instances to function scope
-    fn pattern_process_for_func_params(&mut self, ctx: &mut SemanticContext, pattern: ScopeID) {
+    fn pattern_process_for_func_params(&mut self, ctx: &mut SemanticContext, pattern: PatternID) {
         let func_scope = if let Some(curr_func) = ctx.curr_func {
             curr_func
         } else {
             return;
         };
 
-        let func_expr = if let Some(refers_to) = self.objs.scope(func_scope).refers_to {
-            refers_to
-        } else {
-            return;
+        let func_expr = match self.objs.scope(func_scope).refers_to {
+            Some(ScopeRefersTo::Expr(expr)) => expr,
+            _ => {
+                return;
+            }
         };
 
         // add pattern to vec for func
 
-        match &mut self.exprs[func_expr as usize].variant {
+        match &mut self.objs.expr_mut(func_expr).variant {
             ExprVariant::FunctionLiteral(func_literal) => func_literal.param_info.push(pattern),
             _ => (),
         }
@@ -179,17 +179,16 @@ impl AST {
     fn pattern_matching(
         &mut self,
         ctx: &mut SemanticContext,
-        scope: u32,
-        ident_expr: u32,
+        scope: ScopeID,
+        ident_expr: ExprID,
 
-        // may be absent (so errors will be recorded if necessary)
-        type_id: u32,
-    ) -> Result<u32, PatternError> {
+        type_id: TypeID,
+    ) -> Result<PatternID, PatternError> {
         let mut ident_expr = ident_expr;
 
         let mut ident_has_parens = false;
 
-        while match self.exprs[ident_expr as usize].variant {
+        while match self.objs.expr(ident_expr).variant {
             ExprVariant::Operation(Operation {
                 op: TokenType::LParen,
                 operand1: Some(expr),
@@ -203,11 +202,11 @@ impl AST {
             _ => false,
         } {}
 
-        let type_val = self.types[type_id as usize].clone();
+        let type_val = self.objs.type_get(type_id).clone();
 
-        match self.exprs[ident_expr as usize].variant {
+        match self.objs.expr(ident_expr).variant {
             ExprVariant::Identifier(ident) => {
-                return Ok(self.pattern_push(Pattern {
+                return Ok(self.objs.pattern_push(Pattern {
                     type_id: type_id,
                     variant: PatternVariant::Ident(ident.name),
                 }));
@@ -230,9 +229,9 @@ impl AST {
                         let lhs = lhs.expect("should have lhs");
                         let rhs = rhs.expect("should have rhs");
 
-                        if rhs_type.is_some() && self.exprs[rhs as usize].is_unit() {
+                        if rhs_type.is_some() && self.objs.expr(rhs).is_unit() {
                             return Err(PatternError::IdentMissing(rhs_type.expect("impossible")));
-                        } else if rhs_type.is_none() && !self.exprs[rhs as usize].is_unit() {
+                        } else if rhs_type.is_none() && !self.expr(rhs).is_unit() {
                             return Err(PatternError::TypeMissing(rhs));
                         }
 
@@ -245,7 +244,7 @@ impl AST {
                             None
                         };
 
-                        return Ok(self.pattern_push(Pattern {
+                        return Ok(self.objs.pattern_push(Pattern {
                             type_id,
                             variant: PatternVariant::Tuple((lhs_pattern, rhs_pattern)),
                         }));
@@ -261,7 +260,7 @@ impl AST {
                         let lhs = lhs.expect("should have lhs");
                         let rhs = rhs.expect("should have rhs");
 
-                        if self.exprs[rhs as usize].is_unit() {
+                        if self.objs.expr(rhs).is_unit() {
                             return Err(PatternError::IdentMissing(rhs_type));
                         }
 
@@ -270,7 +269,7 @@ impl AST {
 
                         let rhs_pattern = self.pattern_matching(ctx, scope, rhs, rhs_type)?;
 
-                        return Ok(self.pattern_push(Pattern {
+                        return Ok(self.objs.pattern_push(Pattern {
                             type_id,
                             variant: PatternVariant::RestOfTuple((lhs_pattern, rhs_pattern)),
                         }));
@@ -281,18 +280,35 @@ impl AST {
             _ => {}
         }
 
-        Ok(0)
+        Err(PatternError::MatchingUnsupported(ident_expr))
+    }
+
+    fn expected_expr_returns(
+        &mut self,
+        expr: ExprID,
+        expected: ExprReturns,
+        found: ExprReturns,
+    ) -> SemanticError {
+        let ret = SemanticError::ExpectedExprReturns(ExpectedExprReturns {
+            expr,
+            expected,
+            found,
+        });
+
+        self.semantic_errors.push(ret.clone());
+
+        ret
     }
 
     // ret pattern or error
     fn analyze_instance_creation(
         &mut self,
         ctx: &mut SemanticContext,
-        scope: u32,
-        expr: u32,
-        operand1: Option<u32>,
-        operand2: Option<u32>,
-    ) -> Result<u32, SemanticError> {
+        scope: ScopeID,
+        expr: ExprID,
+        operand1: Option<ExprID>,
+        operand2: Option<ExprID>,
+    ) -> Result<PatternID, SemanticError> {
         let old_analyzing_now = ctx.analyzing_now;
         let mut err: Option<SemanticError> = None;
 
@@ -313,13 +329,26 @@ impl AST {
         }
 
         let mut finalized = false;
-        let mut pattern = 0;
+        let mut pattern = PatternID::default();
 
         if let (Some(ident_expr), Some(type_expr)) = (operand1, operand2) {
-            let type_expr_ref = &self.exprs[type_expr as usize];
+            let type_expr_ref = self.objs.expr(type_expr);
 
-            if type_expr_ref.finalized && type_expr_ref.expr_returns == ExprReturns::Type {
-                let type_id = type_expr_ref.type_or_module;
+            if type_expr_ref.finalized {
+                // ensure that analyze "type expr" is actually a type
+
+                let expr_returns = type_expr_ref.expr_returns;
+
+                if expr_returns != ExprReturns::Type {
+                    return Err(self.expected_expr_returns(expr, ExprReturns::Type, expr_returns));
+                }
+
+                let type_id = match type_expr_ref.type_or_module {
+                    TypeOrModule::Type(t) => t,
+                    TypeOrModule::Module(_) => {
+                        return Err(self.expected_expr_returns(expr, ExprReturns::Type, expr_returns));
+                    }
+                };
 
                 // use pattern matching on our operation of the form
                 // ident_expr : type
@@ -339,9 +368,9 @@ impl AST {
 
         let unit_type = self.get_builtin_type_id(UNIT_TYPE);
 
-        let expr_mut = &mut self.exprs[expr as usize];
+        let expr_mut = self.objs.expr_mut(expr);
 
-        expr_mut.type_or_module = unit_type;
+        expr_mut.type_or_module = TypeOrModule::Type(unit_type);
         expr_mut.expr_returns = ExprReturns::Unit;
         expr_mut.finalized = finalized;
 
@@ -355,8 +384,8 @@ impl AST {
     fn analyze_operation_func_params(
         &mut self,
         ctx: &mut SemanticContext,
-        scope: u32,
-        expr: u32,
+        scope: ScopeID,
+        expr: ExprID,
         operation: Operation,
     ) {
         match operation.op {
@@ -398,8 +427,8 @@ impl AST {
     fn analyze_operation_type_body(
         &mut self,
         ctx: &mut SemanticContext,
-        scope: u32,
-        expr: u32,
+        scope: ScopeID,
+        expr: ExprID,
         operation: Operation,
     ) {
         match operation.op {
@@ -409,7 +438,7 @@ impl AST {
                     .operand1
                     .expect("Block should always contain Expr");
 
-                match self.exprs[child_expr as usize].variant {
+                match self.objs.expr(expr).variant {
                     ExprVariant::Operation(Operation {
                         op: TokenType::Begin,
                         ..
@@ -443,8 +472,7 @@ impl AST {
                     // if second operand is Unit then ignore it (otherwise would cause error)
 
                     if operand == operation.operand2
-                        && match self.exprs
-                            [operation.operand2.expect("RHS should be present") as usize]
+                        && match self.objs.expr(operation.operand2.expect("RHS should be present"))
                             .variant
                         {
                             ExprVariant::Unit => true,
@@ -477,20 +505,20 @@ impl AST {
     fn analyze_type_def(
         &mut self,
         ctx: &mut SemanticContext,
-        scope: u32,
-        expr: u32,
-        name: u32,
-        value: u32,
+        scope: ScopeID,
+        expr: ExprID,
+        name: ExprID,
+        value: ExprID,
     ) {
     }
 
     fn analyze_operation_unary(
         &mut self,
         ctx: &mut SemanticContext,
-        scope: u32,
-        expr: u32,
+        scope: ScopeID,
+        expr: ExprID,
         op: TokenType,
-        operand: u32,
+        operand: ExprID,
     ) {
         if !self.expr(operand).finalized {
             return;
@@ -504,21 +532,29 @@ impl AST {
             return;
         }
 
-        let operand_type = self.expr(operand).type_or_module;
+        let operand_type_or_module = self.expr(operand).type_or_module.clone();
 
         // can surround type or module with parentheses
 
         if op == TokenType::LParen {
             let expr_returns = self.expr(operand).expr_returns;
 
-            let expr_mut = &mut self.exprs[expr as usize];
+            let expr_mut = self.objs.expr_mut(expr);
 
             expr_mut.expr_returns = expr_returns;
-            expr_mut.type_or_module = operand_type;
+            expr_mut.type_or_module = operand_type_or_module;
             expr_mut.finalized = true;
 
             return;
         }
+
+        let operand_type = match self.expr(operand).type_or_module {
+            TypeOrModule::Type(t) => t,
+            TypeOrModule::Module(_) => {
+                self.invalid_operation(expr, "unary operation may not be applied to a module");
+                return;
+            }
+        };
 
         match self.expr(operand).expr_returns {
             ExprReturns::Module => {
@@ -531,18 +567,18 @@ impl AST {
             }
             ExprReturns::Type => {
                 let type_id = match op {
-                    TokenType::Star => self.type_push(Type::Ptr(operand_type)),
-                    TokenType::Ampersand => self.type_push(Type::Ref(operand_type)),
+                    TokenType::Star => self.objs.type_push(Type::Ptr(operand_type)),
+                    TokenType::Ampersand => self.objs.type_push(Type::Ref(operand_type)),
                     _ => {
                         self.invalid_operation(expr, "this operation is not supported for types");
                         return;
                     }
                 };
 
-                let expr_mut = &mut self.exprs[expr as usize];
+                let expr_mut = &mut self.objs.expr_mut(expr);
 
                 expr_mut.expr_returns = ExprReturns::Type;
-                expr_mut.type_or_module = type_id;
+                expr_mut.type_or_module = TypeOrModule::Type(type_id);
                 expr_mut.finalized = true;
 
                 return;
@@ -554,8 +590,8 @@ impl AST {
             TokenType::Plus | TokenType::Minus | TokenType::PlusPlus | TokenType::MinusMinus => {
                 let err_msg = "this unary operation is only supported for integers and floats";
 
-                let type_variant = match self.types[operand_type as usize] {
-                    Type::Scope(scope) => match self.scopes[scope as usize].variant {
+                let type_variant = match self.objs.type_get(operand_type) {
+                    Type::Scope(scope) => match self.objs.scope(*scope).variant {
                         ScopeVariant::Type(variant) => Some(variant),
                         _ => None,
                     },
@@ -577,14 +613,16 @@ impl AST {
 
                 let (expr_type, expr_returns) = match op {
                     TokenType::Plus | TokenType::Minus => (operand_type, ExprReturns::Value),
-                    _ => (0, ExprReturns::Unit),
+                    _ => (TypeID::default(), ExprReturns::Unit),
                 };
 
-                let expr_mut = &mut self.exprs[expr as usize];
+                let expr_mut = self.objs.expr_mut(expr);
 
-                expr_mut.type_or_module = expr_type;
+                expr_mut.type_or_module = TypeOrModule::Type(expr_type);
                 expr_mut.expr_returns = expr_returns;
                 expr_mut.finalized = true;
+
+                return;
             }
             TokenType::Ampersand => {
                 let err_msg = "you may only create a reference to a variable";
@@ -595,37 +633,41 @@ impl AST {
                 }
 
                 // type of finalized type is reference to whatever type operand is
-                let expr_type = self.type_push(Type::Ref(operand_type));
+                let expr_type = self.objs.type_push(Type::Ref(operand_type));
 
-                let expr_mut = &mut self.exprs[expr as usize];
+                let expr_mut = self.objs.expr_mut(expr);
 
-                expr_mut.type_or_module = expr_type;
+                expr_mut.type_or_module = TypeOrModule::Type(expr_type);
                 expr_mut.expr_returns = ExprReturns::Value;
                 expr_mut.finalized = true;
+
+                return;
             }
             TokenType::Star => {
                 // i.e. deref
                 let err_msg = "you may only dereference a pointer or reference";
 
-                let expr_type = match self.types[operand_type as usize] {
-                    Type::Ptr(t) | Type::Ref(t) => t,
+                let expr_type = match self.objs.type_get(operand_type) {
+                    Type::Ptr(t) | Type::Ref(t) => *t,
                     _ => {
                         self.invalid_operation(expr, err_msg);
                         return;
                     }
                 };
 
-                let expr_mut = &mut self.exprs[expr as usize];
+                let expr_mut = self.objs.expr_mut(expr);
 
-                expr_mut.type_or_module = expr_type;
+                expr_mut.type_or_module = TypeOrModule::Type(expr_type);
                 expr_mut.expr_returns = ExprReturns::Value;
                 expr_mut.finalized = true;
+
+                return;
             }
             TokenType::Tilde => {
                 let err_msg = "this unary operation is only supported for integers";
 
-                let type_variant = match self.types[operand_type as usize] {
-                    Type::Scope(scope) => match self.scopes[scope as usize].variant {
+                let type_variant = match self.objs.type_get(operand_type) {
+                    Type::Scope(scope) => match self.objs.scope(*scope).variant {
                         ScopeVariant::Type(variant) => Some(variant),
                         _ => None,
                     },
@@ -645,11 +687,13 @@ impl AST {
                     return;
                 }
 
-                let expr_mut = &mut self.exprs[expr as usize];
+                let expr_mut = &mut self.objs.expr_mut(expr);
 
-                expr_mut.type_or_module = operand_type;
+                expr_mut.type_or_module = TypeOrModule::Type(operand_type);
                 expr_mut.expr_returns = ExprReturns::Value;
                 expr_mut.finalized = true;
+
+                return;
             }
             TokenType::Bang => {
                 let err_msg = "logical NOT may only be applied to a boolean expression";
@@ -663,11 +707,13 @@ impl AST {
                     return;
                 }
 
-                let expr_mut = &mut self.exprs[expr as usize];
+                let expr_mut = self.objs.expr_mut(expr);
 
-                expr_mut.type_or_module = boolean_type;
+                expr_mut.type_or_module = TypeOrModule::Type(boolean_type);
                 expr_mut.expr_returns = ExprReturns::Value;
                 expr_mut.finalized = true;
+
+                return;
             }
             _ => (),
         }
@@ -682,11 +728,11 @@ impl AST {
     fn analyze_operation_binary(
         &mut self,
         ctx: &mut SemanticContext,
-        scope: u32,
-        expr: u32,
+        scope: ScopeID,
+        expr: ExprID,
         op: TokenType,
-        operand1: u32,
-        operand2: u32,
+        operand1: ExprID,
+        operand2: ExprID,
     ) {
         // both operands must already be finalized
 
@@ -709,8 +755,8 @@ impl AST {
         }
     }
 
-    fn analyze_operation(&mut self, ctx: &mut SemanticContext, scope: u32, expr: u32) {
-        let operation = match &self.exprs[expr as usize].variant {
+    fn analyze_operation(&mut self, ctx: &mut SemanticContext, scope: ScopeID, expr: ExprID) {
+        let operation = match &self.objs.expr(expr).variant {
             ExprVariant::Operation(operation) => operation.clone(),
             _ => panic!(),
         };
@@ -739,7 +785,7 @@ impl AST {
             if let Some(operand) = operand {
                 self.analyze_expr(ctx, scope, operand);
 
-                if !self.exprs[operand as usize].finalized {
+                if !self.objs.expr(operand).finalized {
                     operands_finalized = false;
                 }
             }
@@ -852,7 +898,7 @@ impl AST {
         &self,
         analyzing_now: AnalyzingNow,
         allowed: &[AnalyzingNow],
-        expr: u32,
+        expr: ExprID,
     ) -> Result<(), UnexpectedExpr> {
         if allowed.iter().any(|curr| *curr == analyzing_now) {
             Ok(())
@@ -862,7 +908,7 @@ impl AST {
     }
 
     // semantic analysis on particular expression
-    fn analyze_expr(&mut self, ctx: &mut SemanticContext, scope: u32, expr: u32) {
+    fn analyze_expr(&mut self, ctx: &mut SemanticContext, scope: ScopeID, expr: ExprID) {
         match &self.expr(expr).variant {
             ExprVariant::Unit
             | ExprVariant::IntegerLiteral(_)
@@ -984,7 +1030,8 @@ impl AST {
             TokenOrString::String(s) => s,
         };
 
-        self.objs.scope_mut(scope)
+        self.objs
+            .scope_mut(scope)
             .members
             .insert(member_name.to_string(), member);
     }
@@ -1018,7 +1065,7 @@ impl AST {
             name: name.expect("CURRENTLY CAN ONLY ADD NAMED TYPE AS SCOPE MEMBER"),
             visibility: Visibility::Private,
             variant: MemberVariant::Type,
-            module_or_type: ModuleOrType::Type(type_id),
+            type_or_module: TypeOrModule::Type(type_id),
         });
 
         self.scope_add_member(ctx, scope, member_id);
@@ -1040,7 +1087,7 @@ impl AST {
             name: name,
             visibility: Visibility::Private,
             variant: MemberVariant::Type,
-            module_or_type: ModuleOrType::Type(type_id),
+            type_or_module: TypeOrModule::Type(type_id),
         });
 
         self.scope_add_member(ctx, scope, member_id);
@@ -1094,7 +1141,7 @@ impl AST {
                             name: TokenOrString::String(name.to_string()),
                             visibility: Visibility::Global,
                             variant: MemberVariant::Instance,
-                            module_or_type: boolean_type,
+                            type_or_module: boolean_type,
                         });
 
                         self.scope_add_member(&mut ctx, scope, member);

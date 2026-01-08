@@ -73,7 +73,7 @@ pub struct FunctionLiteral {
     pub body: ExprID,
 
     // for semantic analysis record pattern id for each param
-    pub param_info: Vec<u32>,
+    pub param_info: Vec<PatternID>,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -150,7 +150,7 @@ struct Expr {
     pub end_tok: u32,
 
     // ID of language type (or module if expr is module)
-    pub type_or_module: u32,
+    pub type_or_module: TypeOrModule,
 
     pub variant: ExprVariant,
 
@@ -169,7 +169,7 @@ impl Default for Expr {
         Expr {
             tok: 0,
             end_tok: 0,
-            type_or_module: 0,
+            type_or_module: TypeOrModule::default(),
             variant: ExprVariant::Unit,
             expr_returns: ExprReturns::Unit,
             is_var: false,
@@ -208,9 +208,15 @@ pub enum TokenOrString {
 }
 
 #[derive(Clone)]
-pub enum ModuleOrType {
-    Module(ScopeID),
+pub enum TypeOrModule {
     Type(TypeID),
+    Module(ScopeID),
+}
+
+impl Default for TypeOrModule {
+    fn default() -> Self {
+        TypeOrModule::Type(TypeID::default())
+    }
 }
 
 #[derive(Clone)]
@@ -220,9 +226,15 @@ pub struct Member {
 
     pub variant: MemberVariant,
 
-    // if this member is a module => module
     // instance or type => type
-    pub module_or_type: ModuleOrType,
+    // if this member is a module => module
+    pub type_or_module: TypeOrModule,
+}
+
+#[derive(Clone)]
+pub enum ScopeRefersTo {
+    Type(TypeID),
+    Expr(ExprID),
 }
 
 // a scope may refer to a scope for a code block or
@@ -239,7 +251,7 @@ pub struct Scope {
 
     // refers to what this scope belongs to e.g. function
     // (if present)
-    pub refers_to: Option<TypeID>,
+    pub refers_to: Option<ScopeRefersTo>,
 
     pub members: HashMap<String, MemberID>,
 }
