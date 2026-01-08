@@ -625,7 +625,22 @@ impl AST {
                 expr_mut.finalized = true;
             }
             TokenType::Bang => {
+                let err_msg = "logical NOT may only be applied to a boolean expression";
+
+                // check if operand is a boolean
+
                 let boolean_type = self.get_builtin_type_id(BOOLEAN_TYPE);
+
+                if operand_type != boolean_type {
+                    self.invalid_operation(expr, err_msg);
+                    return;
+                }
+
+                let expr_mut = &mut self.exprs[expr as usize];
+
+                expr_mut.type_or_module = boolean_type;
+                expr_mut.expr_returns = ExprReturns::Value;
+                expr_mut.finalized = true;
             }
             _ => ()
         }
