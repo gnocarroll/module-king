@@ -369,6 +369,42 @@ impl AST {
             return;
         }
 
+        let operands = [operand1, operand2];
+
+        let mut found_module = false;
+        let mut operand_is_type = [false, false];
+        let mut operand_types = [TypeID::default(), TypeID::default()];
+
+        for (idx, operand) in operands.iter().enumerate() {
+            let expr_returns = self.objs.expr(*operand).expr_returns;
+
+            if expr_returns == ExprReturns::Module {
+                found_module = true;
+                continue;
+            } else if expr_returns == ExprReturns::Type {
+                operand_is_type[idx] = true;
+            }
+
+            let type_id = match self.objs.expr(*operand).type_or_module {
+                TypeOrModule::Type(t) => t,
+                TypeOrModule::Module(_) => {
+                    continue;
+                }
+            };
+
+            operand_types[idx] = type_id;
+        }
+
+        if found_module {
+            self.invalid_operation(expr, "no binary operations may be applied to a module");
+            return;
+        }
+
+        if !operand_is_type[0] || !operand_is_type[1] {
+            self.invalid_operation(expr, "at least one operand is a type, currently only values supported");
+            return;
+        }
+
         match op {
             TokenType::Plus
             | TokenType::Minus
