@@ -349,6 +349,49 @@ impl AST {
             }));
     }
 
+    // first return value is supported type variants for args
+    // second return value is if operation returns bool (instead of inputted type)
+    // for << and >> rhs may be of different integer type but this is handled
+    // elsewhere
+    fn get_supported_type_variants_binary(op: TokenType) -> Option<(&'static [TypeVariant], bool)> {
+        match op {
+            TokenType::Plus
+            | TokenType::Minus
+            | TokenType::Star
+            | TokenType::FSlash
+            | TokenType::Percent
+            | TokenType::StarStar => Some((&[TypeVariant::Integer, TypeVariant::Float], false)),
+
+            // bit ops
+            TokenType::Pipe
+            | TokenType::Carrot
+            | TokenType::Ampersand
+            | TokenType::LtLt
+            | TokenType::GtGt => Some((&[TypeVariant::Integer], false)),
+
+            // comparison
+            TokenType::Lt | TokenType::Gt | TokenType::Le | TokenType::Ge => {
+                Some((&[TypeVariant::Integer, TypeVariant::Float], true))
+            }
+
+            // equality ops also support Booleans
+            // comparison
+            TokenType::EqEq | TokenType::BangEq => Some((
+                &[
+                    TypeVariant::Integer,
+                    TypeVariant::Float,
+                    TypeVariant::Boolean,
+                ],
+                true,
+            )),
+
+            // and/or
+            TokenType::And | TokenType::Or => Some((&[TypeVariant::Boolean], true)),
+
+            _ => None,
+        }
+    }
+
     fn analyze_operation_binary(
         &mut self,
         ctx: &mut SemanticContext,
@@ -423,49 +466,45 @@ impl AST {
                 "at least one operand is a type, currently only values supported",
             );
             return;
+        };
+
+        let (allowed_type_variants, returns_bool) =
+            match AST::get_supported_type_variants_binary(op) {
+                Some(info) => info,
+                None => {
+                    self.invalid_operation(expr, "not a supported binary operator");
+                    return;
+                }
+            };
+
+        // only for << and >> may lhs, rhs types be different
+        if op != TokenType::LtLt && op != TokenType::GtGt && operand_types[0] != operand_types[1] {
+            self.invalid_operation(expr, "operand types must be the same for this operation");
+            return;
         }
 
-        // returns supported type variants, and if operation returns bool
-        // (e.g. so for less than the boolean returned is TRUE)
+        // check if for ALL operand type variants
+        // one of the allowed type variants matches
+        if !type_variants.iter().all(|elem| {
+            allowed_type_variants
+                .iter()
+                .any(|allowed| *allowed == *elem)
+        }) {
+            self.invalid_operation(expr, "only certain variants of types permitted for this operation");
+            return;
+        }
 
-        let supported_type_variants = |op: TokenType| -> Option<(&[TypeVariant], bool)> {
-            match op {
-                TokenType::Plus
-                | TokenType::Minus
-                | TokenType::Star
-                | TokenType::FSlash
-                | TokenType::Percent
-                | TokenType::StarStar => Some((&[TypeVariant::Integer, TypeVariant::Float], false)),
-
-                // bit ops
-                TokenType::Pipe
-                | TokenType::Carrot
-                | TokenType::Ampersand
-                | TokenType::LtLt
-                | TokenType::GtGt => Some((&[TypeVariant::Integer], false)),
-
-                // comparison
-                TokenType::Lt | TokenType::Gt | TokenType::Le | TokenType::Ge => {
-                    Some((&[TypeVariant::Integer, TypeVariant::Float], true))
-                }
-
-                // equality ops also support Booleans
-                // comparison
-                TokenType::EqEq | TokenType::BangEq => Some((
-                    &[
-                        TypeVariant::Integer,
-                        TypeVariant::Float,
-                        TypeVariant::Boolean,
-                    ],
-                    true,
-                )),
-
-                // and/or
-                TokenType::And | TokenType::Or => Some((&[TypeVariant::Boolean], true)),
-
-                _ => None,
-            }
+        let expr_type = if returns_bool {
+            boolean_type
+        } else {
+            operand_types[0]
         };
+
+        let expr_mut = self.objs.expr_mut(expr);
+
+        expr_mut.expr_returns = ExprReturns::Value;
+        expr_mut.type_or_module = TypeOrModule::Type(expr_type);
+        expr_mut.finalized = true;
     }
 
     pub fn analyze_operation(&mut self, ctx: &mut SemanticContext, scope: ScopeID, expr: ExprID) {
