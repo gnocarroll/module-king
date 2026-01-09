@@ -301,7 +301,7 @@ pub enum PatternVariant {
     RestOfSlice((PatternID, PatternID)),
 }
 
-struct Tokens<'a> {
+pub struct Tokens<'a> {
     file_str: &'a str,
     tokens: &'a Vec<Token>,
 

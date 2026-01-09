@@ -8,8 +8,7 @@ use std::{collections::HashMap, fmt::Display};
 
 use crate::{
     parse::{
-        AST, ExprVariant, TypeOrModule,
-        ast_contents::{ExprID, ScopeID, TypeID},
+        AST, ExprVariant, Tokens, TypeOrModule, ast_contents::{ExprID, ScopeID, TypeID}
     },
     run::{
         context_contents::{ContextObjects, RuntimeScopeID},
@@ -53,9 +52,9 @@ struct ExecutionContext {
     pub curr_scope: RuntimeScopeID,
 }
 
-impl ExecutionContext {
-    pub fn value_to_string(&self, value: &Value) -> String {
-        match &value.variant {
+impl Value {
+    pub fn to_string(&self, tokens: &Tokens, ast: &AST, ctx: &ExecutionContext) -> String {
+        match &self.variant {
             ValueVariant::Unit => "Unit".to_string(),
             ValueVariant::Integer(val) => val.to_string(),
             ValueVariant::Float(val) => val.to_string(),
@@ -64,12 +63,16 @@ impl ExecutionContext {
                 let member_strings: Vec<String> = map.iter().map(|(name, value)| format!(
                     "{}={}",
                     name,
-                    self.value_to_string(&**value)
+                    value.to_string(tokens, ast, ctx)
                 )).collect();
 
                 format!("({})", member_strings.join(", "))
             }
-            ValueVariant::Module(_) => write!(f, "module"),
+            ValueVariant::Module(scope_id) => {
+                let scope = ast.objs.scope(*scope_id);
+
+                let name_string = scope.n
+            }
             ValueVariant::Function(_) => write!(f, "write",),
             ValueVariant::Identifier(ident) =>
         }
@@ -121,17 +124,12 @@ fn eval(ast: &AST, ctx: &mut ExecutionContext, expr: ExprID) -> Result<Value, Ru
     Ok(Value { type_id: Some(type_id), variant: ret })
 }
 
-pub fn run(ast: &AST) {
+pub fn run(ast: &AST) -> Result<Value, RuntimeError> {
     if let Some(expr) = ast.root_expr {
         let mut ctx = ExecutionContext::default();
 
-        let value = match eval(ast, &mut ctx, expr) {
-            Ok(value) => value,
-            Err(_) => {
-                return;
-            }
-        };
-
-        println!("{}", value,);
+        return eval(ast, &mut ctx, expr);
     }
+
+    Err(RuntimeError { expr: ExprID::default(), variant: RuntimeErrorVariant::RootExprMissing })
 }
