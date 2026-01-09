@@ -142,6 +142,7 @@ fn eval(ast: &AST, ctx: &mut ExecutionContext, expr: ExprID) -> Result<Value, Ru
     };
 
     let ret = match ast.objs.expr(expr).variant {
+        ExprVariant::Unit => ValueVariant::Unit,
         ExprVariant::IntegerLiteral(i) => ValueVariant::Integer(match i.try_into() {
             Ok(i) => i,
             Err(_) => {
@@ -154,6 +155,9 @@ fn eval(ast: &AST, ctx: &mut ExecutionContext, expr: ExprID) -> Result<Value, Ru
         ExprVariant::FloatLiteral(f) => ValueVariant::Float(f),
         ExprVariant::Operation(operation) => {
             return eval_operation(ast, ctx, expr, operation);
+        }
+        ExprVariant::Identifier(ident) => {
+            
         }
         _ => {
             return Err(RuntimeError {

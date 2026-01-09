@@ -97,6 +97,9 @@ pub enum IdentifierVariant {
 pub struct Identifier {
     pub name: Token,
 
+    // during semantic analysis connect to actual corresponding Member
+    pub member_id: MemberID,
+
     pub variant: IdentifierVariant,
 }
 
