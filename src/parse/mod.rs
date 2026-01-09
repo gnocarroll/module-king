@@ -81,7 +81,7 @@ pub struct FunctionLiteral {
 }
 
 #[derive(Clone, Copy, PartialEq)]
-enum IdentifierVariant {
+pub enum IdentifierVariant {
     Unknown,
     Module,
     Type,
@@ -90,21 +90,21 @@ enum IdentifierVariant {
 }
 
 #[derive(Clone, Copy)]
-struct Identifier {
+pub struct Identifier {
     pub name: Token,
 
     pub variant: IdentifierVariant,
 }
 
 #[derive(Clone, Copy)]
-struct Operation {
+pub struct Operation {
     pub op: TokenType,
     pub operand1: Option<ExprID>,
     pub operand2: Option<ExprID>,
 }
 
 #[derive(Clone)]
-struct If {
+pub struct If {
     pub cond: ExprID,
     pub body: ExprID,
 
@@ -113,7 +113,7 @@ struct If {
 }
 
 #[derive(Clone)]
-enum ExprVariant {
+pub enum ExprVariant {
     Unit,
     Underscore,
     KWType, // the keyword "type" e.g. type(x)
@@ -148,7 +148,7 @@ enum ExprReturns {
 }
 
 #[derive(Clone)]
-struct Expr {
+pub struct Expr {
     // token indices range for expression (end_tok is not inclusive)
     pub tok: u32,
     pub end_tok: u32,

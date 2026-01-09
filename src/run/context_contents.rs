@@ -5,12 +5,13 @@ pub struct RuntimeScopeID {
     id: u32,
 }
 
+#[derive(Default)]
 pub struct ContextObjects {
-    scopes: Vec<RuntimeScope>
+    scopes: Vec<RuntimeScope>,
 }
 
 impl ContextObjects {
-    fn runtime_scope_push(&mut self, scope: RuntimeScope) -> RuntimeScopeID {
+    pub fn runtime_scope_push(&mut self, scope: RuntimeScope) -> RuntimeScopeID {
         self.scopes.push(scope);
 
         RuntimeScopeID {
@@ -18,15 +19,15 @@ impl ContextObjects {
         }
     }
 
-    fn runtime_scope_new(&mut self) -> RuntimeScopeID {
+    pub fn runtime_scope_new(&mut self) -> RuntimeScopeID {
         self.runtime_scope_push(RuntimeScope::default())
     }
 
-    fn runtime_scope(&self, scope: RuntimeScopeID) -> &RuntimeScope {
+    pub fn runtime_scope(&self, scope: RuntimeScopeID) -> &RuntimeScope {
         &self.scopes[scope.id as usize]
     }
 
-    fn runtime_scope_mut(&mut self, scope: RuntimeScopeID) -> &mut RuntimeScope {
+    pub fn runtime_scope_mut(&mut self, scope: RuntimeScopeID) -> &mut RuntimeScope {
         &mut self.scopes[scope.id as usize]
     }
 }

@@ -5,7 +5,7 @@ mod error;
 
 use std::{collections::HashMap, fmt::Display};
 
-use crate::{parse::{AST, ast_contents::{ExprID, TypeID}}, run::context_contents::RuntimeScopeID};
+use crate::{parse::{AST, ast_contents::{ExprID, TypeID}}, run::context_contents::{ContextObjects, RuntimeScopeID}};
 
 enum ValueVariant {
     Unit,
@@ -61,8 +61,17 @@ struct RuntimeScope {
 }
 
 struct ExecutionContext {
-    pub scopes: Vec<RuntimeScope>,
+    pub objs: ContextObjects,
     pub curr_scope: RuntimeScopeID,
+}
+
+impl Default for ExecutionContext {
+    fn default() -> Self {
+        let mut objs = ContextObjects::default();
+        let curr_scope = objs.runtime_scope_new();
+
+        ExecutionContext { objs, curr_scope }
+    }
 }
 
 fn eval(
@@ -70,11 +79,21 @@ fn eval(
     ctx: &mut ExecutionContext,
     expr: ExprID,
 ) -> Value {
+    match ast.objs.expr(expr).variant {
+        ExprVariant::IntegerLiteral() => {
 
+        }
+        _ => (),
+    }
 }
 
 pub fn run(ast: &AST) {
     if let Some(expr) = ast.root_expr {
+        let mut ctx = ExecutionContext::default();
 
+        println!(
+            "{}",
+            eval(ast, &mut ctx, expr),
+        );
     }
 }
