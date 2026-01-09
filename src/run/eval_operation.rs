@@ -84,6 +84,14 @@ fn integer_op(ttype: TokenType) -> Option<fn(i64, i64) -> i64> {
         TokenType::FSlash => Some(i64::div),
         TokenType::Percent => Some(i64::rem),
         TokenType::StarStar => Some(i64_pow),
+
+        // bit ops
+        TokenType::Pipe => Some(|lhs, rhs| lhs | rhs),
+        TokenType::Ampersand => Some(|lhs, rhs| lhs & rhs),
+        TokenType::Carrot => Some(|lhs, rhs| lhs ^ rhs),
+        TokenType::LtLt => Some(|lhs, rhs| lhs << rhs),
+        TokenType::GtGt => Some(|lhs, rhs| lhs >> rhs),
+
         _ => None,
     }
 }
