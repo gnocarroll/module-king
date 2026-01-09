@@ -61,7 +61,13 @@ impl ExecutionContext {
             ValueVariant::Float(val) => val.to_string(),
             ValueVariant::String(s) => s.clone(),
             ValueVariant::Class(map) => {
-                map.iter().map(|(name, valuee)|)
+                let member_strings: Vec<String> = map.iter().map(|(name, value)| format!(
+                    "{}={}",
+                    name,
+                    self.value_to_string(&**value)
+                )).collect();
+
+                format!("({})", member_strings.join(", "))
             }
             ValueVariant::Module(_) => write!(f, "module"),
             ValueVariant::Function(_) => write!(f, "write",),
