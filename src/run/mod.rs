@@ -8,7 +8,7 @@ use std::{collections::HashMap, fmt::Display};
 
 use crate::{
     parse::{
-        AST, ExprVariant, Tokens, TypeOrModule,
+        AST, ExprVariant, TypeOrModule,
         ast_contents::{ExprID, ScopeID, TypeID},
     },
     run::{
@@ -16,10 +16,11 @@ use crate::{
         error::{RuntimeError, RuntimeErrorVariant},
         eval_operation::eval_operation,
     },
+    tokens::Tokens,
 };
 
 #[derive(Clone)]
-enum ValueVariant {
+pub enum ValueVariant {
     Unit,
     Boolean(bool),
     Integer(i64),
@@ -32,30 +33,31 @@ enum ValueVariant {
 }
 
 #[derive(Clone)]
-struct Value {
+pub struct Value {
     pub type_id: Option<TypeID>,
     pub variant: ValueVariant,
 }
 
 #[derive(Default)]
-struct RuntimeScope {
+pub struct RuntimeScope {
     pub members: HashMap<String, Value>,
 
     pub parent: RuntimeScopeID,
 }
 
 #[derive(Clone)]
-struct RuntimeIdentifier {
+pub struct RuntimeIdentifier {
     pub scope: RuntimeScopeID,
     pub name: String,
 }
 
-struct ExecutionContext {
+pub struct ExecutionContext<'a> {
+    pub tokens: &'a Tokens<'a>,
     pub objs: ContextObjects,
     pub curr_scope: RuntimeScopeID,
 }
 
-impl ExecutionContext {
+impl<'a> ExecutionContext<'a> {
     pub fn access_ident(&self, ident: &RuntimeIdentifier) -> &Value {
         &self.objs.runtime_scope(ident.scope).members[&ident.name]
     }
@@ -71,19 +73,31 @@ impl ExecutionContext {
     pub fn access_ident_clone(&self, ident: &RuntimeIdentifier) -> Value {
         self.objs.runtime_scope(ident.scope).members[&ident.name].clone()
     }
+
+    pub fn new(tokens: &'a Tokens) -> Self {
+        let mut objs = ContextObjects::default();
+        let curr_scope = objs.runtime_scope_new();
+
+        ExecutionContext {
+            tokens,
+            objs,
+            curr_scope,
+        }
+    }
 }
 
 impl Value {
-    pub fn to_string(&self, tokens: &Tokens, ast: &AST, ctx: &ExecutionContext) -> String {
+    pub fn to_string(&self, ast: &AST, ctx: &ExecutionContext) -> String {
         match &self.variant {
             ValueVariant::Unit => "Unit".to_string(),
             ValueVariant::Integer(val) => val.to_string(),
             ValueVariant::Float(val) => val.to_string(),
+            ValueVariant::Boolean(val) => val.to_string(),
             ValueVariant::String(s) => s.clone(),
             ValueVariant::Class(map) => {
                 let member_strings: Vec<String> = map
                     .iter()
-                    .map(|(name, value)| format!("{}={}", name, value.to_string(tokens, ast, ctx)))
+                    .map(|(name, value)| format!("{}={}", name, value.to_string(ast, ctx)))
                     .collect();
 
                 format!("({})", member_strings.join(", "))
@@ -92,7 +106,7 @@ impl Value {
                 let scope = ast.objs.scope(*scope_id);
 
                 let name_string = match &scope.name {
-                    Some(tok_or_string) => tokens.tok_or_string_to_string(tok_or_string),
+                    Some(tok_or_string) => ctx.tokens.tok_or_string_to_string(tok_or_string),
                     None => "(anonymous)".to_string(),
                 };
 
@@ -103,7 +117,7 @@ impl Value {
 
                 let func_name_string = match &expr.variant {
                     ExprVariant::FunctionLiteral(func) => match &func.name {
-                        Some(t) => tokens.tok_as_str(t),
+                        Some(t) => ctx.tokens.tok_as_str(t),
                         None => "(anonymous)",
                     },
                     _ => "ERR_EXPR_IS_NOT_FUNC",
@@ -111,17 +125,8 @@ impl Value {
 
                 format!("function {}", func_name_string)
             }
-            ValueVariant::Identifier(ident) => ctx.access_ident(ident).to_string(tokens, ast, ctx),
+            ValueVariant::Identifier(ident) => ctx.access_ident(ident).to_string(ast, ctx),
         }
-    }
-}
-
-impl Default for ExecutionContext {
-    fn default() -> Self {
-        let mut objs = ContextObjects::default();
-        let curr_scope = objs.runtime_scope_new();
-
-        ExecutionContext { objs, curr_scope }
     }
 }
 
@@ -164,15 +169,14 @@ fn eval(ast: &AST, ctx: &mut ExecutionContext, expr: ExprID) -> Result<Value, Ru
     })
 }
 
-pub fn run(ast: &AST) -> Result<Value, RuntimeError> {
+pub fn run(tokens: &Tokens, ast: &AST) {
     if let Some(expr) = ast.root_expr {
-        let mut ctx = ExecutionContext::default();
+        let mut ctx = ExecutionContext::new(tokens);
 
-        return eval(ast, &mut ctx, expr);
+        if let Ok(value) = eval(ast, &mut ctx, expr) {
+            eprintln!();
+            eprintln!("PROG RETURN VALUE BELOW:");
+            eprintln!("{}", value.to_string(ast, &ctx));
+        }
     }
-
-    Err(RuntimeError {
-        expr: ExprID::default(),
-        variant: RuntimeErrorVariant::RootExprMissing,
-    })
 }

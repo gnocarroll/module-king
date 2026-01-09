@@ -1,12 +1,13 @@
 use std::{collections::HashMap, fs, io::Read, process::ExitCode};
 
-use crate::args::{ArgParser, ArgQuantity};
+use crate::{args::{ArgParser, ArgQuantity}, tokens::Tokens};
 
 mod args;
 mod constants;
 mod parse;
 mod run;
 mod scan;
+mod tokens;
 
 fn main() -> ExitCode {
     let mut arg_parser = ArgParser::default();
@@ -102,7 +103,15 @@ fn main() -> ExitCode {
             );
         }
 
-        parse::parse_file(filename.as_str(), file_string.as_str(), &tokens);
+        let mut tokens = Tokens::new(file_string.as_str(), &tokens);
+
+        let ast = parse::parse_file(filename.as_str(), &mut tokens);
+
+        // if no errors run interpreter
+
+        if !ast.has_errors() {
+            run::run(&tokens, &ast);
+        }
     }
 
     0.into()

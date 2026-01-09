@@ -1,12 +1,6 @@
 // error structs for syntax, semantic analysis
 
-use crate::{parse::{Expr, ExprReturns, Operation, ast_contents::{ExprID, TypeID}}, scan::{Token, TokenType}};
-
-#[derive(Clone, Copy)]
-pub struct ExpectedToken {
-    pub expected: TokenType,
-    pub found: Token,
-}
+use crate::{parse::{Expr, ExprReturns, Operation, ast_contents::{ExprID, TypeID}}, scan::{Token, TokenType}, tokens::ExpectedToken};
 
 // e.g. function beginning, end name does not match
 #[derive(Clone, Copy)]

@@ -7,10 +7,10 @@ use crate::{
         AST, Expr, ExprVariant, FunctionLiteral, Identifier, IdentifierVariant, Operation, Tokens,
         TypeLiteral, TypeVariant,
         ast_contents::ExprID,
-        errors::{ExpectedToken, NameMismatch, ParseError},
+        errors::{NameMismatch, ParseError},
         operator,
     },
-    scan::{Token, TokenType},
+    scan::{Token, TokenType}, tokens::ExpectedToken,
 };
 
 impl AST {

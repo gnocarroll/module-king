@@ -7,8 +7,12 @@ mod syntax;
 use std::{collections::HashMap, fmt::Formatter};
 
 use crate::{
-    parse::{ast_contents::{ASTContents, ExprID, MemberID, PatternID, ScopeID, TypeID}, errors::{ExpectedToken, ParseError, SemanticError}},
+    parse::{
+        ast_contents::{ASTContents, ExprID, MemberID, PatternID, ScopeID, TypeID},
+        errors::{ParseError, SemanticError},
+    },
     scan::{Token, TokenType},
+    tokens::{ExpectedToken, TokenOrString, Tokens},
 };
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -206,12 +210,6 @@ pub enum MemberVariant {
 }
 
 #[derive(Clone)]
-pub enum TokenOrString {
-    Token(Token),
-    String(String),
-}
-
-#[derive(Clone)]
 pub enum TypeOrModule {
     Type(TypeID),
     Module(ScopeID),
@@ -268,8 +266,8 @@ pub struct Pattern {
 
 #[derive(Clone)]
 pub enum PatternVariant {
-    IgnoreOne,             // _
-    IgnoreMultiple,        // ..
+    IgnoreOne,                   // _
+    IgnoreMultiple,              // ..
     Binding((Token, PatternID)), // e.g. rest @ ..
 
     // lhs, (optional) rhs
@@ -285,116 +283,22 @@ pub enum PatternVariant {
     // data structure
     Struct(
         (
-            Option<Token>, // type name (optional)
-            PatternID, // at least one addition pattern inside struct pattern
+            Option<Token>,     // type name (optional)
+            PatternID,         // at least one addition pattern inside struct pattern
             Option<PatternID>, // next pattern
         ),
     ),
 
-    RestOfStruct((
-        PatternID,
-        PatternID, // next ptr
-    )),
+    RestOfStruct(
+        (
+            PatternID,
+            PatternID, // next ptr
+        ),
+    ),
 
     // same as tuple really but uses []
     Slice((PatternID, Option<PatternID>)),
     RestOfSlice((PatternID, PatternID)),
-}
-
-pub struct Tokens<'a> {
-    file_str: &'a str,
-    tokens: &'a Vec<Token>,
-
-    // token not file offset
-    offset: usize,
-}
-
-impl<'a> Tokens<'a> {
-    fn new(file_str: &'a str, tokens: &'a Vec<Token>) -> Self {
-        Tokens {
-            file_str,
-            tokens: tokens,
-            offset: 0,
-        }
-    }
-
-    // Token -> &str
-    pub fn tok_as_str(&self, token: &Token) -> &str {
-        token.as_str(self.file_str)
-    }
-
-    pub fn tok_or_string_to_string(&self, token_or_string: &TokenOrString) -> String {
-        match token_or_string {
-            TokenOrString::Token(t) => self.tok_as_str(t).to_string(),
-            TokenOrString::String(s) => s.clone(),
-        }
-    }
-
-    pub fn idx(&self) -> u32 {
-        self.offset as u32
-    }
-
-    // 0-indexed (e.g. 0 is the same as just calling peek())
-    fn _peek_nth(&self, idx: isize) -> Token {
-        let mut idx = idx + (self.offset as isize);
-
-        if idx < 0 {
-            idx = 0;
-        }
-
-        match self.tokens.get(idx as usize) {
-            Some(t) => *t,
-            None => match self.tokens.last() {
-                Some(t) => *t,
-                None => Token::default(),
-            },
-        }
-    }
-
-    pub fn peek_nth(&self, idx: usize) -> Token {
-        self._peek_nth(idx as isize)
-    }
-
-    pub fn peek(&self) -> Token {
-        self.peek_nth(0)
-    }
-
-    pub fn next(&mut self) -> Token {
-        if self.offset < self.tokens.len() - 1 {
-            self.offset += 1;
-        }
-
-        self._peek_nth(-1)
-    }
-
-    pub fn expect(&mut self, ttype: TokenType) -> Result<Token, ExpectedToken> {
-        let maybe_ret = self.peek();
-
-        if maybe_ret.ttype != ttype {
-            return Err(ExpectedToken {
-                expected: ttype,
-                found: maybe_ret,
-            });
-        }
-
-        self.next();
-
-        Ok(maybe_ret)
-    }
-
-    // advance until you find one of the provided token types (or EOF)
-    // but DO NOT consume it, so ret will be peek()
-    pub fn sync(&mut self, ttypes: &[TokenType]) -> Token {
-        loop {
-            let tok = self.peek();
-
-            if tok.ttype == TokenType::Eof || ttypes.iter().any(|ttype| *ttype == tok.ttype) {
-                return tok;
-            }
-
-            self.next();
-        }
-    }
 }
 
 // NOTE: AST is used for syntax and semantic analysis since I think
@@ -410,20 +314,17 @@ pub struct AST {
 }
 
 impl AST {
-    fn has_errors(&self) -> bool {
+    pub fn has_errors(&self) -> bool {
         self.parse_errors.len() > 0 || self.semantic_errors.len() > 0
     }
 
-    fn display_parse_errors(&self, tokens: &Tokens) {
+    pub fn display_parse_errors(&self, tokens: &Tokens) {
         for err in &self.parse_errors {
             match err {
                 ParseError::ExpectedToken(ExpectedToken { expected, found }) => {
                     eprintln!(
                         "Ln {}, Col {}: expected {}, found {} instead",
-                        found.line,
-                        found.column,
-                        expected,
-                        found.ttype,
+                        found.line, found.column, expected, found.ttype,
                     );
                 }
                 _ => (),
@@ -431,7 +332,7 @@ impl AST {
         }
     }
 
-    fn display_semantic_errors(&self, tokens: &Tokens) {
+    pub fn display_semantic_errors(&self, tokens: &Tokens) {
         for err in &self.semantic_errors {
             match err {
                 SemanticError::InvalidOperation(invalid_op) => {
@@ -439,20 +340,19 @@ impl AST {
                 }
                 _ => {
                     eprintln!("Displaying not implemented for this kind of semantic error.")
-                },
+                }
             }
         }
     }
 }
 
 // public function to perform syntactic + semantic analysis
-pub fn parse_file(file_name: &str, file_str: &str, tokens: &Vec<Token>) -> AST {
+pub fn parse_file(file_name: &str, tokens: &mut Tokens) -> AST {
     let mut ast = AST::default();
-    let mut tokens = Tokens::new(file_str, tokens);
 
     // call to parse_expr does syntactic analysis
 
-    ast.do_syntax_analysis(&mut tokens);
+    ast.do_syntax_analysis(tokens);
 
     if let Some(expr) = ast.root_expr {
         println!("{}", ast.expr_to_string(&tokens, expr));
