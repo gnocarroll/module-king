@@ -100,7 +100,7 @@ impl Value {
             ValueVariant::Function(func) => {
                 let expr = ast.objs.expr(*func);
 
-                let func_name_string = match expr.variant {
+                let func_name_string = match &expr.variant {
                     ExprVariant::FunctionLiteral(func) => match &func.name {
                         Some(t) => tokens.tok_as_str(t),
                         None => "(anonymous)",
@@ -110,7 +110,7 @@ impl Value {
 
                 format!("function {}", func_name_string)
             }
-            ValueVariant::Identifier(ident) => ctx,
+            ValueVariant::Identifier(ident) => ctx.access_ident(ident).to_string(tokens, ast, ctx),
         }
     }
 }
