@@ -17,49 +17,22 @@ use crate::{
     },
 };
 
+#[derive(Clone)]
 enum ValueVariant {
     Unit,
     Integer(i64),
     Float(f64),
     String(String),
+    Identifier(RuntimeIdentifier),
     Class(HashMap<String, Box<Value>>),
     Module(ScopeID),
     Function(ExprID),
 }
 
+#[derive(Clone)]
 struct Value {
     pub type_id: Option<TypeID>,
     pub variant: ValueVariant,
-}
-
-impl Display for Value {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self.variant {
-            ValueVariant::Unit => write!(f, "Unit"),
-            ValueVariant::Integer(val) => write!(f, "{val}"),
-            ValueVariant::Float(val) => write!(f, "{val}"),
-            ValueVariant::String(s) => write!(f, "{s}"),
-            ValueVariant::Class(map) => {
-                write!(f, "(");
-
-                let mut first_loop = false;
-
-                for (name, val) in map {
-                    if first_loop {
-                        first_loop = false;
-                    } else {
-                        write!(f, ", ");
-                    }
-
-                    write!(f, "{}={}", name, val,);
-                }
-
-                write!(f, ")")
-            }
-            ValueVariant::Module(_) => write!(f, "module"),
-            ValueVariant::Function(_) => write!(f, "write",),
-        }
-    }
 }
 
 #[derive(Default)]
@@ -69,9 +42,32 @@ struct RuntimeScope {
     pub parent: RuntimeScopeID,
 }
 
+#[derive(Clone)]
+struct RuntimeIdentifier {
+    pub scope: RuntimeScopeID,
+    pub name: String,
+}
+
 struct ExecutionContext {
     pub objs: ContextObjects,
     pub curr_scope: RuntimeScopeID,
+}
+
+impl ExecutionContext {
+    pub fn value_to_string(&self, value: &Value) -> String {
+        match &value.variant {
+            ValueVariant::Unit => "Unit".to_string(),
+            ValueVariant::Integer(val) => val.to_string(),
+            ValueVariant::Float(val) => val.to_string(),
+            ValueVariant::String(s) => s.clone(),
+            ValueVariant::Class(map) => {
+                map.iter().map(|(name, valuee)|)
+            }
+            ValueVariant::Module(_) => write!(f, "module"),
+            ValueVariant::Function(_) => write!(f, "write",),
+            ValueVariant::Identifier(ident) =>
+        }
+    }
 }
 
 impl Default for ExecutionContext {

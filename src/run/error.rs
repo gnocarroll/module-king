@@ -8,4 +8,5 @@ pub struct RuntimeError {
 pub enum RuntimeErrorVariant {
     IntegerOverflow,
     NotImplemented,
+    InvalidOperation,
 }
