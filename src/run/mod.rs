@@ -2,6 +2,7 @@
 
 mod context_contents;
 mod error;
+mod eval_operation;
 
 use std::{collections::HashMap, fmt::Display};
 
@@ -12,7 +13,7 @@ use crate::{
     },
     run::{
         context_contents::{ContextObjects, RuntimeScopeID},
-        error::{RuntimeError, RuntimeErrorVariant},
+        error::{RuntimeError, RuntimeErrorVariant}, eval_operation::eval_operation,
     },
 };
 
@@ -94,17 +95,18 @@ fn eval(ast: &AST, ctx: &mut ExecutionContext, expr: ExprID) -> Result<Value, Ru
     };
 
     let ret = match ast.objs.expr(expr).variant {
-        ExprVariant::IntegerLiteral(i) => Value {
-            type_id: Some(type_id),
-            variant: ValueVariant::Integer(match i.try_into() {
-                Ok(i) => i,
-                Err(_) => {
-                    return Err(RuntimeError {
-                        expr,
-                        variant: RuntimeErrorVariant::IntegerOverflow,
-                    });
-                }
-            }),
+        ExprVariant::IntegerLiteral(i) => ValueVariant::Integer(match i.try_into() {
+            Ok(i) => i,
+            Err(_) => {
+                return Err(RuntimeError {
+                    expr,
+                    variant: RuntimeErrorVariant::IntegerOverflow,
+                });
+            }
+        }),
+        ExprVariant::FloatLiteral(f) => ValueVariant::Float(f),
+        ExprVariant::Operation(operation) => {
+            return eval_operation(ast, ctx, expr, operation);
         },
         _ => {
             return Err(RuntimeError {
@@ -114,7 +116,7 @@ fn eval(ast: &AST, ctx: &mut ExecutionContext, expr: ExprID) -> Result<Value, Ru
         }
     };
 
-    Ok(ret)
+    Ok(Value { type_id: Some(type_id), variant: ret })
 }
 
 pub fn run(ast: &AST) {
