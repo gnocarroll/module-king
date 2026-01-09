@@ -5,7 +5,16 @@ mod error;
 
 use std::{collections::HashMap, fmt::Display};
 
-use crate::{parse::{AST, ast_contents::{ExprID, TypeID}}, run::context_contents::{ContextObjects, RuntimeScopeID}};
+use crate::{
+    parse::{
+        AST, ExprVariant, TypeOrModule,
+        ast_contents::{ExprID, ScopeID, TypeID},
+    },
+    run::{
+        context_contents::{ContextObjects, RuntimeScopeID},
+        error::{RuntimeError, RuntimeErrorVariant},
+    },
+};
 
 enum ValueVariant {
     Unit,
@@ -13,10 +22,12 @@ enum ValueVariant {
     Float(f64),
     String(String),
     Class(HashMap<String, Box<Value>>),
+    Module(ScopeID),
+    Function(ExprID),
 }
 
 struct Value {
-    pub type_id: TypeID,
+    pub type_id: Option<TypeID>,
     pub variant: ValueVariant,
 }
 
@@ -39,16 +50,13 @@ impl Display for Value {
                         write!(f, ", ");
                     }
 
-                    write!(
-                        f,
-                        "{}={}",
-                        name,
-                        val,
-                    );
+                    write!(f, "{}={}", name, val,);
                 }
 
                 write!(f, ")")
             }
+            ValueVariant::Module(_) => write!(f, "module"),
+            ValueVariant::Function(_) => write!(f, "write",),
         }
     }
 }
@@ -56,7 +64,7 @@ impl Display for Value {
 #[derive(Default)]
 struct RuntimeScope {
     pub members: HashMap<String, Value>,
-    
+
     pub parent: RuntimeScopeID,
 }
 
@@ -74,26 +82,52 @@ impl Default for ExecutionContext {
     }
 }
 
-fn eval(
-    ast: &AST,
-    ctx: &mut ExecutionContext,
-    expr: ExprID,
-) -> Value {
-    match ast.objs.expr(expr).variant {
-        ExprVariant::IntegerLiteral() => {
-
+fn eval(ast: &AST, ctx: &mut ExecutionContext, expr: ExprID) -> Result<Value, RuntimeError> {
+    let type_id = match ast.objs.expr(expr).type_or_module {
+        TypeOrModule::Type(t) => t,
+        TypeOrModule::Module(scope) => {
+            return Ok(Value {
+                type_id: None,
+                variant: ValueVariant::Module(scope),
+            });
         }
-        _ => (),
-    }
+    };
+
+    let ret = match ast.objs.expr(expr).variant {
+        ExprVariant::IntegerLiteral(i) => Value {
+            type_id: Some(type_id),
+            variant: ValueVariant::Integer(match i.try_into() {
+                Ok(i) => i,
+                Err(_) => {
+                    return Err(RuntimeError {
+                        expr,
+                        variant: RuntimeErrorVariant::IntegerOverflow,
+                    });
+                }
+            }),
+        },
+        _ => {
+            return Err(RuntimeError {
+                expr,
+                variant: RuntimeErrorVariant::NotImplemented,
+            });
+        }
+    };
+
+    Ok(ret)
 }
 
 pub fn run(ast: &AST) {
     if let Some(expr) = ast.root_expr {
         let mut ctx = ExecutionContext::default();
 
-        println!(
-            "{}",
-            eval(ast, &mut ctx, expr),
-        );
+        let value = match eval(ast, &mut ctx, expr) {
+            Ok(value) => value,
+            Err(_) => {
+                return;
+            }
+        };
+
+        println!("{}", value,);
     }
 }
