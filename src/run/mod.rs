@@ -8,11 +8,13 @@ use std::{collections::HashMap, fmt::Display};
 
 use crate::{
     parse::{
-        AST, ExprVariant, Tokens, TypeOrModule, ast_contents::{ExprID, ScopeID, TypeID}
+        AST, ExprVariant, Tokens, TypeOrModule,
+        ast_contents::{ExprID, ScopeID, TypeID},
     },
     run::{
         context_contents::{ContextObjects, RuntimeScopeID},
-        error::{RuntimeError, RuntimeErrorVariant}, eval_operation::eval_operation,
+        error::{RuntimeError, RuntimeErrorVariant},
+        eval_operation::eval_operation,
     },
 };
 
@@ -52,6 +54,24 @@ struct ExecutionContext {
     pub curr_scope: RuntimeScopeID,
 }
 
+impl ExecutionContext {
+    pub fn access_ident(&self, ident: &RuntimeIdentifier) -> &Value {
+        &self.objs.runtime_scope(ident.scope).members[&ident.name]
+    }
+
+    pub fn access_ident_mut(&mut self, ident: &RuntimeIdentifier) -> &mut Value {
+        self.objs
+            .runtime_scope_mut(ident.scope)
+            .members
+            .get_mut(&ident.name)
+            .expect("bad runtime ident")
+    }
+
+    pub fn access_ident_clone(&self, ident: &RuntimeIdentifier) -> Value {
+        self.objs.runtime_scope(ident.scope).members[&ident.name].clone()
+    }
+}
+
 impl Value {
     pub fn to_string(&self, tokens: &Tokens, ast: &AST, ctx: &ExecutionContext) -> String {
         match &self.variant {
@@ -60,21 +80,37 @@ impl Value {
             ValueVariant::Float(val) => val.to_string(),
             ValueVariant::String(s) => s.clone(),
             ValueVariant::Class(map) => {
-                let member_strings: Vec<String> = map.iter().map(|(name, value)| format!(
-                    "{}={}",
-                    name,
-                    value.to_string(tokens, ast, ctx)
-                )).collect();
+                let member_strings: Vec<String> = map
+                    .iter()
+                    .map(|(name, value)| format!("{}={}", name, value.to_string(tokens, ast, ctx)))
+                    .collect();
 
                 format!("({})", member_strings.join(", "))
             }
             ValueVariant::Module(scope_id) => {
                 let scope = ast.objs.scope(*scope_id);
 
-                let name_string = scope.n
+                let name_string = match &scope.name {
+                    Some(tok_or_string) => tokens.tok_or_string_to_string(tok_or_string),
+                    None => "(anonymous)".to_string(),
+                };
+
+                format!("module {}", name_string)
             }
-            ValueVariant::Function(_) => write!(f, "write",),
-            ValueVariant::Identifier(ident) =>
+            ValueVariant::Function(func) => {
+                let expr = ast.objs.expr(*func);
+
+                let func_name_string = match expr.variant {
+                    ExprVariant::FunctionLiteral(func) => match &func.name {
+                        Some(t) => tokens.tok_as_str(t),
+                        None => "(anonymous)",
+                    },
+                    _ => "ERR_EXPR_IS_NOT_FUNC",
+                };
+
+                format!("function {}", func_name_string)
+            }
+            ValueVariant::Identifier(ident) => ctx,
         }
     }
 }
@@ -112,7 +148,7 @@ fn eval(ast: &AST, ctx: &mut ExecutionContext, expr: ExprID) -> Result<Value, Ru
         ExprVariant::FloatLiteral(f) => ValueVariant::Float(f),
         ExprVariant::Operation(operation) => {
             return eval_operation(ast, ctx, expr, operation);
-        },
+        }
         _ => {
             return Err(RuntimeError {
                 expr,
@@ -121,7 +157,10 @@ fn eval(ast: &AST, ctx: &mut ExecutionContext, expr: ExprID) -> Result<Value, Ru
         }
     };
 
-    Ok(Value { type_id: Some(type_id), variant: ret })
+    Ok(Value {
+        type_id: Some(type_id),
+        variant: ret,
+    })
 }
 
 pub fn run(ast: &AST) -> Result<Value, RuntimeError> {
@@ -131,5 +170,8 @@ pub fn run(ast: &AST) -> Result<Value, RuntimeError> {
         return eval(ast, &mut ctx, expr);
     }
 
-    Err(RuntimeError { expr: ExprID::default(), variant: RuntimeErrorVariant::RootExprMissing })
+    Err(RuntimeError {
+        expr: ExprID::default(),
+        variant: RuntimeErrorVariant::RootExprMissing,
+    })
 }

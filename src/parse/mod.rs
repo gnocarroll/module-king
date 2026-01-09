@@ -323,6 +323,13 @@ impl<'a> Tokens<'a> {
         token.as_str(self.file_str)
     }
 
+    pub fn tok_or_string_to_string(&self, token_or_string: &TokenOrString) -> String {
+        match token_or_string {
+            TokenOrString::Token(t) => self.tok_as_str(t).to_string(),
+            TokenOrString::String(s) => s.clone(),
+        }
+    }
+
     pub fn idx(&self) -> u32 {
         self.offset as u32
     }
