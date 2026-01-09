@@ -21,6 +21,7 @@ use crate::{
 #[derive(Clone)]
 enum ValueVariant {
     Unit,
+    Boolean(bool),
     Integer(i64),
     Float(f64),
     String(String),

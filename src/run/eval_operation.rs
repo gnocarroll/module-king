@@ -74,6 +74,56 @@ fn eval_operation_unary(
     })
 }
 
+fn integer_op(ttype: TokenType) -> Option<fn(i64, i64) -> i64> {
+    let i64_pow = |lhs: i64, rhs: i64| lhs.pow(rhs as u32);
+
+    match ttype {
+        TokenType::Plus => Some(i64::add),
+        TokenType::Minus => Some(i64::sub),
+        TokenType::Star => Some(i64::mul),
+        TokenType::FSlash => Some(i64::div),
+        TokenType::Percent => Some(i64::rem),
+        TokenType::StarStar => Some(i64_pow),
+        _ => None,
+    }
+}
+
+fn integer_cmp(ttype: TokenType) -> Option<fn(i64, i64) -> bool> {
+    match ttype {
+        TokenType::Gt => Some(|lhs, rhs| lhs > rhs),
+        TokenType::Lt => Some(|lhs, rhs| lhs < rhs),
+        TokenType::Ge => Some(|lhs, rhs| lhs >= rhs),
+        TokenType::Le => Some(|lhs, rhs| lhs <= rhs),
+        TokenType::EqEq => Some(|lhs, rhs| lhs == rhs),
+        TokenType::BangEq => Some(|lhs, rhs| lhs != rhs),
+        _ => None,
+    }
+}
+
+fn float_op(ttype: TokenType) -> Option<fn(f64, f64) -> f64> {
+    match ttype {
+        TokenType::Plus => Some(f64::add),
+        TokenType::Minus => Some(f64::sub),
+        TokenType::Star => Some(f64::mul),
+        TokenType::FSlash => Some(f64::div),
+        TokenType::Percent => Some(f64::rem),
+        TokenType::StarStar => Some(f64::powf),
+        _ => None,
+    }
+}
+
+fn float_cmp(ttype: TokenType) -> Option<fn(f64, f64) -> bool> {
+    match ttype {
+        TokenType::Gt => Some(|lhs, rhs| lhs > rhs),
+        TokenType::Lt => Some(|lhs, rhs| lhs < rhs),
+        TokenType::Ge => Some(|lhs, rhs| lhs >= rhs),
+        TokenType::Le => Some(|lhs, rhs| lhs <= rhs),
+        TokenType::EqEq => Some(|lhs, rhs| lhs == rhs),
+        TokenType::BangEq => Some(|lhs, rhs| lhs != rhs),
+        _ => None,
+    }
+}
+
 fn eval_operation_binary(
     ast: &AST,
     ctx: &mut ExecutionContext,
@@ -100,24 +150,21 @@ fn eval_operation_binary(
 
     let operand_values = [eval(ast, ctx, operand1)?, eval(ast, ctx, operand2)?];
 
-    let i64_pow = |lhs: i64, rhs: i64| lhs.pow(rhs as u32);
-
-    let integer_op = |ttype: TokenType| -> Option<fn(i64, i64) -> i64> {
-        match ttype {
-            TokenType::Plus => Some(i64::add),
-            TokenType::Minus => Some(i64::sub),
-            TokenType::Star => Some(i64::mul),
-            TokenType::FSlash => Some(i64::div),
-            TokenType::Percent => Some(i64::rem),
-            TokenType::StarStar => Some(i64_pow),
-            _ => None,
-        }
-    };
-
     let ret = match (&operand_values[0].variant, &operand_values[1].variant) {
         (ValueVariant::Integer(lhs), ValueVariant::Integer(rhs)) => {
             if let Some(i64_op) = integer_op(op) {
                 ValueVariant::Integer(i64_op(*lhs, *rhs))
+            } else if let Some(i64_cmp) = integer_cmp(op) {
+                ValueVariant::Boolean(i64_cmp(*lhs, *rhs))
+            } else {
+                return invalid_op;
+            }
+        }
+        (ValueVariant::Float(lhs), ValueVariant::Float(rhs)) => {
+            if let Some(f64_op) = float_op(op) {
+                ValueVariant::Float(f64_op(*lhs, *rhs))
+            } else if let Some(f64_cmp) = float_cmp(op) {
+                ValueVariant::Boolean(f64_cmp(*lhs, *rhs))
             } else {
                 return invalid_op;
             }
