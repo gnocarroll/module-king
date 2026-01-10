@@ -411,11 +411,47 @@ impl AST {
         // certain operations will be handled up here e.g. colon for var creation
         // this is due to potential need for different sort of analysis
 
-        if op == TokenType::Colon { // var creation
-            // helper function will look at pairing of pattern, type
-            // e.g. (x, y) : (Float, Float)
-            let _ = self.analyze_instance_creation(ctx, scope, expr, Some(operand1), Some(operand2));
-            return;
+        match op {
+            TokenType::Colon => {
+                // var creation
+                // helper function will look at pairing of pattern, type
+                // e.g. (x, y) : (Float, Float)
+                if let Ok(pattern) = self.analyze_instance_creation(
+                    ctx,
+                    scope,
+                    expr,
+                    Some(operand1),
+                    Some(operand2),
+                ) {
+                    self.scope_create_members_from_pattern(ctx, scope, pattern);
+                }
+
+                return;
+            }
+            TokenType::ColonEq => {
+                // var creation + assignment + type inference
+                // operand1 := operand2;
+
+                self.analyze_expr(ctx, scope, operand2);
+
+                let type_id = if self.objs.expr(operand2).finalized {
+                    match self.objs.expr(operand2).type_or_module {
+                        TypeOrModule::Type(t) => Some(t),
+                        _ => None
+                    }
+                } else {
+                    None
+                };
+
+                if let Some(type_id) = type_id {
+                    if let Ok(pattern) = self.pattern_matching(ctx, scope, operand1, type_id) {
+                        self.scope_create_members_from_pattern(ctx, scope, pattern);
+                    }
+                }
+
+                return;
+            }
+            _ => (),
         }
 
         self.analyze_expr(ctx, scope, operand1);
@@ -505,7 +541,10 @@ impl AST {
                 .iter()
                 .any(|allowed| *allowed == *elem)
         }) {
-            self.invalid_operation(expr, "only certain variants of types permitted for this operation");
+            self.invalid_operation(
+                expr,
+                "only certain variants of types permitted for this operation",
+            );
             return;
         }
 

@@ -17,9 +17,11 @@ impl AST {
         }
     }
 
-    pub fn pattern_error_push(&mut self, pattern_error: PatternError) {
+    pub fn pattern_error_push(&mut self, pattern_error: PatternError) -> PatternError {        
         self.semantic_errors
-            .push(SemanticError::PatternError(pattern_error))
+            .push(SemanticError::PatternError(pattern_error.clone()));
+
+        pattern_error
     }
 
     pub fn get_builtin_type_id(&mut self, name: &str) -> TypeID {

@@ -20,13 +20,13 @@ use crate::{
 };
 
 #[derive(Clone, Copy, PartialEq)]
-enum IsEnum {
+pub enum IsEnum {
     Enum,
     Other,
 }
 
 #[derive(Clone, Copy, PartialEq)]
-enum AnalyzingNow {
+pub enum AnalyzingNow {
     Type,
     TypeBody(IsEnum),
     FuncParams,
@@ -34,7 +34,7 @@ enum AnalyzingNow {
     Expr,    // if specification is unnecessary
 }
 
-struct SemanticContext<'a> {
+pub struct SemanticContext<'a> {
     tokens: &'a Tokens<'a>,
     analyzing_now: AnalyzingNow,
 
@@ -156,19 +156,19 @@ impl AST {
                 match type_val {
                     Type::Tuple((lhs_type, rhs_type)) => {
                         if !ident_has_parens {
-                            return Err(PatternError::ParenMismatch(ExprAndType {
+                            return Err(self.pattern_error_push(PatternError::ParenMismatch(ExprAndType {
                                 expr: ident_expr,
                                 type_id,
-                            }));
+                            })));
                         }
 
                         let lhs = lhs.expect("should have lhs");
                         let rhs = rhs.expect("should have rhs");
 
                         if rhs_type.is_some() && self.objs.expr(rhs).is_unit() {
-                            return Err(PatternError::IdentMissing(rhs_type.expect("impossible")));
+                            return Err(self.pattern_error_push(PatternError::IdentMissing(rhs_type.expect("impossible"))));
                         } else if rhs_type.is_none() && !self.expr(rhs).is_unit() {
-                            return Err(PatternError::TypeMissing(rhs));
+                            return Err(self.pattern_error_push(PatternError::TypeMissing(rhs)));
                         }
 
                         // first pattern match on lhs of tuple
@@ -187,10 +187,10 @@ impl AST {
                     }
                     Type::RestOfTuple((lhs_type, rhs_type)) => {
                         if ident_has_parens {
-                            return Err(PatternError::ParenMismatch(ExprAndType {
+                            return Err(self.pattern_error_push(PatternError::ParenMismatch(ExprAndType {
                                 expr: ident_expr,
                                 type_id,
-                            }));
+                            })));
                         }
 
                         let lhs = lhs.expect("should have lhs");
