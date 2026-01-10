@@ -6,11 +6,12 @@ use crate::{
     parse::{
         AST, Expr, ExprVariant, FunctionLiteral, Identifier, IdentifierVariant, Operation, Tokens,
         TypeLiteral, TypeVariant,
-        ast_contents::ExprID,
+        ast_contents::{ExprID, MemberID},
         errors::{NameMismatch, ParseError},
         operator,
     },
-    scan::{Token, TokenType}, tokens::ExpectedToken,
+    scan::{Token, TokenType},
+    tokens::ExpectedToken,
 };
 
 impl AST {
@@ -377,6 +378,9 @@ impl AST {
                         TokenType::String => ExprVariant::StringLiteral(tok),
                         TokenType::Identifier => ExprVariant::Identifier(Identifier {
                             name: tok,
+
+                            // dummy values for these fields for now
+                            member_id: MemberID::default(),
                             variant: IdentifierVariant::Unknown,
                         }),
                         _ => panic!("single token literal parsing broken"),

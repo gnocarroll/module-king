@@ -1,4 +1,6 @@
-use crate::run::RuntimeScope;
+use std::collections::HashMap;
+
+use crate::{parse::ast_contents::MemberID, run::{RuntimeIdentifier, RuntimeScope}};
 
 #[derive(Clone, Copy, Default)]
 pub struct RuntimeScopeID {
@@ -8,6 +10,7 @@ pub struct RuntimeScopeID {
 #[derive(Default)]
 pub struct ContextObjects {
     scopes: Vec<RuntimeScope>,
+    member_map: HashMap<MemberID, RuntimeIdentifier>,
 }
 
 impl ContextObjects {

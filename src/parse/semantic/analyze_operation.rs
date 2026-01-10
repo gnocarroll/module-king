@@ -144,6 +144,8 @@ impl AST {
         op: TokenType,
         operand: ExprID,
     ) {
+        self.analyze_expr(ctx, scope, operand);
+
         if !self.expr(operand).finalized {
             return;
         }
@@ -401,14 +403,15 @@ impl AST {
         operand1: ExprID,
         operand2: ExprID,
     ) {
-        // both operands must already be finalized
-
-        if !self.expr(operand1).finalized || !self.expr(operand2).finalized {
+        if operator::get_bp(op, Infix).is_none() && operator::get_bp(op, PostfixAround).is_none() {
+            self.invalid_operation(expr, "not a supported binary operator");
             return;
         }
 
-        if operator::get_bp(op, Infix).is_none() && operator::get_bp(op, PostfixAround).is_none() {
-            self.invalid_operation(expr, "not a supported binary operator");
+        self.analyze_expr(ctx, scope, operand1);
+        self.analyze_expr(ctx, scope, operand2);
+
+        if !self.expr(operand1).finalized || !self.expr(operand2).finalized {
             return;
         }
 
@@ -467,6 +470,8 @@ impl AST {
             );
             return;
         };
+
+        // below code is if both are values
 
         let (allowed_type_variants, returns_bool) =
             match AST::get_supported_type_variants_binary(op) {
@@ -528,22 +533,6 @@ impl AST {
         }
 
         if return_early {
-            return;
-        }
-
-        let mut operands_finalized = true;
-
-        for operand in [operation.operand1, operation.operand2] {
-            if let Some(operand) = operand {
-                self.analyze_expr(ctx, scope, operand);
-
-                if !self.objs.expr(operand).finalized {
-                    operands_finalized = false;
-                }
-            }
-        }
-
-        if !operands_finalized {
             return;
         }
 
