@@ -82,22 +82,45 @@ impl ContextObjects {
         &mut self.scopes[scope.id as usize]
     }
 
-    pub fn access_ident(&self, ident: &RuntimeIdentifier) -> &Value {
+    pub fn ident_get(&self, ident: &RuntimeIdentifier) -> &Value {
         &self.runtime_scope(ident.scope).members[&ident.member_id]
     }
 
-    pub fn access_ident_mut(&mut self, ident: &RuntimeIdentifier) -> &mut Value {
+    pub fn ident_get_mut(&mut self, ident: &RuntimeIdentifier) -> &mut Value {
         self.runtime_scope_mut(ident.scope)
             .members
             .get_mut(&ident.member_id)
             .expect("bad runtime ident")
     }
 
-    pub fn access_ident_clone(&self, ident: &RuntimeIdentifier) -> Value {
+    pub fn ident_clone(&self, ident: &RuntimeIdentifier) -> Value {
         self.runtime_scope(ident.scope).members[&ident.member_id].clone()
     }
 
-    pub fn alloc_instance(
+    pub fn instance_get(
+        &self,
+        member_id: MemberID,
+    ) -> Option<&Value> {
+        Some(self.ident_get(self.member_map.get(&member_id)?))
+    }
+
+    pub fn instance_get_mut(
+        &mut self,
+        member_id: MemberID,
+    ) -> Option<&mut Value> {
+        let ident = self.member_map.get(&member_id)?.clone();
+
+        Some(self.ident_get_mut(&ident))
+    }
+
+    pub fn instance_clone(
+        &self,
+        member_id: MemberID,
+    ) -> Option<Value> {
+        Some(self.ident_clone(self.member_map.get(&member_id)?))
+    }
+
+    pub fn instance_alloc(
         &mut self,
         ast: &AST,
         scope: RuntimeScopeID,
