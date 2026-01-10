@@ -451,6 +451,25 @@ impl AST {
 
                 return;
             }
+            TokenType::Eq => {
+                self.analyze_expr(ctx, scope, operand1);
+                self.analyze_expr(ctx, scope, operand2);
+
+                match self.expr(operand1).variant {
+                    ExprVariant::Operation(Operation {
+                        op: TokenType::Colon,
+                        operand1: ident_expr,
+                        operand2: type_expr,
+                    }) => {
+
+                    }
+                    _ => {
+                        self.invalid_operation(expr, "lhs of assignment should be of form \"pattern : Type\"");
+                    }
+                }
+
+                return;
+            }
             _ => (),
         }
 
