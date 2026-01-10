@@ -27,7 +27,7 @@ pub enum ValueVariant {
     Float(f64),
     String(String),
     Identifier(RuntimeIdentifier),
-    Class(HashMap<String, Box<Value>>),
+    Record(HashMap<String, Box<Value>>),
     Module(ScopeID),
     Function(ExprID),
 }
@@ -58,22 +58,6 @@ pub struct ExecutionContext<'a> {
 }
 
 impl<'a> ExecutionContext<'a> {
-    pub fn access_ident(&self, ident: &RuntimeIdentifier) -> &Value {
-        &self.objs.runtime_scope(ident.scope).members[&ident.member_id]
-    }
-
-    pub fn access_ident_mut(&mut self, ident: &RuntimeIdentifier) -> &mut Value {
-        self.objs
-            .runtime_scope_mut(ident.scope)
-            .members
-            .get_mut(&ident.member_id)
-            .expect("bad runtime ident")
-    }
-
-    pub fn access_ident_clone(&self, ident: &RuntimeIdentifier) -> Value {
-        self.objs.runtime_scope(ident.scope).members[&ident.member_id].clone()
-    }
-
     pub fn new(tokens: &'a Tokens) -> Self {
         let mut objs = ContextObjects::default();
         let curr_scope = objs.runtime_scope_new();
@@ -94,7 +78,7 @@ impl Value {
             ValueVariant::Float(val) => val.to_string(),
             ValueVariant::Boolean(val) => val.to_string(),
             ValueVariant::String(s) => s.clone(),
-            ValueVariant::Class(map) => {
+            ValueVariant::Record(map) => {
                 let member_strings: Vec<String> = map
                     .iter()
                     .map(|(name, value)| format!("{}={}", name, value.to_string(ast, ctx)))
