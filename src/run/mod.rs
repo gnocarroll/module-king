@@ -26,7 +26,7 @@ pub enum ValueVariant {
     Integer(i64),
     Float(f64),
     String(String),
-    Identifier(RuntimeIdentifier),
+    Identifier(MemberID),
     Record(HashMap<String, Box<Value>>),
     Module(ScopeID),
     Function(ExprID),
@@ -43,12 +43,6 @@ pub struct RuntimeScope {
     pub members: HashMap<MemberID, Value>,
 
     pub parent: RuntimeScopeID,
-}
-
-#[derive(Clone)]
-pub struct RuntimeIdentifier {
-    pub scope: RuntimeScopeID,
-    pub member_id: MemberID,
 }
 
 pub struct ExecutionContext<'a> {
@@ -109,7 +103,10 @@ impl Value {
 
                 format!("function {}", func_name_string)
             }
-            ValueVariant::Identifier(ident) => ctx.access_ident(ident).to_string(ast, ctx),
+            ValueVariant::Identifier(member_id) => match ctx.objs.instance_get(*member_id) {
+                Some(value) => value.to_string(ast, ctx),
+                None => "ERR_IDENT_DNE".to_string(),
+            },
         }
     }
 }
@@ -140,9 +137,7 @@ fn eval(ast: &AST, ctx: &mut ExecutionContext, expr: ExprID) -> Result<Value, Ru
         ExprVariant::Operation(operation) => {
             return eval_operation(ast, ctx, expr, operation);
         }
-        ExprVariant::Identifier(ident) => {
-
-        }
+        ExprVariant::Identifier(ident) => ValueVariant::Identifier(ident.member_id),
         _ => {
             return Err(RuntimeError {
                 expr,

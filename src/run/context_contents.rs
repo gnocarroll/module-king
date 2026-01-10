@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     parse::{AST, MemberVariant, ScopeVariant, Type, TypeOrModule, TypeVariant, Visibility, ast_contents::{MemberID, TypeID}},
-    run::{RuntimeIdentifier, RuntimeScope, Value, ValueVariant},
+    run::{RuntimeScope, Value, ValueVariant},
 };
 
 #[derive(Clone, Copy, Default)]
@@ -13,7 +13,9 @@ pub struct RuntimeScopeID {
 #[derive(Default)]
 pub struct ContextObjects {
     scopes: Vec<RuntimeScope>,
-    member_map: HashMap<MemberID, RuntimeIdentifier>,
+
+    // find which scope given MemberID is in in O(1) so value can be retrieved
+    member_map: HashMap<MemberID, RuntimeScopeID>,
 }
 
 fn type_to_value(ast: &AST, type_id: TypeID) -> Value {
@@ -82,42 +84,42 @@ impl ContextObjects {
         &mut self.scopes[scope.id as usize]
     }
 
-    pub fn ident_get(&self, ident: &RuntimeIdentifier) -> &Value {
-        &self.runtime_scope(ident.scope).members[&ident.member_id]
+    pub fn scope_instance_get(&self, scope: RuntimeScopeID, member_id: MemberID) -> &Value {
+        &self.runtime_scope(scope).members[&member_id]
     }
 
-    pub fn ident_get_mut(&mut self, ident: &RuntimeIdentifier) -> &mut Value {
-        self.runtime_scope_mut(ident.scope)
+    pub fn scope_instance_get_mut(&mut self, scope: RuntimeScopeID, member_id: MemberID) -> &mut Value {
+        self.runtime_scope_mut(scope)
             .members
-            .get_mut(&ident.member_id)
+            .get_mut(&member_id)
             .expect("bad runtime ident")
     }
 
-    pub fn ident_clone(&self, ident: &RuntimeIdentifier) -> Value {
-        self.runtime_scope(ident.scope).members[&ident.member_id].clone()
+    pub fn scope_instance_clone(&self, scope: RuntimeScopeID, member_id: MemberID) -> Value {
+        self.runtime_scope(scope).members[&member_id].clone()
     }
 
     pub fn instance_get(
         &self,
         member_id: MemberID,
     ) -> Option<&Value> {
-        Some(self.ident_get(self.member_map.get(&member_id)?))
+        Some(self.scope_instance_get(*self.member_map.get(&member_id)?, member_id))
     }
 
     pub fn instance_get_mut(
         &mut self,
         member_id: MemberID,
     ) -> Option<&mut Value> {
-        let ident = self.member_map.get(&member_id)?.clone();
+        let scope_id = *self.member_map.get(&member_id)?;
 
-        Some(self.ident_get_mut(&ident))
+        Some(self.scope_instance_get_mut(scope_id, member_id))
     }
 
     pub fn instance_clone(
         &self,
         member_id: MemberID,
     ) -> Option<Value> {
-        Some(self.ident_clone(self.member_map.get(&member_id)?))
+        Some(self.scope_instance_clone(*self.member_map.get(&member_id)?, member_id))
     }
 
     pub fn instance_alloc(
@@ -125,29 +127,25 @@ impl ContextObjects {
         ast: &AST,
         scope: RuntimeScopeID,
         member_id: MemberID,
-    ) -> Option<RuntimeIdentifier> {
+    ) {
         let member = ast.objs.member(member_id);
 
         let type_id = match member.type_or_module {
             TypeOrModule::Type(t) => t,
             TypeOrModule::Module(_) => {
-                return None;
+                return;
             }
         };
 
         let value = type_to_value(ast, type_id);
 
-        let ret = RuntimeIdentifier { scope, member_id };
-
         // record in member_map mapping from MemberID -> runtime id so Value
         // can be retrieved in O(1) time in the future
 
-        self.member_map.insert(member_id, ret.clone());
+        self.member_map.insert(member_id, scope);
 
         let scope_obj = self.runtime_scope_mut(scope);
 
         scope_obj.members.insert(member_id, value);
-
-        Some(ret)
     }
 }
