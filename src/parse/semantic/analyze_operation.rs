@@ -408,6 +408,16 @@ impl AST {
             return;
         }
 
+        // certain operations will be handled up here e.g. colon for var creation
+        // this is due to potential need for different sort of analysis
+
+        if op == TokenType::Colon { // var creation
+            // helper function will look at pairing of pattern, type
+            // e.g. (x, y) : (Float, Float)
+            let _ = self.analyze_instance_creation(ctx, scope, expr, Some(operand1), Some(operand2));
+            return;
+        }
+
         self.analyze_expr(ctx, scope, operand1);
         self.analyze_expr(ctx, scope, operand2);
 

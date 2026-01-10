@@ -112,6 +112,8 @@ impl Value {
 }
 
 fn eval(ast: &AST, ctx: &mut ExecutionContext, expr: ExprID) -> Result<Value, RuntimeError> {
+    // 1. get language type of expr
+
     let type_id = match ast.objs.expr(expr).type_or_module {
         TypeOrModule::Type(t) => t,
         TypeOrModule::Module(scope) => {
@@ -122,7 +124,10 @@ fn eval(ast: &AST, ctx: &mut ExecutionContext, expr: ExprID) -> Result<Value, Ru
         }
     };
 
-    let ret = match ast.objs.expr(expr).variant {
+    // 2. depending on expr variant we convert to value variant or maybe
+    // immediately find out what the ret value of this function should be
+
+    let variant = match ast.objs.expr(expr).variant {
         ExprVariant::Unit => ValueVariant::Unit,
         ExprVariant::IntegerLiteral(i) => ValueVariant::Integer(match i.try_into() {
             Ok(i) => i,
@@ -148,10 +153,12 @@ fn eval(ast: &AST, ctx: &mut ExecutionContext, expr: ExprID) -> Result<Value, Ru
 
     Ok(Value {
         type_id: Some(type_id),
-        variant: ret,
+        variant,
     })
 }
 
+// central public function of this module, used to run interpreter given
+// program tokens and AST with semantic information
 pub fn run(tokens: &Tokens, ast: &AST) {
     if let Some(expr) = ast.root_expr {
         let mut ctx = ExecutionContext::new(tokens);
