@@ -443,11 +443,9 @@ impl AST {
                     None
                 };
 
-                if let Some(type_id) = type_id {
-                    if let Ok(pattern) = self.pattern_matching(ctx, scope, operand1, type_id) {
-                        self.scope_create_members_from_pattern(ctx, scope, pattern);
-                    }
-                }
+                let (pattern, _) = self.pattern_matching(ctx, scope, operand1, type_id);
+                
+                self.scope_create_members_from_pattern(ctx, scope, pattern);
 
                 return;
             }

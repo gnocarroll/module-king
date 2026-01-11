@@ -175,10 +175,12 @@ impl AST {
                         let mut rhs_type = rhs_type;
 
                         if !ident_has_parens {
-                            pattern_err = Some(self.pattern_error_push(PatternError::ParenMismatch(ExprAndType {
-                                expr: ident_expr,
-                                type_id,
-                            })));
+                            pattern_err = Some(self.pattern_error_push(
+                                PatternError::ParenMismatch(ExprAndType {
+                                    expr: ident_expr,
+                                    type_id,
+                                }),
+                            ));
 
                             // due to missing parentheses on lhs (non-type side) cannot match types, so replace
                             // types with None
@@ -193,9 +195,12 @@ impl AST {
                         let rhs_is_unit = self.objs.expr(rhs).is_unit();
 
                         if rhs_type.is_some() && rhs_is_unit {
-                            pattern_err = Some(self.pattern_error_push(PatternError::IdentMissing(rhs_type.expect("impossible"))));
+                            pattern_err = Some(self.pattern_error_push(
+                                PatternError::IdentMissing(rhs_type.expect("impossible")),
+                            ));
                         } else if rhs_type.is_none() && !rhs_is_unit {
-                            pattern_err = Some(self.pattern_error_push(PatternError::TypeMissing(rhs)));
+                            pattern_err =
+                                Some(self.pattern_error_push(PatternError::TypeMissing(rhs)));
                         }
 
                         // first pattern match on lhs of tuple
@@ -233,23 +238,29 @@ impl AST {
                         let mut rhs_type = Some(rhs_type);
 
                         if ident_has_parens {
-                            pattern_err = Some(self.pattern_error_push(PatternError::ParenMismatch(ExprAndType {
-                                expr: ident_expr,
-                                type_id,
-                            })));
+                            pattern_err = Some(self.pattern_error_push(
+                                PatternError::ParenMismatch(ExprAndType {
+                                    expr: ident_expr,
+                                    type_id,
+                                }),
+                            ));
 
                             // cannot match to the types, unnecessary parens around lhs
 
                             lhs_type = None;
                             rhs_type = None;
                         } else if self.objs.expr(rhs).is_unit() {
-                            pattern_err = Some(PatternError::IdentMissing(rhs_type.expect("should always be Some in this branch")));
+                            pattern_err = Some(PatternError::IdentMissing(
+                                rhs_type.expect("should always be Some in this branch"),
+                            ));
                         }
 
                         // first pattern match on lhs of tuple
-                        let (lhs_pattern, lhs_err) = self.pattern_matching(ctx, scope, lhs, lhs_type);
+                        let (lhs_pattern, lhs_err) =
+                            self.pattern_matching(ctx, scope, lhs, lhs_type);
 
-                        let (rhs_pattern, rhs_err) = self.pattern_matching(ctx, scope, rhs, rhs_type);
+                        let (rhs_pattern, rhs_err) =
+                            self.pattern_matching(ctx, scope, rhs, rhs_type);
 
                         match (lhs_err, rhs_err) {
                             (_, Some(err)) | (Some(err), _) => {
@@ -273,7 +284,10 @@ impl AST {
         }
 
         (
-            self.objs.pattern_push(Pattern { type_id, variant: PatternVariant::IgnoreMultiple }),
+            self.objs.pattern_push(Pattern {
+                type_id,
+                variant: PatternVariant::IgnoreMultiple,
+            }),
             Some(self.pattern_error_push(PatternError::MatchingUnsupported(ident_expr))),
         )
     }
@@ -295,7 +309,7 @@ impl AST {
         ret
     }
 
-    // ret pattern or error
+    // ret pattern and err if err is present
     fn analyze_instance_creation(
         &mut self,
         ctx: &mut SemanticContext,
@@ -303,7 +317,7 @@ impl AST {
         expr: ExprID,
         operand1: Option<ExprID>,
         operand2: Option<ExprID>,
-    ) -> Result<PatternID, SemanticError> {
+    ) -> (PatternID, Option<SemanticError>) {
         let old_analyzing_now = ctx.analyzing_now;
         let mut err: Option<SemanticError> = None;
 
@@ -323,46 +337,57 @@ impl AST {
             err = Some(self.missing_operand(expr, 2));
         }
 
-        let mut finalized = false;
         let mut pattern = PatternID::default();
 
-        if let (Some(ident_expr), Some(type_expr)) = (operand1, operand2) {
-            let type_expr_ref = self.objs.expr(type_expr);
+        if let (Some(ident_expr), type_expr) = (operand1, operand2) {
+            let type_expr_struct = type_expr.map(|type_expr| self.objs.expr(type_expr).clone());
 
-            if type_expr_ref.finalized {
-                // ensure that analyze "type expr" is actually a type
+            // ensure that analyze "type expr" is actually a type
 
-                let expr_returns = type_expr_ref.expr_returns;
+            let expr_returns = type_expr_struct.as_ref().map_or(ExprReturns::Error, |type_expr_struct| {
+                type_expr_struct.expr_returns
+            });
 
-                if expr_returns != ExprReturns::Type {
-                    return Err(self.expected_expr_returns(expr, ExprReturns::Type, expr_returns));
-                }
+            let expr_returns_type = expr_returns == ExprReturns::Type;
 
-                let type_id = match type_expr_ref.type_or_module {
-                    TypeOrModule::Type(t) => t,
-                    TypeOrModule::Module(_) => {
-                        return Err(self.expected_expr_returns(
-                            expr,
-                            ExprReturns::Type,
-                            expr_returns,
-                        ));
-                    }
-                };
-
-                // use pattern matching on our operation of the form
-                // ident_expr : type
-                // type_id is id of said type
-
-                let pattern_result = self.pattern_matching(ctx, scope, ident_expr, Some(type_id));
-
-                match pattern_result {
-                    (value, None) => {
-                        finalized = true;
-                        pattern = value;
-                    }
-                    (_, Some(e)) => err = Some(SemanticError::PatternError(e)),
-                }
+            if !expr_returns_type {
+                err = Some(self.expected_expr_returns(expr, ExprReturns::Type, expr_returns));
             }
+
+            let type_id = if let (Some(type_expr_struct), true) = (type_expr_struct, expr_returns_type) {
+                match type_expr_struct.type_or_module {
+                    TypeOrModule::Type(t) => Some(t),
+                    TypeOrModule::Module(_) => {
+                        err =
+                            Some(self.expected_expr_returns(expr, ExprReturns::Type, expr_returns));
+
+                        None
+                    }
+                }
+            } else {
+                None
+            };
+
+            // use pattern matching on our operation of the form
+            // ident_expr : type
+            // type_id is id of said type
+
+            let (got_pattern, pattern_err) = self.pattern_matching(ctx, scope, ident_expr, type_id);
+
+            pattern = got_pattern;
+
+            if let Some(e) = pattern_err {
+                err = Some(SemanticError::PatternError(e));
+            }
+        } else {
+            // return dummy pattern
+            
+            let err_type_id = self.get_builtin_type_id(ERROR_TYPE);
+
+            pattern = self.objs.pattern_push(Pattern {
+                type_id: err_type_id,
+                variant: PatternVariant::IgnoreMultiple,
+            });
         }
 
         let unit_type = self.get_builtin_type_id(UNIT_TYPE);
@@ -371,13 +396,9 @@ impl AST {
 
         expr_mut.type_or_module = TypeOrModule::Type(unit_type);
         expr_mut.expr_returns = ExprReturns::Unit;
-        expr_mut.finalized = finalized;
+        expr_mut.finalized = err.is_none();
 
-        if let Some(err) = err {
-            return Err(err);
-        }
-
-        Ok(pattern)
+        (pattern, err)
     }
 
     fn analyze_type_def(

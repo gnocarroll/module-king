@@ -148,6 +148,7 @@ pub enum ExprVariant {
 
 #[derive(Clone, Copy, PartialEq)]
 enum ExprReturns {
+    Error,
     Unit,
     Value,
     Type,
