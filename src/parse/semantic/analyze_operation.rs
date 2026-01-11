@@ -684,6 +684,22 @@ impl AST {
                 self.analyze_operation_period(ctx, scope, expr, operand1, operand2);
                 return;
             }
+            TokenType::Semicolon => {
+                self.analyze_expr(ctx, scope, operand1);
+                self.analyze_expr(ctx, scope, operand2);
+
+                let finalized = self.expr(operand1).finalized && self.expr(operand2).finalized;
+
+                let unit_type = self.get_builtin_type_id(UNIT_TYPE);
+
+                let expr_mut = self.objs.expr_mut(expr);
+
+                expr_mut.expr_returns = ExprReturns::Unit;
+                expr_mut.type_or_module = TypeOrModule::Type(unit_type);
+                expr_mut.finalized = finalized;
+
+                return;
+            }
             _ => (),
         }
 
