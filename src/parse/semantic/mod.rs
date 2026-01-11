@@ -547,8 +547,8 @@ impl AST {
             ExprVariant::Identifier(ident) => {
                 let name = ctx.tokens.tok_as_str(&ident.name);
 
-                if let Some(member) = self.scope_search(scope, name) {
-                    let member = self.objs.member(member);
+                if let Some(member_id) = self.scope_search(scope, name) {
+                    let member = self.objs.member(member_id);
 
                     let etype = member.type_or_module.clone();
                     
@@ -569,6 +569,7 @@ impl AST {
                     expr_mut.type_or_module = etype;
 
                     if let ExprVariant::Identifier(ident) = &mut expr_mut.variant {
+                        ident.member_id = member_id;
                         ident.variant = ident_variant;
                     }
 
