@@ -7,7 +7,7 @@ use crate::{
         operator,
         semantic::{AnalyzingNow, IsEnum, SemanticContext},
     },
-    scan::TokenType,
+    scan::TokenType, tokens::TokenOrString,
 };
 
 use operator::OperatorVariant::*;
@@ -470,6 +470,55 @@ impl AST {
                     _ => {
                         self.invalid_operation(expr, "lhs of assignment should be of form \"pattern : Type\"");
                     }
+                }
+
+                return;
+            }
+            TokenType::Is => {
+                self.analyze_expr(ctx, scope, operand2);
+
+                let name = match self.expr(operand1).variant {
+                    ExprVariant::Operation(Operation {
+                        op: TokenType::Type,
+                        operand1: Some(type_name),
+                        operand2: None,
+                    }) => {
+                        match self.expr(type_name).variant {
+                            ExprVariant::Identifier(ident) => {
+                                Some(ident.name)
+                            }
+                            _ => {
+                                self.invalid_operation(expr, "on left-hand side of \"is\" operator expected to find name of new type");
+
+                                None
+                            }
+                        }
+                    }
+                    _ => {
+                        self.invalid_operation(expr, "on left-hand side of \"is\" operator expected to find new type being declared");
+
+                        None
+                    }
+                };
+
+                let rhs = self.objs.expr(operand2);
+
+                // if type creation can be completed then do it here with helper function
+                // else record error
+
+                if let (
+                    ExprReturns::Type,
+                    TypeOrModule::Type(type_id),
+                    Some(name),
+                ) = (rhs.expr_returns, rhs.type_or_module.clone(), name) {
+                    self.scope_add_member_type_from_name_and_id(
+                        ctx,
+                        scope,
+                        TokenOrString::Token(name),
+                        type_id,
+                    );
+                } else {
+                    self.invalid_operation(expr, "creation of new type could not be completed");
                 }
 
                 return;

@@ -49,6 +49,10 @@ pub enum Type {
     Ref(TypeID),
     Ptr(TypeID),
 
+    // alias is like C/C++ typedef where compiler will not recognized it as
+    // actually separate type
+    Alias(TypeID),
+
     // lhs is type, rhs is (optional) expr
     // e.g. [Integer; 5] -> Integer, 5
     Slice((TypeID, TypeID)),
