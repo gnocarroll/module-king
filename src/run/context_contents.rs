@@ -8,23 +8,23 @@ use crate::{
     run::{ExecutionContext, error::RuntimeErrorVariant},
 };
 
-#[derive(Clone, Copy, Default, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub struct RuntimeScopeID {
     id: u32,
 }
 
-#[derive(Clone, Copy, Default, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub struct ValueID {
     id: u32,
 }
 
-#[derive(Clone, Copy, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct RuntimeReference {
     pub scope: RuntimeScopeID,
     pub value_id: ValueID,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum ValueVariant {
     Unit,
     Boolean(bool),
@@ -301,6 +301,17 @@ impl ContextObjects {
             scope,
             value_id: self.scope_instance_get(scope, member_id),
         })
+    }
+
+    // give new value to member
+    pub fn instance_set(&mut self, member_id: MemberID, new_value: Value) {
+        let scope_id = *(self.member_map.get(&member_id).expect("member not allocated"));
+
+        let scope = self.runtime_scope_mut(scope_id);
+
+        let value_id = scope.members[&member_id];
+
+        scope.value_overwrite(value_id, new_value);
     }
 
     pub fn instance_alloc(

@@ -244,9 +244,12 @@ fn eval_operation_eq(
 
     let new_value = new_value_ref.dup_in_scope(ast, ctx, assign_to_ref.scope);
 
-    ctx.objs
-        .runtime_scope_mut(assign_to_ref.scope)
-        .value_overwrite(assign_to_ref.value_id, new_value);
+    match ctx.objs.ref_get(assign_to_ref).variant {
+        ValueVariant::Identifier(member_id) => {
+            ctx.objs.instance_set(member_id, new_value);
+        }
+        _ => todo!("implement assignment to more than just simple idents")
+    }
 
     let type_id = match ast.objs.expr(expr).type_or_module {
         TypeOrModule::Type(t) => Some(t),
@@ -295,6 +298,8 @@ fn eval_operation_binary(
     let operand_refs = [eval(ast, ctx, operand1)?, eval(ast, ctx, operand2)?];
     
     if op == TokenType::Semicolon {
+        eprintln!("RHS OF SEMI: {}", operand_refs[1].to_string(ast, ctx));
+
         let unit_type = ast.get_builtin_type_id(UNIT_TYPE);
 
         return Ok(Value {
