@@ -7,7 +7,8 @@ use crate::{
         operator,
         semantic::{AnalyzingNow, IsEnum, SemanticContext},
     },
-    scan::TokenType, tokens::TokenOrString,
+    scan::TokenType,
+    tokens::TokenOrString,
 };
 
 use operator::OperatorVariant::*;
@@ -440,7 +441,10 @@ impl AST {
         };
 
         if lhs_type != err_type && rhs_type != err_type && lhs_type != rhs_type {
-            self.invalid_operation(expr, "lhs and rhs type are not the same for this assignment");
+            self.invalid_operation(
+                expr,
+                "lhs and rhs type are not the same for this assignment",
+            );
         }
     }
 
@@ -461,9 +465,7 @@ impl AST {
                 operand2: None,
             }) => {
                 match self.expr(type_name).variant {
-                    ExprVariant::Identifier(ident) => {
-                        Some(ident.name)
-                    }
+                    ExprVariant::Identifier(ident) => Some(ident.name),
                     _ => {
                         self.invalid_operation(expr, "on left-hand side of \"is\" operator expected to find name of new type");
 
@@ -472,7 +474,10 @@ impl AST {
                 }
             }
             _ => {
-                self.invalid_operation(expr, "on left-hand side of \"is\" operator expected to find new type being declared");
+                self.invalid_operation(
+                    expr,
+                    "on left-hand side of \"is\" operator expected to find new type being declared",
+                );
 
                 None
             }
@@ -483,11 +488,9 @@ impl AST {
         // if type creation can be completed then do it here with helper function
         // else record error
 
-        if let (
-            ExprReturns::Type,
-            TypeOrModule::Type(type_id),
-            Some(name),
-        ) = (rhs.expr_returns, rhs.type_or_module.clone(), name) {
+        if let (ExprReturns::Type, TypeOrModule::Type(type_id), Some(name)) =
+            (rhs.expr_returns, rhs.type_or_module.clone(), name)
+        {
             self.scope_add_member_type_from_name_and_id(
                 ctx,
                 scope,
@@ -497,6 +500,58 @@ impl AST {
         } else {
             self.invalid_operation(expr, "creation of new type could not be completed");
         }
+    }
+
+    // member access e.g. point.x
+    fn analyze_operation_period(
+        &mut self,
+        ctx: &mut SemanticContext,
+        scope: ScopeID,
+        expr: ExprID,
+        operand1: ExprID,
+        operand2: ExprID,
+    ) {
+        // analyze what is being access
+        self.analyze_expr(ctx, scope, operand1);
+
+        let operand1_struct = self.objs.expr(operand1).clone();
+
+        if !operand1_struct.finalized {
+            return;
+        }
+
+        let scope = match operand1_struct.type_or_module {
+            TypeOrModule::Module(scope) => scope,
+            TypeOrModule::Type(t) => {
+                let mut type_id = t;
+
+                let scope = loop {
+                    match self.objs.type_get(type_id) {
+                        Type::Scope(scope) => break *scope,
+                        Type::Alias(t) | Type::Ptr(t) | Type::Ref(t) => type_id = *t,
+                        _ => {
+                            self.invalid_operation(expr, "cannot access members of this type");
+                            return;
+                        }
+                    }
+                };
+
+                scope
+            }
+        };
+
+        let name = match &mut self.objs.expr_mut(operand2).variant {
+            ExprVariant::Identifier(ident) => ctx.tokens.tok_as_str(&ident.name).to_string(),
+            _ => {
+                self.invalid_operation(expr, "rhs of access should be an identifier");
+                return;
+            }
+        };
+
+        let member_id = if let Some(member_id) = self.objs.scope(scope).members.get(&name) {
+            member_id
+        } else {
+        };
     }
 
     fn analyze_operation_binary(
@@ -545,14 +600,14 @@ impl AST {
                 let type_id = if self.objs.expr(operand2).finalized {
                     match self.objs.expr(operand2).type_or_module {
                         TypeOrModule::Type(t) => Some(t),
-                        _ => None
+                        _ => None,
                     }
                 } else {
                     None
                 };
 
                 let (pattern, _) = self.pattern_matching(ctx, scope, operand1, type_id);
-                
+
                 self.scope_create_members_from_pattern(ctx, scope, pattern);
 
                 // after creation of members analyze lhs (now relevant vars should exist)
@@ -569,7 +624,8 @@ impl AST {
                 return;
             }
             TokenType::Period => {
-
+                self.analyze_operation_period(ctx, scope, expr, operand1, operand2);
+                return;
             }
             _ => (),
         }
