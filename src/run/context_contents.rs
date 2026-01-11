@@ -32,7 +32,7 @@ pub enum ValueVariant {
     Float(f64),
     String(String),
     Identifier(MemberID),
-    Record(HashMap<String, Box<Value>>),
+    Record(HashMap<String, ValueID>),
 
     Ref(RuntimeReference),
     ImplicitRef(RuntimeReference),
@@ -47,9 +47,11 @@ pub struct Value {
     pub variant: ValueVariant,
 }
 
-impl Value {
+impl RuntimeReference {
     pub fn to_string(&self, ast: &AST, ctx: &ExecutionContext) -> String {
-        match &self.variant {
+        let value = ctx.objs.ref_get(*self);
+
+        match &value.variant {
             ValueVariant::Unit => "Unit".to_string(),
             ValueVariant::Integer(val) => val.to_string(),
             ValueVariant::Float(val) => val.to_string(),
@@ -58,7 +60,15 @@ impl Value {
             ValueVariant::Record(map) => {
                 let member_strings: Vec<String> = map
                     .iter()
-                    .map(|(name, value)| format!("{}={}", name, value.to_string(ast, ctx)))
+                    .map(|(name, value_id)| {
+                        let value_string = RuntimeReference {
+                            scope: self.scope,
+                            value_id: *value_id,
+                        }
+                        .to_string(ast, ctx);
+
+                        format!("{}={}", name, value_string)
+                    })
                     .collect();
 
                 format!("({})", member_strings.join(", "))
@@ -87,11 +97,11 @@ impl Value {
                 format!("function {}", func_name_string)
             }
             ValueVariant::Identifier(member_id) => match ctx.objs.instance_get(*member_id) {
-                Some(runtime_ref) => ctx.objs.ref_get(runtime_ref).to_string(ast, ctx),
+                Some(runtime_ref) => runtime_ref.to_string(ast, ctx),
                 None => "ERR_IDENT_DNE".to_string(),
             },
             ValueVariant::Ref(runtime_ref) | ValueVariant::ImplicitRef(runtime_ref) => {
-                ctx.objs.ref_get(*runtime_ref).to_string(ast, ctx)
+                runtime_ref.to_string(ast, ctx)
             }
         }
     }
@@ -132,7 +142,7 @@ pub struct ContextObjects {
     member_map: HashMap<MemberID, RuntimeScopeID>,
 }
 
-fn type_to_value(ast: &AST, type_id: TypeID) -> Value {
+fn type_to_value_id(ast: &AST, runtime_scope: &mut RuntimeScope, type_id: TypeID) -> ValueID {
     let variant = match ast.objs.type_get(type_id) {
         Type::Scope(scope) => match &ast.objs.scope(*scope).variant {
             ScopeVariant::Type(variant) => match variant {
@@ -145,7 +155,7 @@ fn type_to_value(ast: &AST, type_id: TypeID) -> Value {
                     // filter map function will look at members of Record and for ones that are not global (i.e. shared)
                     // and are instances it will use this function type_to_value to create a corresponding value recursively
 
-                    let values: HashMap<String, Box<Value>> = ast
+                    let values: HashMap<String, ValueID> = ast
                         .objs
                         .scope(*scope)
                         .members
@@ -165,7 +175,9 @@ fn type_to_value(ast: &AST, type_id: TypeID) -> Value {
                                 TypeOrModule::Module(_) => return None,
                             };
 
-                            Some((name.clone(), Box::new(type_to_value(ast, type_id))))
+                            let value_id = type_to_value_id(ast, runtime_scope, type_id);
+
+                            Some((name.clone(), value_id))
                         })
                         .collect();
 
@@ -180,10 +192,10 @@ fn type_to_value(ast: &AST, type_id: TypeID) -> Value {
         _ => todo!("have not implemented in interpreter other sorts of types yet"),
     };
 
-    Value {
+    runtime_scope.value_push(Value {
         type_id: Some(type_id),
         variant,
-    }
+    })
 }
 
 impl ContextObjects {
@@ -248,16 +260,14 @@ impl ContextObjects {
             }
         };
 
-        let value = type_to_value(ast, type_id);
-
-        // record in member_map mapping from MemberID -> runtime id so Value
-        // can be retrieved in O(1) time in the future
-
         self.member_map.insert(member_id, scope);
 
         let scope_obj = self.runtime_scope_mut(scope);
 
-        let value_id = scope_obj.value_push(value);
+        let value_id = type_to_value_id(ast, scope_obj, type_id);
+
+        // record in member_map mapping from MemberID -> runtime id so Value
+        // can be retrieved in O(1) time in the future
 
         scope_obj.members.insert(member_id, value_id);
 

@@ -4,15 +4,10 @@ mod context_contents;
 mod error;
 mod eval_operation;
 
-use std::{collections::HashMap, fmt::Display};
-
 use crate::{
-    parse::{
-        AST, ExprVariant, TypeOrModule,
-        ast_contents::{ExprID, MemberID, ScopeID, TypeID},
-    },
+    parse::{AST, ExprVariant, TypeOrModule, ast_contents::ExprID},
     run::{
-        context_contents::{ContextObjects, RuntimeScopeID},
+        context_contents::{ContextObjects, RuntimeScopeID, Value, ValueVariant},
         error::{RuntimeError, RuntimeErrorVariant},
         eval_operation::eval_operation,
     },
