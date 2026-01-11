@@ -145,12 +145,21 @@ impl AST {
 
         let type_id = type_id.unwrap_or(err_type_id);
 
+        let mut pattern_err: Option<PatternError> = None;
+
+        if type_id == err_type_id {
+            pattern_err = Some(self.pattern_error_push(PatternError::TypeMissing(ident_expr)));
+        }
+
         match self.objs.expr(ident_expr).variant {
             ExprVariant::Identifier(ident) => {
-                return Ok(self.objs.pattern_push(Pattern {
-                    type_id: type_id,
-                    variant: PatternVariant::Ident(ident.name),
-                }));
+                return (
+                    self.objs.pattern_push(Pattern {
+                        type_id: type_id,
+                        variant: PatternVariant::Ident(ident.name),
+                    }),
+                    pattern_err,
+                );
             }
             // Tuple
             ExprVariant::Operation(Operation {
