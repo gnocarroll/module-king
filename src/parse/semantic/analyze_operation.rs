@@ -478,6 +478,25 @@ impl AST {
                     err_type
                 };
 
+                let operand2_struct = self.objs.expr(operand2).clone();
+
+                let rhs_type = if !operand2_struct.finalized {
+                    err_type
+                } else if operand2_struct.expr_returns == ExprReturns::Value {
+                    match operand2_struct.type_or_module {
+                        TypeOrModule::Type(t) => t,
+                        TypeOrModule::Module(_) => {
+                            panic!("expr returns value but Module found");
+                        }
+                    }
+                } else {
+                    err_type
+                };
+
+                if lhs_type != err_type && rhs_type != err_type && lhs_type != rhs_type {
+                    self.invalid_operation(expr, "lhs and rhs type are not the same for this assignment");
+                }
+
                 return;
             }
             TokenType::Is => {
