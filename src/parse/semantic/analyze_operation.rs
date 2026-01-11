@@ -394,6 +394,111 @@ impl AST {
         }
     }
 
+    fn analyze_operation_eq(
+        &mut self,
+        ctx: &mut SemanticContext,
+        scope: ScopeID,
+        expr: ExprID,
+        operand1: ExprID,
+        operand2: ExprID,
+    ) {
+        self.analyze_expr(ctx, scope, operand1);
+        self.analyze_expr(ctx, scope, operand2);
+
+        let err_type = self.get_builtin_type_id(ERROR_TYPE);
+
+        let operand1_struct = self.objs.expr(operand1).clone();
+
+        let lhs_type = if !operand1_struct.finalized {
+            err_type
+        } else if operand1_struct.is_var {
+            match operand1_struct.type_or_module {
+                TypeOrModule::Type(t) => t,
+                TypeOrModule::Module(_) => {
+                    self.invalid_operation(expr, "use \"is\" to assign to/create modules");
+                    err_type
+                }
+            }
+        } else {
+            self.invalid_operation(expr, "lhs of assignment should be an assignable variable");
+            err_type
+        };
+
+        let operand2_struct = self.objs.expr(operand2).clone();
+
+        let rhs_type = if !operand2_struct.finalized {
+            err_type
+        } else if operand2_struct.expr_returns == ExprReturns::Value {
+            match operand2_struct.type_or_module {
+                TypeOrModule::Type(t) => t,
+                TypeOrModule::Module(_) => {
+                    panic!("expr returns value but Module found");
+                }
+            }
+        } else {
+            err_type
+        };
+
+        if lhs_type != err_type && rhs_type != err_type && lhs_type != rhs_type {
+            self.invalid_operation(expr, "lhs and rhs type are not the same for this assignment");
+        }
+    }
+
+    fn analyze_operation_is(
+        &mut self,
+        ctx: &mut SemanticContext,
+        scope: ScopeID,
+        expr: ExprID,
+        operand1: ExprID,
+        operand2: ExprID,
+    ) {
+        self.analyze_expr(ctx, scope, operand2);
+
+        let name = match self.expr(operand1).variant {
+            ExprVariant::Operation(Operation {
+                op: TokenType::Type,
+                operand1: Some(type_name),
+                operand2: None,
+            }) => {
+                match self.expr(type_name).variant {
+                    ExprVariant::Identifier(ident) => {
+                        Some(ident.name)
+                    }
+                    _ => {
+                        self.invalid_operation(expr, "on left-hand side of \"is\" operator expected to find name of new type");
+
+                        None
+                    }
+                }
+            }
+            _ => {
+                self.invalid_operation(expr, "on left-hand side of \"is\" operator expected to find new type being declared");
+
+                None
+            }
+        };
+
+        let rhs = self.objs.expr(operand2);
+
+        // if type creation can be completed then do it here with helper function
+        // else record error
+
+        if let (
+            ExprReturns::Type,
+            TypeOrModule::Type(type_id),
+            Some(name),
+        ) = (rhs.expr_returns, rhs.type_or_module.clone(), name) {
+            self.scope_add_member_type_from_name_and_id(
+                ctx,
+                scope,
+                TokenOrString::Token(name),
+                type_id,
+            );
+        } else {
+            self.invalid_operation(expr, "creation of new type could not be completed");
+        }
+    }
+
     fn analyze_operation_binary(
         &mut self,
         ctx: &mut SemanticContext,
@@ -456,96 +561,11 @@ impl AST {
                 return;
             }
             TokenType::Eq => {
-                self.analyze_expr(ctx, scope, operand1);
-                self.analyze_expr(ctx, scope, operand2);
-
-                let err_type = self.get_builtin_type_id(ERROR_TYPE);
-
-                let operand1_struct = self.objs.expr(operand1).clone();
-
-                let lhs_type = if !operand1_struct.finalized {
-                    err_type
-                } else if operand1_struct.is_var {
-                    match operand1_struct.type_or_module {
-                        TypeOrModule::Type(t) => t,
-                        TypeOrModule::Module(_) => {
-                            self.invalid_operation(expr, "use \"is\" to assign to/create modules");
-                            err_type
-                        }
-                    }
-                } else {
-                    self.invalid_operation(expr, "lhs of assignment should be an assignable variable");
-                    err_type
-                };
-
-                let operand2_struct = self.objs.expr(operand2).clone();
-
-                let rhs_type = if !operand2_struct.finalized {
-                    err_type
-                } else if operand2_struct.expr_returns == ExprReturns::Value {
-                    match operand2_struct.type_or_module {
-                        TypeOrModule::Type(t) => t,
-                        TypeOrModule::Module(_) => {
-                            panic!("expr returns value but Module found");
-                        }
-                    }
-                } else {
-                    err_type
-                };
-
-                if lhs_type != err_type && rhs_type != err_type && lhs_type != rhs_type {
-                    self.invalid_operation(expr, "lhs and rhs type are not the same for this assignment");
-                }
-
+                self.analyze_operation_eq(ctx, scope, expr, operand1, operand2);
                 return;
             }
             TokenType::Is => {
-                self.analyze_expr(ctx, scope, operand2);
-
-                let name = match self.expr(operand1).variant {
-                    ExprVariant::Operation(Operation {
-                        op: TokenType::Type,
-                        operand1: Some(type_name),
-                        operand2: None,
-                    }) => {
-                        match self.expr(type_name).variant {
-                            ExprVariant::Identifier(ident) => {
-                                Some(ident.name)
-                            }
-                            _ => {
-                                self.invalid_operation(expr, "on left-hand side of \"is\" operator expected to find name of new type");
-
-                                None
-                            }
-                        }
-                    }
-                    _ => {
-                        self.invalid_operation(expr, "on left-hand side of \"is\" operator expected to find new type being declared");
-
-                        None
-                    }
-                };
-
-                let rhs = self.objs.expr(operand2);
-
-                // if type creation can be completed then do it here with helper function
-                // else record error
-
-                if let (
-                    ExprReturns::Type,
-                    TypeOrModule::Type(type_id),
-                    Some(name),
-                ) = (rhs.expr_returns, rhs.type_or_module.clone(), name) {
-                    self.scope_add_member_type_from_name_and_id(
-                        ctx,
-                        scope,
-                        TokenOrString::Token(name),
-                        type_id,
-                    );
-                } else {
-                    self.invalid_operation(expr, "creation of new type could not be completed");
-                }
-
+                self.analyze_operation_is(ctx, scope, expr, operand1, operand2);
                 return;
             }
             TokenType::Period => {
