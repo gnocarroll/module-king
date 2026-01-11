@@ -151,6 +151,8 @@ impl AST {
             pattern_err = Some(self.pattern_error_push(PatternError::TypeMissing(ident_expr)));
         }
 
+        let type_val = self.objs.type_get(type_id).clone();
+
         match self.objs.expr(ident_expr).variant {
             ExprVariant::Identifier(ident) => {
                 return (
@@ -169,60 +171,100 @@ impl AST {
             }) => {
                 match type_val {
                     Type::Tuple((lhs_type, rhs_type)) => {
+                        let mut lhs_type = Some(lhs_type);
+                        let mut rhs_type = rhs_type;
+
                         if !ident_has_parens {
-                            return Err(self.pattern_error_push(PatternError::ParenMismatch(ExprAndType {
+                            pattern_err = Some(self.pattern_error_push(PatternError::ParenMismatch(ExprAndType {
                                 expr: ident_expr,
                                 type_id,
                             })));
+
+                            // due to missing parentheses on lhs (non-type side) cannot match types, so replace
+                            // types with None
+
+                            lhs_type = None;
+                            rhs_type = None;
                         }
 
                         let lhs = lhs.expect("should have lhs");
                         let rhs = rhs.expect("should have rhs");
 
-                        if rhs_type.is_some() && self.objs.expr(rhs).is_unit() {
-                            return Err(self.pattern_error_push(PatternError::IdentMissing(rhs_type.expect("impossible"))));
-                        } else if rhs_type.is_none() && !self.expr(rhs).is_unit() {
-                            return Err(self.pattern_error_push(PatternError::TypeMissing(rhs)));
+                        let rhs_is_unit = self.objs.expr(rhs).is_unit();
+
+                        if rhs_type.is_some() && rhs_is_unit {
+                            pattern_err = Some(self.pattern_error_push(PatternError::IdentMissing(rhs_type.expect("impossible"))));
+                        } else if rhs_type.is_none() && !rhs_is_unit {
+                            pattern_err = Some(self.pattern_error_push(PatternError::TypeMissing(rhs)));
                         }
 
                         // first pattern match on lhs of tuple
-                        let lhs_pattern = self.pattern_matching(ctx, scope, lhs, lhs_type)?;
+                        let (lhs_pattern, err) = self.pattern_matching(ctx, scope, lhs, lhs_type);
 
-                        let rhs_pattern = if let Some(rhs_type) = rhs_type {
-                            Some(self.pattern_matching(ctx, scope, rhs, rhs_type)?)
+                        if let Some(err) = err {
+                            pattern_err = Some(err);
+                        }
+
+                        let rhs_pattern = if !rhs_is_unit {
+                            let (pattern, err) = self.pattern_matching(ctx, scope, rhs, rhs_type);
+
+                            if let Some(err) = err {
+                                pattern_err = Some(err);
+                            }
+
+                            Some(pattern)
                         } else {
                             None
                         };
 
-                        return Ok(self.objs.pattern_push(Pattern {
-                            type_id,
-                            variant: PatternVariant::Tuple((lhs_pattern, rhs_pattern)),
-                        }));
+                        return (
+                            self.objs.pattern_push(Pattern {
+                                type_id,
+                                variant: PatternVariant::Tuple((lhs_pattern, rhs_pattern)),
+                            }),
+                            pattern_err,
+                        );
                     }
                     Type::RestOfTuple((lhs_type, rhs_type)) => {
-                        if ident_has_parens {
-                            return Err(self.pattern_error_push(PatternError::ParenMismatch(ExprAndType {
-                                expr: ident_expr,
-                                type_id,
-                            })));
-                        }
-
                         let lhs = lhs.expect("should have lhs");
                         let rhs = rhs.expect("should have rhs");
 
-                        if self.objs.expr(rhs).is_unit() {
-                            return Err(PatternError::IdentMissing(rhs_type));
+                        let mut lhs_type = Some(lhs_type);
+                        let mut rhs_type = Some(rhs_type);
+
+                        if ident_has_parens {
+                            pattern_err = Some(self.pattern_error_push(PatternError::ParenMismatch(ExprAndType {
+                                expr: ident_expr,
+                                type_id,
+                            })));
+
+                            // cannot match to the types, unnecessary parens around lhs
+
+                            lhs_type = None;
+                            rhs_type = None;
+                        } else if self.objs.expr(rhs).is_unit() {
+                            pattern_err = Some(PatternError::IdentMissing(rhs_type.expect("should always be Some in this branch")));
                         }
 
                         // first pattern match on lhs of tuple
-                        let lhs_pattern = self.pattern_matching(ctx, scope, lhs, lhs_type)?;
+                        let (lhs_pattern, lhs_err) = self.pattern_matching(ctx, scope, lhs, lhs_type);
 
-                        let rhs_pattern = self.pattern_matching(ctx, scope, rhs, rhs_type)?;
+                        let (rhs_pattern, rhs_err) = self.pattern_matching(ctx, scope, rhs, rhs_type);
 
-                        return Ok(self.objs.pattern_push(Pattern {
-                            type_id,
-                            variant: PatternVariant::RestOfTuple((lhs_pattern, rhs_pattern)),
-                        }));
+                        match (lhs_err, rhs_err) {
+                            (_, Some(err)) | (Some(err), _) => {
+                                pattern_err = Some(err);
+                            }
+                            _ => (),
+                        }
+
+                        return (
+                            self.objs.pattern_push(Pattern {
+                                type_id,
+                                variant: PatternVariant::RestOfTuple((lhs_pattern, rhs_pattern)),
+                            }),
+                            pattern_err,
+                        );
                     }
                     _ => (),
                 }
@@ -230,7 +272,10 @@ impl AST {
             _ => {}
         }
 
-        Err(PatternError::MatchingUnsupported(ident_expr))
+        (
+            self.objs.pattern_push(Pattern { type_id, variant: PatternVariant::IgnoreMultiple }),
+            Some(self.pattern_error_push(PatternError::MatchingUnsupported(ident_expr))),
+        )
     }
 
     fn expected_expr_returns(
