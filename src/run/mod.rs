@@ -19,36 +19,6 @@ use crate::{
     tokens::Tokens,
 };
 
-#[derive(Clone)]
-pub enum ValueVariant {
-    Unit,
-    Boolean(bool),
-    Integer(i64),
-    Float(f64),
-    String(String),
-    Identifier(MemberID),
-    Record(HashMap<String, Box<Value>>),
-
-    // e.g. left MemberID is for a Point struct and right MemberID is for field "x"
-    Access((MemberID, MemberID)),
-    
-    Module(ScopeID),
-    Function(ExprID),
-}
-
-#[derive(Clone)]
-pub struct Value {
-    pub type_id: Option<TypeID>,
-    pub variant: ValueVariant,
-}
-
-#[derive(Default)]
-pub struct RuntimeScope {
-    pub members: HashMap<MemberID, Value>,
-
-    pub parent: RuntimeScopeID,
-}
-
 pub struct ExecutionContext<'a> {
     pub tokens: &'a Tokens<'a>,
     pub objs: ContextObjects,
