@@ -337,16 +337,19 @@ impl AST {
             err = Some(self.missing_operand(expr, 2));
         }
 
-        let mut pattern = PatternID::default();
+        let pattern: PatternID;
+        let mut type_id = self.get_builtin_type_id(ERROR_TYPE);
 
         if let (Some(ident_expr), type_expr) = (operand1, operand2) {
             let type_expr_struct = type_expr.map(|type_expr| self.objs.expr(type_expr).clone());
 
             // ensure that analyze "type expr" is actually a type
 
-            let expr_returns = type_expr_struct.as_ref().map_or(ExprReturns::Error, |type_expr_struct| {
-                type_expr_struct.expr_returns
-            });
+            let expr_returns = type_expr_struct
+                .as_ref()
+                .map_or(ExprReturns::Error, |type_expr_struct| {
+                    type_expr_struct.expr_returns
+                });
 
             let expr_returns_type = expr_returns == ExprReturns::Type;
 
@@ -354,7 +357,9 @@ impl AST {
                 err = Some(self.expected_expr_returns(expr, ExprReturns::Type, expr_returns));
             }
 
-            let type_id = if let (Some(type_expr_struct), true) = (type_expr_struct, expr_returns_type) {
+            let maybe_type_id = if let (Some(type_expr_struct), true) =
+                (type_expr_struct, expr_returns_type)
+            {
                 match type_expr_struct.type_or_module {
                     TypeOrModule::Type(t) => Some(t),
                     TypeOrModule::Module(_) => {
@@ -368,11 +373,18 @@ impl AST {
                 None
             };
 
+            // if TypeID was determined record TypeID of this expr
+
+            if let Some(t) = maybe_type_id {
+                type_id = t;
+            }
+
             // use pattern matching on our operation of the form
             // ident_expr : type
             // type_id is id of said type
 
-            let (got_pattern, pattern_err) = self.pattern_matching(ctx, scope, ident_expr, type_id);
+            let (got_pattern, pattern_err) =
+                self.pattern_matching(ctx, scope, ident_expr, maybe_type_id);
 
             pattern = got_pattern;
 
@@ -390,12 +402,11 @@ impl AST {
             });
         }
 
-        let unit_type = self.get_builtin_type_id(UNIT_TYPE);
-
         let expr_mut = self.objs.expr_mut(expr);
 
-        expr_mut.type_or_module = TypeOrModule::Type(unit_type);
-        expr_mut.expr_returns = ExprReturns::Unit;
+        expr_mut.type_or_module = TypeOrModule::Type(type_id);
+        expr_mut.expr_returns = ExprReturns::Value;
+        expr_mut.is_var = true;
         expr_mut.finalized = err.is_none();
 
         (pattern, err)

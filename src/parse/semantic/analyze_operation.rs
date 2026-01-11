@@ -1,5 +1,5 @@
 use crate::{
-    constants::BOOLEAN_TYPE,
+    constants::{BOOLEAN_TYPE, ERROR_TYPE},
     parse::{
         AST, ExprReturns, ExprVariant, Operation, ScopeVariant, Type, TypeOrModule, TypeVariant,
         ast_contents::{ExprID, ScopeID, TypeID},
@@ -459,18 +459,24 @@ impl AST {
                 self.analyze_expr(ctx, scope, operand1);
                 self.analyze_expr(ctx, scope, operand2);
 
-                match self.expr(operand1).variant {
-                    ExprVariant::Operation(Operation {
-                        op: TokenType::Colon,
-                        operand1: ident_expr,
-                        operand2: type_expr,
-                    }) => {
+                let err_type = self.get_builtin_type_id(ERROR_TYPE);
 
+                let operand1_struct = self.objs.expr(operand1).clone();
+
+                let lhs_type = if !operand1_struct.finalized {
+                    err_type
+                } else if operand1_struct.is_var {
+                    match operand1_struct.type_or_module {
+                        TypeOrModule::Type(t) => t,
+                        TypeOrModule::Module(_) => {
+                            self.invalid_operation(expr, "use \"is\" to assign to/create modules");
+                            err_type
+                        }
                     }
-                    _ => {
-                        self.invalid_operation(expr, "lhs of assignment should be of form \"pattern : Type\"");
-                    }
-                }
+                } else {
+                    self.invalid_operation(expr, "lhs of assignment should be an assignable variable");
+                    err_type
+                };
 
                 return;
             }
@@ -522,6 +528,9 @@ impl AST {
                 }
 
                 return;
+            }
+            TokenType::Period => {
+
             }
             _ => (),
         }
