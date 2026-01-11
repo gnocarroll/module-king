@@ -118,8 +118,8 @@ impl AST {
         scope: ScopeID,
         ident_expr: ExprID,
 
-        type_id: TypeID,
-    ) -> Result<PatternID, PatternError> {
+        type_id: Option<TypeID>,
+    ) -> (PatternID, Option<PatternError>) {
         let mut ident_expr = ident_expr;
 
         let mut ident_has_parens = false;
@@ -138,7 +138,12 @@ impl AST {
             _ => false,
         } {}
 
-        let type_val = self.objs.type_get(type_id).clone();
+        // ensure we always have a type ID by getting ERROR_TYPE id if no type id
+        // was passed to this function
+
+        let err_type_id = self.get_builtin_type_id(ERROR_TYPE);
+
+        let type_id = type_id.unwrap_or(err_type_id);
 
         match self.objs.expr(ident_expr).variant {
             ExprVariant::Identifier(ident) => {
