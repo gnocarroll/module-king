@@ -1,14 +1,12 @@
 use std::ops::{Add, Div, Mul, Rem, Sub};
 
 use crate::{
-    parse::{AST, Operation, TypeOrModule, ast_contents::ExprID},
-    run::{
+    constants::UNIT_TYPE, parse::{AST, Operation, TypeOrModule, ast_contents::ExprID}, run::{
         ExecutionContext, Value, ValueVariant,
         context_contents::RuntimeReference,
         error::{RuntimeError, RuntimeErrorVariant},
         eval,
-    },
-    scan::TokenType,
+    }, scan::TokenType
 };
 
 pub fn eval_operation(
@@ -131,6 +129,35 @@ fn float_cmp(ttype: TokenType) -> Option<fn(f64, f64) -> bool> {
         TokenType::BangEq => Some(|lhs, rhs| lhs != rhs),
         _ => None,
     }
+}
+
+fn allocate_instances_from_ref(
+    ast: &AST,
+    ctx: &mut ExecutionContext,
+    runtime_ref: RuntimeReference,
+) {
+    match ctx.objs.ref_get(runtime_ref).variant {
+        ValueVariant::Identifier(member_id) => {
+            ctx.objs.instance_alloc(ast, ctx.curr_scope, member_id);
+        }
+        _ => todo!("e.g. create instances from more complicated pattern"),
+    }
+}
+
+fn eval_operation_colon(
+    ast: &AST,
+    ctx: &mut ExecutionContext,
+    expr: ExprID,
+    operand1: ExprID,
+    operand2: ExprID,
+) -> Result<RuntimeReference, RuntimeError> {
+    let ret = eval(ast, ctx, operand1);
+
+    if let Ok(lhs_ref) = ret {
+        allocate_instances_from_ref(ast, ctx, lhs_ref);
+    }
+
+    ret
 }
 
 fn eval_operation_period(
@@ -259,13 +286,24 @@ fn eval_operation_binary(
 
     match op {
         // for colon lhs is identifier(s), just return them
-        TokenType::Colon => return eval(ast, ctx, operand1),
+        TokenType::Colon => return eval_operation_colon(ast, ctx, expr, operand1, operand2),
         TokenType::Period => return eval_operation_period(ast, ctx, expr, operand1, operand2),
         TokenType::Eq => return eval_operation_eq(ast, ctx, expr, operand1, operand2),
         _ => (),
     }
 
     let operand_refs = [eval(ast, ctx, operand1)?, eval(ast, ctx, operand2)?];
+    
+    if op == TokenType::Semicolon {
+        let unit_type = ast.get_builtin_type_id(UNIT_TYPE);
+
+        return Ok(Value {
+            type_id: Some(unit_type),
+            variant: ValueVariant::Unit,
+        }
+        .to_runtime_ref(ctx, ctx.curr_scope));
+    }
+    
     let operand_values = [
         ctx.objs.ref_get(operand_refs[0]),
         ctx.objs.ref_get(operand_refs[1]),

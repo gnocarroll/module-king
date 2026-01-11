@@ -1,11 +1,18 @@
 use std::collections::HashMap;
 
-use crate::{constants::ERROR_TYPE, parse::{
-    AST, Member, MemberVariant, Scope, ScopeRefersTo, ScopeVariant, TokenOrString, Type, TypeOrModule, TypeVariant, Visibility, ast_contents::{ExprID, MemberID, ScopeID, TypeID}, errors::{InvalidOperation, MissingOperand, PatternError, SemanticError}, semantic::SemanticContext
-}};
+use crate::{
+    constants::ERROR_TYPE,
+    parse::{
+        AST, Member, MemberVariant, Scope, ScopeRefersTo, ScopeVariant, TokenOrString, Type,
+        TypeOrModule, TypeVariant, Visibility,
+        ast_contents::{ExprID, MemberID, ScopeID, TypeID},
+        errors::{InvalidOperation, MissingOperand, PatternError, SemanticError},
+        semantic::SemanticContext,
+    },
+};
 
 impl AST {
-    pub fn get_builtin_type(&mut self, name: &str) -> MemberID {
+    pub fn get_builtin_type(&self, name: &str) -> MemberID {
         if let Some(member) = self.scope_search(ScopeID::default(), name) {
             if self.objs.member(member).variant != MemberVariant::Type {
                 panic!("Not a type")
@@ -17,14 +24,14 @@ impl AST {
         }
     }
 
-    pub fn pattern_error_push(&mut self, pattern_error: PatternError) -> PatternError {        
+    pub fn pattern_error_push(&mut self, pattern_error: PatternError) -> PatternError {
         self.semantic_errors
             .push(SemanticError::PatternError(pattern_error.clone()));
 
         pattern_error
     }
 
-    pub fn get_builtin_type_id(&mut self, name: &str) -> TypeID {
+    pub fn get_builtin_type_id(&self, name: &str) -> TypeID {
         let member = self.get_builtin_type(name);
 
         match self.objs.member(member).type_or_module {
@@ -82,7 +89,7 @@ impl AST {
 
     // search provided scope for a given name and received Member if said name
     // can be found, also recurse to parent if needed
-    pub fn scope_search(&mut self, scope: ScopeID, name: &str) -> Option<MemberID> {
+    pub fn scope_search(&self, scope: ScopeID, name: &str) -> Option<MemberID> {
         let mut scope = scope;
 
         loop {
@@ -106,7 +113,12 @@ impl AST {
         type_id
     }
 
-    pub fn scope_add_member(&mut self, ctx: &mut SemanticContext, scope: ScopeID, member: MemberID) {
+    pub fn scope_add_member(
+        &mut self,
+        ctx: &mut SemanticContext,
+        scope: ScopeID,
+        member: MemberID,
+    ) {
         let t_or_s = self.objs.member(member).name.clone();
 
         let member_name = match t_or_s {
@@ -120,7 +132,12 @@ impl AST {
             .insert(member_name.to_string(), member);
     }
 
-    pub fn type_create(&mut self, scope: ScopeID, name: TokenOrString, variant: TypeVariant) -> TypeID {
+    pub fn type_create(
+        &mut self,
+        scope: ScopeID,
+        name: TokenOrString,
+        variant: TypeVariant,
+    ) -> TypeID {
         let scope_id = self.objs.scope_push(Scope {
             name: Some(name.clone()),
             variant: ScopeVariant::Type(variant),
@@ -167,7 +184,7 @@ impl AST {
     ) -> TypeID {
         let type_id = if let Type::Scope(scope) = self.objs.type_get(type_id) {
             let scope_mut = self.objs.scope_mut(*scope);
-            
+
             if scope_mut.name.is_none() {
                 scope_mut.name = Some(name.clone());
 

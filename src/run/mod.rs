@@ -73,10 +73,12 @@ fn eval(ast: &AST, ctx: &mut ExecutionContext, expr: ExprID) -> Result<RuntimeRe
         }
     };
 
-    Ok(Value {
+    let ret = Value {
         type_id: Some(type_id),
         variant,
-    }.to_runtime_ref(ctx, ctx.curr_scope))
+    }.to_runtime_ref(ctx, ctx.curr_scope);
+
+    Ok(ret)
 }
 
 // central public function of this module, used to run interpreter given
