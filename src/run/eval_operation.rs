@@ -132,6 +132,53 @@ fn float_cmp(ttype: TokenType) -> Option<fn(f64, f64) -> bool> {
     }
 }
 
+fn eval_operation_period(
+    ast: &AST,
+    ctx: &mut ExecutionContext,
+    expr: ExprID,
+    operand1: ExprID,
+    operand2: ExprID,
+) -> Result<Value, RuntimeError> {
+    let value_to_access = eval(ast, ctx, operand1)?;
+
+    let member = eval(ast, ctx, operand2)?;
+
+    match (&value_to_access.variant, member.variant) {
+        (ValueVariant::Record(map), ValueVariant::Identifier(member_id)) => {
+            let name = ctx.tokens.tok_or_string_to_string(&ast.objs.member(member_id).name);
+
+            return match map.get(&name) {
+                Some(value) => Ok((**value).clone()),
+                None => Err(RuntimeError { expr, variant: RuntimeErrorVariant::InvalidOperation }),
+            }
+        }
+        (ValueVariant::Identifier(member_id), ValueVariant::Identifier(field_member_id)) => {
+            let type_id = match ast.objs.expr(expr).type_or_module {
+                TypeOrModule::Type(t) => Some(t),
+                _ => None,
+            };
+            
+            return Ok(Value {
+                type_id,
+                variant: ValueVariant::Access((*member_id, field_member_id)),
+            });
+        }
+        _ => {
+            return Err(RuntimeError { expr, variant: RuntimeErrorVariant::InvalidOperation })
+        }
+    }
+}
+
+fn eval_operation_eq(
+    ast: &AST,
+    ctx: &mut ExecutionContext,
+    expr: ExprID,
+    operand1: ExprID,
+    operand2: ExprID,
+) -> Result<Value, RuntimeError> {
+
+}
+
 fn eval_operation_binary(
     ast: &AST,
     ctx: &mut ExecutionContext,
@@ -155,6 +202,12 @@ fn eval_operation_binary(
             TypeOrModule::Module(_) => return invalid_op,
         },
     ];
+
+    match op {
+        TokenType::Period => return eval_operation_period(ast, ctx, expr, operand1, operand2),
+        TokenType::Eq => return eval_operation_eq(ast, ctx, expr, operand1, operand2),
+        _ => (),
+    }
 
     let operand_values = [eval(ast, ctx, operand1)?, eval(ast, ctx, operand2)?];
 

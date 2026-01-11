@@ -280,7 +280,17 @@ impl AST {
                     _ => (),
                 }
             }
-            _ => {}
+            _ => {
+                self.analyze_expr(ctx, scope, ident_expr);
+
+                return (
+                    self.objs.pattern_push(Pattern {
+                        type_id,
+                        variant: PatternVariant::MiscExpr(ident_expr),
+                    }),
+                    pattern_err,
+                );
+            }
         }
 
         (

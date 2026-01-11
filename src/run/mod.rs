@@ -28,6 +28,10 @@ pub enum ValueVariant {
     String(String),
     Identifier(MemberID),
     Record(HashMap<String, Box<Value>>),
+
+    // e.g. left MemberID is for a Point struct and right MemberID is for field "x"
+    Access((MemberID, MemberID)),
+    
     Module(ScopeID),
     Function(ExprID),
 }

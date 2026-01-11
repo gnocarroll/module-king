@@ -307,6 +307,9 @@ pub enum PatternVariant {
     // same as tuple really but uses []
     Slice((PatternID, Option<PatternID>)),
     RestOfSlice((PatternID, PatternID)),
+
+    // some other kind of expression is found
+    MiscExpr(ExprID),
 }
 
 // NOTE: AST is used for syntax and semantic analysis since I think
