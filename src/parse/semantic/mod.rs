@@ -353,14 +353,14 @@ impl AST {
                 // ident_expr : type
                 // type_id is id of said type
 
-                let pattern_result = self.pattern_matching(ctx, scope, ident_expr, type_id);
+                let pattern_result = self.pattern_matching(ctx, scope, ident_expr, Some(type_id));
 
                 match pattern_result {
-                    Ok(value) => {
+                    (value, None) => {
                         finalized = true;
                         pattern = value;
                     }
-                    Err(e) => err = Some(SemanticError::PatternError(e)),
+                    (_, Some(e)) => err = Some(SemanticError::PatternError(e)),
                 }
             }
         }
