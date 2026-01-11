@@ -212,7 +212,7 @@ fn eval_operation_eq(
     operand1: ExprID,
     operand2: ExprID,
 ) -> Result<RuntimeReference, RuntimeError> {
-    let assign_to_ref = eval(ast, ctx, operand2)?;
+    let assign_to_ref = eval(ast, ctx, operand1)?;
     let new_value_ref = eval(ast, ctx, operand2)?;
 
     let new_value = new_value_ref.dup_in_scope(ast, ctx, assign_to_ref.scope);

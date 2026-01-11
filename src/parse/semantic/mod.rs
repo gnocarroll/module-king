@@ -551,22 +551,31 @@ impl AST {
                     let member = self.objs.member(member);
 
                     let etype = member.type_or_module.clone();
+                    
+                    let expr_returns = match member.variant {
+                        MemberVariant::Module => ExprReturns::Module,
+                        MemberVariant::Type => ExprReturns::Type,
+                        MemberVariant::Instance => ExprReturns::Value,
+                    };
+                    
                     let ident_variant = match member.variant {
                         MemberVariant::Module => IdentifierVariant::Module,
                         MemberVariant::Type => IdentifierVariant::Type,
                         MemberVariant::Instance => IdentifierVariant::Instance,
                     };
 
-                    let expr = self.expr_mut(expr);
+                    let expr_mut = self.expr_mut(expr);
 
-                    expr.type_or_module = etype;
+                    expr_mut.type_or_module = etype;
 
-                    if let ExprVariant::Identifier(ident) = &mut expr.variant {
+                    if let ExprVariant::Identifier(ident) = &mut expr_mut.variant {
                         ident.variant = ident_variant;
                     }
 
-                    expr.is_var = true;
-                    expr.finalized = true;
+                    expr_mut.expr_returns = expr_returns;
+
+                    expr_mut.is_var = true;
+                    expr_mut.finalized = true;
                 }
             }
             ExprVariant::FunctionLiteral(_) => {

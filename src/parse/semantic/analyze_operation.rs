@@ -1,5 +1,5 @@
 use crate::{
-    constants::{BOOLEAN_TYPE, ERROR_TYPE},
+    constants::{BOOLEAN_TYPE, ERROR_TYPE, UNIT_TYPE},
     parse::{
         AST, ExprReturns, ExprVariant, IdentifierVariant, MemberVariant, Operation, ScopeVariant, Type, TypeOrModule, TypeVariant, Visibility, ast_contents::{ExprID, ScopeID, TypeID}, errors::{InvalidOperation, SemanticError}, operator, semantic::{AnalyzingNow, IsEnum, SemanticContext}
     },
@@ -33,13 +33,15 @@ impl AST {
                 }
             }
             TokenType::Colon => {
-                if let Ok(pattern) = self.analyze_instance_creation(
+                let (pattern, _) = self.analyze_instance_creation(
                     ctx,
                     scope,
                     expr,
                     operation.operand1,
                     operation.operand2,
-                ) {}
+                );
+                
+                // add param
             }
             TokenType::Eq | TokenType::ColonEq => {
                 // arg with default provided
@@ -436,12 +438,24 @@ impl AST {
             err_type
         };
 
+        let mut finalized = false;
+
         if lhs_type != err_type && rhs_type != err_type && lhs_type != rhs_type {
             self.invalid_operation(
                 expr,
                 "lhs and rhs type are not the same for this assignment",
             );
+        } else {
+            finalized = true;
         }
+
+        let unit_type = self.get_builtin_type_id(UNIT_TYPE);
+
+        let expr_mut = self.objs.expr_mut(expr);
+
+        expr_mut.expr_returns = ExprReturns::Unit;
+        expr_mut.type_or_module = TypeOrModule::Type(unit_type);
+        expr_mut.finalized = finalized;
     }
 
     fn analyze_operation_is(
