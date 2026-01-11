@@ -498,6 +498,8 @@ impl AST {
         // if type creation can be completed then do it here with helper function
         // else record error
 
+        let mut finalized = false;
+
         if let (ExprReturns::Type, TypeOrModule::Type(type_id), Some(name)) =
             (rhs.expr_returns, rhs.type_or_module.clone(), name)
         {
@@ -507,9 +509,19 @@ impl AST {
                 TokenOrString::Token(name),
                 type_id,
             );
+
+            finalized = true;
         } else {
             self.invalid_operation(expr, "creation of new type could not be completed");
         }
+
+        let unit_type = self.get_builtin_type_id(UNIT_TYPE);
+
+        let expr_mut = self.objs.expr_mut(expr);
+
+        expr_mut.expr_returns = ExprReturns::Unit;
+        expr_mut.type_or_module = TypeOrModule::Type(unit_type);
+        expr_mut.finalized = finalized;
     }
 
     // member access e.g. point.x
