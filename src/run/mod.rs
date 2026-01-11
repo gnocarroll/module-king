@@ -38,53 +38,6 @@ impl<'a> ExecutionContext<'a> {
     }
 }
 
-impl Value {
-    pub fn to_string(&self, ast: &AST, ctx: &ExecutionContext) -> String {
-        match &self.variant {
-            ValueVariant::Unit => "Unit".to_string(),
-            ValueVariant::Integer(val) => val.to_string(),
-            ValueVariant::Float(val) => val.to_string(),
-            ValueVariant::Boolean(val) => val.to_string(),
-            ValueVariant::String(s) => s.clone(),
-            ValueVariant::Record(map) => {
-                let member_strings: Vec<String> = map
-                    .iter()
-                    .map(|(name, value)| format!("{}={}", name, value.to_string(ast, ctx)))
-                    .collect();
-
-                format!("({})", member_strings.join(", "))
-            }
-            ValueVariant::Module(scope_id) => {
-                let scope = ast.objs.scope(*scope_id);
-
-                let name_string = match &scope.name {
-                    Some(tok_or_string) => ctx.tokens.tok_or_string_to_string(tok_or_string),
-                    None => "(anonymous)".to_string(),
-                };
-
-                format!("module {}", name_string)
-            }
-            ValueVariant::Function(func) => {
-                let expr = ast.objs.expr(*func);
-
-                let func_name_string = match &expr.variant {
-                    ExprVariant::FunctionLiteral(func) => match &func.name {
-                        Some(t) => ctx.tokens.tok_as_str(t),
-                        None => "(anonymous)",
-                    },
-                    _ => "ERR_EXPR_IS_NOT_FUNC",
-                };
-
-                format!("function {}", func_name_string)
-            }
-            ValueVariant::Identifier(member_id) => match ctx.objs.instance_get(*member_id) {
-                Some(value) => value.to_string(ast, ctx),
-                None => "ERR_IDENT_DNE".to_string(),
-            },
-        }
-    }
-}
-
 fn eval(ast: &AST, ctx: &mut ExecutionContext, expr: ExprID) -> Result<Value, RuntimeError> {
     // 1. get language type of expr
 

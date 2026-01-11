@@ -1,8 +1,11 @@
 use std::collections::HashMap;
 
-use crate::parse::{
-    AST, MemberVariant, ScopeVariant, Type, TypeOrModule, TypeVariant, Visibility,
-    ast_contents::{ExprID, MemberID, ScopeID, TypeID},
+use crate::{
+    parse::{
+        AST, ExprVariant, MemberVariant, ScopeVariant, Type, TypeOrModule, TypeVariant, Visibility,
+        ast_contents::{ExprID, MemberID, ScopeID, TypeID},
+    },
+    run::ExecutionContext,
 };
 
 #[derive(Clone, Copy, Default, Eq, Hash, PartialEq)]
@@ -15,6 +18,12 @@ pub struct ValueID {
     id: u32,
 }
 
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub struct RuntimeReference {
+    pub scope: RuntimeScopeID,
+    pub value_id: ValueID,
+}
+
 #[derive(Clone)]
 pub enum ValueVariant {
     Unit,
@@ -25,8 +34,8 @@ pub enum ValueVariant {
     Identifier(MemberID),
     Record(HashMap<String, Box<Value>>),
 
-    // e.g. left MemberID is for a Point struct and right MemberID is for field "x"
-    Access((MemberID, MemberID)),
+    Ref(RuntimeReference),
+    ImplicitRef(RuntimeReference),
 
     Module(ScopeID),
     Function(ExprID),
@@ -36,6 +45,56 @@ pub enum ValueVariant {
 pub struct Value {
     pub type_id: Option<TypeID>,
     pub variant: ValueVariant,
+}
+
+impl Value {
+    pub fn to_string(&self, ast: &AST, ctx: &ExecutionContext) -> String {
+        match &self.variant {
+            ValueVariant::Unit => "Unit".to_string(),
+            ValueVariant::Integer(val) => val.to_string(),
+            ValueVariant::Float(val) => val.to_string(),
+            ValueVariant::Boolean(val) => val.to_string(),
+            ValueVariant::String(s) => s.clone(),
+            ValueVariant::Record(map) => {
+                let member_strings: Vec<String> = map
+                    .iter()
+                    .map(|(name, value)| format!("{}={}", name, value.to_string(ast, ctx)))
+                    .collect();
+
+                format!("({})", member_strings.join(", "))
+            }
+            ValueVariant::Module(scope_id) => {
+                let scope = ast.objs.scope(*scope_id);
+
+                let name_string = match &scope.name {
+                    Some(tok_or_string) => ctx.tokens.tok_or_string_to_string(tok_or_string),
+                    None => "(anonymous)".to_string(),
+                };
+
+                format!("module {}", name_string)
+            }
+            ValueVariant::Function(func) => {
+                let expr = ast.objs.expr(*func);
+
+                let func_name_string = match &expr.variant {
+                    ExprVariant::FunctionLiteral(func) => match &func.name {
+                        Some(t) => ctx.tokens.tok_as_str(t),
+                        None => "(anonymous)",
+                    },
+                    _ => "ERR_EXPR_IS_NOT_FUNC",
+                };
+
+                format!("function {}", func_name_string)
+            }
+            ValueVariant::Identifier(member_id) => match ctx.objs.instance_get(*member_id) {
+                Some(runtime_ref) => ctx.objs.ref_get(runtime_ref).to_string(ast, ctx),
+                None => "ERR_IDENT_DNE".to_string(),
+            },
+            ValueVariant::Ref(runtime_ref) | ValueVariant::ImplicitRef(runtime_ref) => {
+                ctx.objs.ref_get(*runtime_ref).to_string(ast, ctx)
+            }
+        }
+    }
 }
 
 #[derive(Default)]
@@ -51,7 +110,9 @@ impl RuntimeScope {
     pub fn value_push(&mut self, value: Value) -> ValueID {
         self.values.push(value);
 
-        ValueID { id: self.values.len() as u32 - 1 }
+        ValueID {
+            id: self.values.len() as u32 - 1,
+        }
     }
 
     pub fn value(&self, value: ValueID) -> &Value {
@@ -150,17 +211,40 @@ impl ContextObjects {
         self.runtime_scope(scope).members[&member_id]
     }
 
-    pub fn instance_get(&self, member_id: MemberID) -> Option<ValueID> {
-        Some(self.scope_instance_get(*self.member_map.get(&member_id)?, member_id))
+    pub fn ref_get(&self, runtime_ref: RuntimeReference) -> &Value {
+        self.runtime_scope(runtime_ref.scope)
+            .value(runtime_ref.value_id)
     }
 
-    pub fn instance_alloc(&mut self, ast: &AST, scope: RuntimeScopeID, member_id: MemberID) {
+    pub fn ref_get_mut(&mut self, runtime_ref: RuntimeReference) -> &mut Value {
+        self.runtime_scope_mut(runtime_ref.scope)
+            .value_mut(runtime_ref.value_id)
+    }
+
+    // return scope and value for full locat
+    pub fn instance_get(&self, member_id: MemberID) -> Option<RuntimeReference> {
+        let scope = *self.member_map.get(&member_id)?;
+
+        Some(RuntimeReference {
+            scope,
+            value_id: self.scope_instance_get(scope, member_id),
+        })
+    }
+
+    pub fn instance_alloc(
+        &mut self,
+        ast: &AST,
+        scope: RuntimeScopeID,
+        member_id: MemberID,
+    ) -> RuntimeReference {
         let member = ast.objs.member(member_id);
 
         let type_id = match member.type_or_module {
             TypeOrModule::Type(t) => t,
             TypeOrModule::Module(_) => {
-                return;
+                panic!(
+                    "attempted to allocate module in interpreter, doesn't make sense/isn't supported"
+                );
             }
         };
 
@@ -173,6 +257,10 @@ impl ContextObjects {
 
         let scope_obj = self.runtime_scope_mut(scope);
 
-        scope_obj.members.insert(member_id, value);
+        let value_id = scope_obj.value_push(value);
+
+        scope_obj.members.insert(member_id, value_id);
+
+        RuntimeReference { scope, value_id }
     }
 }
