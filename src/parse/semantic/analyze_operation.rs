@@ -1,11 +1,7 @@
 use crate::{
     constants::{BOOLEAN_TYPE, ERROR_TYPE},
     parse::{
-        AST, ExprReturns, ExprVariant, Operation, ScopeVariant, Type, TypeOrModule, TypeVariant,
-        ast_contents::{ExprID, ScopeID, TypeID},
-        errors::{InvalidOperation, SemanticError},
-        operator,
-        semantic::{AnalyzingNow, IsEnum, SemanticContext},
+        AST, ExprReturns, ExprVariant, IdentifierVariant, MemberVariant, Operation, ScopeVariant, Type, TypeOrModule, TypeVariant, Visibility, ast_contents::{ExprID, ScopeID, TypeID}, errors::{InvalidOperation, SemanticError}, operator, semantic::{AnalyzingNow, IsEnum, SemanticContext}
     },
     scan::TokenType,
     tokens::TokenOrString,
@@ -549,9 +545,44 @@ impl AST {
         };
 
         let member_id = if let Some(member_id) = self.objs.scope(scope).members.get(&name) {
-            member_id
+            *member_id
         } else {
+            self.invalid_operation(expr, "member name on rhs not recognized");
+            return;
         };
+
+        match (operand1_struct.expr_returns, self.objs.member(member_id).visibility) {
+            // should only be accessing global fields through type
+            (ExprReturns::Type, Visibility::Export | Visibility::Private) => {
+                self.invalid_operation(expr, "only global fields may be accessed through type, not ones specific to an instance");
+                return;
+            }
+            _ => (),
+        }
+
+        let expr_returns = match self.objs.member(member_id).variant {
+            MemberVariant::Instance => ExprReturns::Value,
+            MemberVariant::Type => ExprReturns::Type,
+            MemberVariant::Module => ExprReturns::Module,
+        };
+
+        let type_or_module = self.objs.member(member_id).type_or_module.clone();
+
+        let expr_mut = self.objs.expr_mut(expr);
+
+        match &mut expr_mut.variant {
+            ExprVariant::Identifier(ident) => {
+                ident.member_id = member_id;
+                ident.variant = IdentifierVariant::Member;
+            }
+            _ => panic!("should have already checked that it was ident on rhs")
+        }
+
+        expr_mut.expr_returns = expr_returns;
+        expr_mut.type_or_module = type_or_module; 
+
+        expr_mut.is_var = true;
+        expr_mut.finalized = true;
     }
 
     fn analyze_operation_binary(
