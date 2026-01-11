@@ -127,6 +127,13 @@ static OP_INFO_TABLE: &[&[OperatorInfo]] = &[
             assoc: Assoc::Right,
             is_rhs_optional: false,
         },
+        // e.g. (type Point) is ...
+        OperatorInfo {
+            ttype: TokenType::Is,
+            variant: Infix,
+            assoc: Assoc::Right,
+            is_rhs_optional: false,
+        },
         OperatorInfo {
             ttype: TokenType::PipeEq,
             variant: Infix,
@@ -368,9 +375,10 @@ static OP_INFO_TABLE: &[&[OperatorInfo]] = &[
             assoc: Assoc::Right,
             is_rhs_optional: false,
         },
+        // e.g. (type Point) is ...
         OperatorInfo {
             ttype: TokenType::Type,
-            variant: PrefixAround,
+            variant: Prefix,
             assoc: Assoc::Right,
             is_rhs_optional: false,
         },

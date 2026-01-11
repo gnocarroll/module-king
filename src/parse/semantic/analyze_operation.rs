@@ -416,15 +416,18 @@ impl AST {
                 // var creation
                 // helper function will look at pairing of pattern, type
                 // e.g. (x, y) : (Float, Float)
-                if let Ok(pattern) = self.analyze_instance_creation(
+                let (pattern, _) = self.analyze_instance_creation(
                     ctx,
                     scope,
                     expr,
                     Some(operand1),
                     Some(operand2),
-                ) {
-                    self.scope_create_members_from_pattern(ctx, scope, pattern);
-                }
+                );
+
+                self.scope_create_members_from_pattern(ctx, scope, pattern);
+
+                // after creation of members analyze lhs (now relevant vars should exist)
+                self.analyze_expr(ctx, scope, operand1);
 
                 return;
             }
@@ -446,6 +449,9 @@ impl AST {
                 let (pattern, _) = self.pattern_matching(ctx, scope, operand1, type_id);
                 
                 self.scope_create_members_from_pattern(ctx, scope, pattern);
+
+                // after creation of members analyze lhs (now relevant vars should exist)
+                self.analyze_expr(ctx, scope, operand1);
 
                 return;
             }
