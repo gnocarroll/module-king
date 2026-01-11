@@ -382,6 +382,13 @@ static OP_INFO_TABLE: &[&[OperatorInfo]] = &[
             assoc: Assoc::Right,
             is_rhs_optional: false,
         },
+        // e.g. module m;
+        OperatorInfo {
+            ttype: TokenType::Module,
+            variant: Prefix,
+            assoc: Assoc::Right,
+            is_rhs_optional: false,
+        },
     ],
     &[
         OperatorInfo {

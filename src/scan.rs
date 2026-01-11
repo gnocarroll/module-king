@@ -69,6 +69,7 @@ pub enum TokenType {
     Export,
     From,
     Global,
+    Module,
 
     If,
     Then,
@@ -401,6 +402,7 @@ impl TokenType {
             Export => Text("export"),
             From => Text("from"),
             Global => Text("global"),
+            Module => Text("module"),
 
             If => Text("if"),
             Then => Text("then"),

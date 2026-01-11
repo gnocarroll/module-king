@@ -608,20 +608,6 @@ impl AST {
             return;
         }
 
-        match operation.op {
-            TokenType::Type => {
-                self.analyze_type_def(
-                    ctx,
-                    scope,
-                    expr,
-                    operation.operand1.expect("typedef missing lhs"),
-                    operation.operand2.expect("typedef missing rhs"),
-                );
-                return;
-            }
-            _ => (),
-        }
-
         // Now take care of most general cases of operations
 
         match (operation.operand1, operation.operand2) {

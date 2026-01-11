@@ -421,12 +421,6 @@ impl AST {
                 Some((_, r_bp)) => {
                     tokens.next();
 
-                    // for typedef (the Type operator) next token must be identifier
-                    if tok.ttype == TokenType::Type && tokens.peek().ttype != TokenType::Identifier
-                    {
-                        return self.expr_kwtype(tok_idx);
-                    }
-
                     let lhs = self.parse_expr(tokens);
 
                     let mut found_end = false;

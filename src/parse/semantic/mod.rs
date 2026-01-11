@@ -381,7 +381,7 @@ impl AST {
             }
         } else {
             // return dummy pattern
-            
+
             let err_type_id = self.get_builtin_type_id(ERROR_TYPE);
 
             pattern = self.objs.pattern_push(Pattern {
@@ -399,16 +399,6 @@ impl AST {
         expr_mut.finalized = err.is_none();
 
         (pattern, err)
-    }
-
-    fn analyze_type_def(
-        &mut self,
-        ctx: &mut SemanticContext,
-        scope: ScopeID,
-        expr: ExprID,
-        name: ExprID,
-        value: ExprID,
-    ) {
     }
 
     fn semantic_analyze_func(&mut self, ctx: &mut SemanticContext, scope: ScopeID, expr: ExprID) {
