@@ -7,7 +7,7 @@ mod eval_operation;
 use crate::{
     parse::{AST, ExprVariant, TypeOrModule, ast_contents::ExprID},
     run::{
-        context_contents::{ContextObjects, RuntimeScopeID, Value, ValueVariant},
+        context_contents::{ContextObjects, RuntimeReference, RuntimeScopeID, Value, ValueVariant},
         error::{RuntimeError, RuntimeErrorVariant},
         eval_operation::eval_operation,
     },
@@ -33,7 +33,7 @@ impl<'a> ExecutionContext<'a> {
     }
 }
 
-fn eval(ast: &AST, ctx: &mut ExecutionContext, expr: ExprID) -> Result<Value, RuntimeError> {
+fn eval(ast: &AST, ctx: &mut ExecutionContext, expr: ExprID) -> Result<RuntimeReference, RuntimeError> {
     // 1. get language type of expr
 
     let type_id = match ast.objs.expr(expr).type_or_module {
@@ -42,7 +42,7 @@ fn eval(ast: &AST, ctx: &mut ExecutionContext, expr: ExprID) -> Result<Value, Ru
             return Ok(Value {
                 type_id: None,
                 variant: ValueVariant::Module(scope),
-            });
+            }.to_runtime_ref(ctx, ctx.curr_scope));
         }
     };
 
@@ -76,7 +76,7 @@ fn eval(ast: &AST, ctx: &mut ExecutionContext, expr: ExprID) -> Result<Value, Ru
     Ok(Value {
         type_id: Some(type_id),
         variant,
-    })
+    }.to_runtime_ref(ctx, ctx.curr_scope))
 }
 
 // central public function of this module, used to run interpreter given

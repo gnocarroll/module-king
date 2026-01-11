@@ -47,6 +47,12 @@ pub struct Value {
     pub variant: ValueVariant,
 }
 
+impl Value {
+    pub fn to_runtime_ref(self, ctx: &mut ExecutionContext, scope: RuntimeScopeID) -> RuntimeReference {
+        RuntimeReference { scope, value_id: ctx.objs.runtime_scope_mut(scope).value_push(self) }
+    }
+}
+
 impl RuntimeReference {
     pub fn to_string(&self, ast: &AST, ctx: &ExecutionContext) -> String {
         let value = ctx.objs.ref_get(*self);

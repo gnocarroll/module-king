@@ -10,4 +10,6 @@ pub enum RuntimeErrorVariant {
     NotImplemented,
     InvalidOperation,
     RootExprMissing,
+    MemberDNE,
+    BadIdent,
 }

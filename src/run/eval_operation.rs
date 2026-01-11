@@ -1,12 +1,10 @@
 use std::ops::{Add, Div, Mul, Rem, Sub};
 
 use crate::{
-    parse::{
-        AST, ExprVariant, Operation, TypeOrModule,
-        ast_contents::{ExprID, TypeID},
-    },
+    parse::{AST, Operation, TypeOrModule, ast_contents::ExprID},
     run::{
         ExecutionContext, Value, ValueVariant,
+        context_contents::RuntimeReference,
         error::{RuntimeError, RuntimeErrorVariant},
         eval,
     },
@@ -18,7 +16,7 @@ pub fn eval_operation(
     ctx: &mut ExecutionContext,
     expr: ExprID,
     operation: Operation,
-) -> Result<Value, RuntimeError> {
+) -> Result<RuntimeReference, RuntimeError> {
     match (operation.operand1, operation.operand2) {
         (Some(operand), None) => eval_operation_unary(ast, ctx, expr, operation.op, operand),
         (Some(operand1), Some(operand2)) => {
@@ -37,7 +35,7 @@ fn eval_operation_unary(
     expr: ExprID,
     op: TokenType,
     operand: ExprID,
-) -> Result<Value, RuntimeError> {
+) -> Result<RuntimeReference, RuntimeError> {
     let invalid_op = Err(RuntimeError {
         expr,
         variant: RuntimeErrorVariant::InvalidOperation,
@@ -49,13 +47,15 @@ fn eval_operation_unary(
             return invalid_op;
         }
     };
-    let operand_value = eval(ast, ctx, operand)?;
+
+    let operand_ref = eval(ast, ctx, operand)?;
+    let operand_value = ctx.objs.ref_get(operand_ref);
 
     let ret = match (op, &operand_value.variant) {
         // unary +
         (TokenType::Plus, ValueVariant::Integer(_) | ValueVariant::Float(_)) => {
             // no-op
-            return Ok(operand_value);
+            return Ok(operand_ref);
         }
 
         // unary -
@@ -71,7 +71,8 @@ fn eval_operation_unary(
     Ok(Value {
         type_id: Some(type_id),
         variant: ret,
-    })
+    }
+    .to_runtime_ref(ctx, ctx.curr_scope))
 }
 
 fn integer_op(ttype: TokenType) -> Option<fn(i64, i64) -> i64> {
@@ -138,33 +139,54 @@ fn eval_operation_period(
     expr: ExprID,
     operand1: ExprID,
     operand2: ExprID,
-) -> Result<Value, RuntimeError> {
-    let value_to_access = eval(ast, ctx, operand1)?;
+) -> Result<RuntimeReference, RuntimeError> {
+    let value_ref = eval(ast, ctx, operand1)?;
+    let member_ref = eval(ast, ctx, operand2)?;
 
-    let member = eval(ast, ctx, operand2)?;
+    let value_to_access = ctx.objs.ref_get(value_ref);
+    let member = ctx.objs.ref_get(member_ref);
 
-    match (&value_to_access.variant, member.variant) {
+    match (&value_to_access.variant, &member.variant) {
         (ValueVariant::Record(map), ValueVariant::Identifier(member_id)) => {
-            let name = ctx.tokens.tok_or_string_to_string(&ast.objs.member(member_id).name);
+            let name = ctx
+                .tokens
+                .tok_or_string_to_string(&ast.objs.member(*member_id).name);
 
             return match map.get(&name) {
-                Some(value) => Ok((**value).clone()),
-                None => Err(RuntimeError { expr, variant: RuntimeErrorVariant::InvalidOperation }),
-            }
+                Some(value_id) => Ok(RuntimeReference { scope: ctx.curr_scope, value_id: *value_id }),
+                None => Err(RuntimeError {
+                    expr,
+                    variant: RuntimeErrorVariant::InvalidOperation,
+                }),
+            };
         }
         (ValueVariant::Identifier(member_id), ValueVariant::Identifier(field_member_id)) => {
-            let type_id = match ast.objs.expr(expr).type_or_module {
-                TypeOrModule::Type(t) => Some(t),
-                _ => None,
+            let runtime_ref = match ctx.objs.instance_get(*member_id) {
+                Some(r) => r,
+                None => {
+                    return Err(RuntimeError { expr, variant: RuntimeErrorVariant::MemberDNE });
+                },
             };
-            
-            return Ok(Value {
-                type_id,
-                variant: ValueVariant::Access((*member_id, field_member_id)),
-            });
+
+            let name = ctx.tokens.tok_or_string_to_string(&ast.objs.member(*field_member_id).name);
+
+            let value_id = *match &ctx.objs.ref_get(runtime_ref).variant {
+                ValueVariant::Record(map) => match map.get(&name) {
+                    Some(id) => id,
+                    None => {
+                        return Err(RuntimeError { expr, variant: RuntimeErrorVariant::BadIdent });
+                    }
+                }
+                _ => panic!(),
+            };
+
+            return Ok(RuntimeReference { scope: ctx.curr_scope, value_id });
         }
         _ => {
-            return Err(RuntimeError { expr, variant: RuntimeErrorVariant::InvalidOperation })
+            return Err(RuntimeError {
+                expr,
+                variant: RuntimeErrorVariant::InvalidOperation,
+            });
         }
     }
 }
@@ -175,8 +197,7 @@ fn eval_operation_eq(
     expr: ExprID,
     operand1: ExprID,
     operand2: ExprID,
-) -> Result<Value, RuntimeError> {
-
+) -> Result<RuntimeReference, RuntimeError> {
 }
 
 fn eval_operation_binary(
@@ -186,7 +207,7 @@ fn eval_operation_binary(
     op: TokenType,
     operand1: ExprID,
     operand2: ExprID,
-) -> Result<Value, RuntimeError> {
+) -> Result<RuntimeReference, RuntimeError> {
     let invalid_op = Err(RuntimeError {
         expr,
         variant: RuntimeErrorVariant::InvalidOperation,
@@ -209,7 +230,8 @@ fn eval_operation_binary(
         _ => (),
     }
 
-    let operand_values = [eval(ast, ctx, operand1)?, eval(ast, ctx, operand2)?];
+    let operand_refs = [eval(ast, ctx, operand1)?, eval(ast, ctx, operand2)?];
+    let operand_values = [ctx.objs.ref_get(operand_refs[0]), ctx.objs.ref_get(operand_refs[1])];
 
     let ret = match (&operand_values[0].variant, &operand_values[1].variant) {
         (ValueVariant::Integer(lhs), ValueVariant::Integer(rhs)) => {
@@ -238,5 +260,5 @@ fn eval_operation_binary(
     Ok(Value {
         type_id: Some(type_ids[0]),
         variant: ret,
-    })
+    }.to_runtime_ref(ctx, ctx.curr_scope))
 }
