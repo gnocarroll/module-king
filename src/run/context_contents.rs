@@ -5,7 +5,7 @@ use crate::{
         AST, ExprVariant, MemberVariant, ScopeVariant, Type, TypeOrModule, TypeVariant, Visibility,
         ast_contents::{ExprID, MemberID, ScopeID, TypeID},
     },
-    run::ExecutionContext,
+    run::{ExecutionContext, error::RuntimeErrorVariant},
 };
 
 #[derive(Clone, Copy, Default, Eq, Hash, PartialEq)]
@@ -48,8 +48,15 @@ pub struct Value {
 }
 
 impl Value {
-    pub fn to_runtime_ref(self, ctx: &mut ExecutionContext, scope: RuntimeScopeID) -> RuntimeReference {
-        RuntimeReference { scope, value_id: ctx.objs.runtime_scope_mut(scope).value_push(self) }
+    pub fn to_runtime_ref(
+        self,
+        ctx: &mut ExecutionContext,
+        scope: RuntimeScopeID,
+    ) -> RuntimeReference {
+        RuntimeReference {
+            scope,
+            value_id: ctx.objs.runtime_scope_mut(scope).value_push(self),
+        }
     }
 }
 
@@ -111,6 +118,48 @@ impl RuntimeReference {
             }
         }
     }
+
+    pub fn dup_in_scope(
+        &self,
+        ast: &AST,
+        ctx: &mut ExecutionContext,
+        target_scope: RuntimeScopeID,
+    ) -> Value {
+        let value = ctx.objs.ref_get(*self).clone();
+
+        let new_value = match &value.variant {
+            ValueVariant::Unit
+            | ValueVariant::Float(_)
+            | ValueVariant::Boolean(_)
+            | ValueVariant::Integer(_)
+            | ValueVariant::Module(_)
+            | ValueVariant::ImplicitRef(_)
+            | ValueVariant::Ref(_)
+            | ValueVariant::String(_)
+            | ValueVariant::Function(_) => value,
+            ValueVariant::Identifier(ident) => {
+                return ctx
+                    .objs
+                    .instance_get(*ident)
+                    .expect("should have been alloced")
+                    .dup_in_scope(ast, ctx, target_scope);
+            }
+            ValueVariant::Record(map) => {
+                let new_map: HashMap<String, ValueID> = map.iter().map(|(name, value_id)| {
+                    let new_value = RuntimeReference {
+                        scope: self.scope,
+                        value_id: *value_id,
+                    }.dup_in_scope(ast, ctx, target_scope);
+
+                    (name.clone(), ctx.objs.runtime_scope_mut(target_scope).value_push(new_value))
+                }).collect();
+
+                Value { type_id: value.type_id, variant: ValueVariant::Record(new_map) }
+            }
+        };
+
+        new_value
+    }
 }
 
 #[derive(Default)]
@@ -137,6 +186,11 @@ impl RuntimeScope {
 
     pub fn value_mut(&mut self, value: ValueID) -> &mut Value {
         &mut self.values[value.id as usize]
+    }
+
+    // ret new value
+    pub fn value_overwrite(&mut self, value_id: ValueID, new_value: Value) {
+        self.values[value_id.id as usize] = new_value;
     }
 }
 

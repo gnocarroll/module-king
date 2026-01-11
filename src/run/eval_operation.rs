@@ -153,7 +153,10 @@ fn eval_operation_period(
                 .tok_or_string_to_string(&ast.objs.member(*member_id).name);
 
             return match map.get(&name) {
-                Some(value_id) => Ok(RuntimeReference { scope: ctx.curr_scope, value_id: *value_id }),
+                Some(value_id) => Ok(RuntimeReference {
+                    scope: ctx.curr_scope,
+                    value_id: *value_id,
+                }),
                 None => Err(RuntimeError {
                     expr,
                     variant: RuntimeErrorVariant::InvalidOperation,
@@ -164,23 +167,34 @@ fn eval_operation_period(
             let runtime_ref = match ctx.objs.instance_get(*member_id) {
                 Some(r) => r,
                 None => {
-                    return Err(RuntimeError { expr, variant: RuntimeErrorVariant::MemberDNE });
-                },
+                    return Err(RuntimeError {
+                        expr,
+                        variant: RuntimeErrorVariant::MemberDNE,
+                    });
+                }
             };
 
-            let name = ctx.tokens.tok_or_string_to_string(&ast.objs.member(*field_member_id).name);
+            let name = ctx
+                .tokens
+                .tok_or_string_to_string(&ast.objs.member(*field_member_id).name);
 
             let value_id = *match &ctx.objs.ref_get(runtime_ref).variant {
                 ValueVariant::Record(map) => match map.get(&name) {
                     Some(id) => id,
                     None => {
-                        return Err(RuntimeError { expr, variant: RuntimeErrorVariant::BadIdent });
+                        return Err(RuntimeError {
+                            expr,
+                            variant: RuntimeErrorVariant::BadIdent,
+                        });
                     }
-                }
+                },
                 _ => panic!(),
             };
 
-            return Ok(RuntimeReference { scope: ctx.curr_scope, value_id });
+            return Ok(RuntimeReference {
+                scope: ctx.curr_scope,
+                value_id,
+            });
         }
         _ => {
             return Err(RuntimeError {
@@ -198,6 +212,25 @@ fn eval_operation_eq(
     operand1: ExprID,
     operand2: ExprID,
 ) -> Result<RuntimeReference, RuntimeError> {
+    let assign_to_ref = eval(ast, ctx, operand2)?;
+    let new_value_ref = eval(ast, ctx, operand2)?;
+
+    let new_value = new_value_ref.dup_in_scope(ast, ctx, assign_to_ref.scope);
+
+    ctx.objs
+        .runtime_scope_mut(assign_to_ref.scope)
+        .value_overwrite(assign_to_ref.value_id, new_value);
+
+    let type_id = match ast.objs.expr(expr).type_or_module {
+        TypeOrModule::Type(t) => Some(t),
+        TypeOrModule::Module(_) => panic!("eq operation should have type, not be a module"),
+    };
+
+    Ok(Value {
+        type_id,
+        variant: ValueVariant::Unit,
+    }
+    .to_runtime_ref(ctx, ctx.curr_scope))
 }
 
 fn eval_operation_binary(
@@ -225,13 +258,18 @@ fn eval_operation_binary(
     ];
 
     match op {
+        // for colon lhs is identifier(s), just return them
+        TokenType::Colon => return eval(ast, ctx, operand1),
         TokenType::Period => return eval_operation_period(ast, ctx, expr, operand1, operand2),
         TokenType::Eq => return eval_operation_eq(ast, ctx, expr, operand1, operand2),
         _ => (),
     }
 
     let operand_refs = [eval(ast, ctx, operand1)?, eval(ast, ctx, operand2)?];
-    let operand_values = [ctx.objs.ref_get(operand_refs[0]), ctx.objs.ref_get(operand_refs[1])];
+    let operand_values = [
+        ctx.objs.ref_get(operand_refs[0]),
+        ctx.objs.ref_get(operand_refs[1]),
+    ];
 
     let ret = match (&operand_values[0].variant, &operand_values[1].variant) {
         (ValueVariant::Integer(lhs), ValueVariant::Integer(rhs)) => {
@@ -260,5 +298,6 @@ fn eval_operation_binary(
     Ok(Value {
         type_id: Some(type_ids[0]),
         variant: ret,
-    }.to_runtime_ref(ctx, ctx.curr_scope))
+    }
+    .to_runtime_ref(ctx, ctx.curr_scope))
 }
