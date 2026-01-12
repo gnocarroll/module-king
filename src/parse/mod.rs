@@ -347,7 +347,7 @@ impl AST {
         for err in &self.semantic_errors {
             match err {
                 SemanticError::InvalidOperation(invalid_op) => {
-                    eprintln!("invalid op");
+                    eprintln!("invalid op: {}", invalid_op.msg);
                 }
                 _ => {
                     eprintln!("Displaying not implemented for this kind of semantic error.")
