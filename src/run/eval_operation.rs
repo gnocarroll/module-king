@@ -2,12 +2,37 @@ use std::ops::{Add, Div, Mul, Rem, Sub};
 
 use crate::{
     constants::UNIT_TYPE, parse::{AST, Operation, TypeOrModule, ast_contents::ExprID}, run::{
-        ExecutionContext, Value, ValueVariant,
-        context_contents::RuntimeReference,
-        error::{RuntimeError, RuntimeErrorVariant},
-        eval,
+        self, ExecutionContext, Value, ValueVariant, context_contents::RuntimeReference, error::{RuntimeError, RuntimeErrorVariant}, eval
     }, scan::TokenType
 };
+
+
+pub fn eval_eager(
+    _ast: &AST,
+    ctx: &mut ExecutionContext,
+    runtime_ref: RuntimeReference,
+) -> Result<RuntimeReference, RuntimeError> {
+    let mut runtime_ref = runtime_ref;
+
+    loop {
+        match ctx.objs.ref_get(runtime_ref).variant {
+            ValueVariant::Unit
+            | ValueVariant::Boolean(_)
+            | ValueVariant::Float(_)
+            | ValueVariant::Function(_)
+            | ValueVariant::Integer(_)
+            | ValueVariant::Module(_)
+            | ValueVariant::Record(_)
+            | ValueVariant::String(_) => return Ok(runtime_ref),
+            ValueVariant::Identifier(ident) => {
+                return Ok(ctx.objs.instance_get(ident).expect("MEMBER NOT ALLOCATED"));
+            }
+            ValueVariant::Ref(r) | ValueVariant::ImplicitRef(r) => {
+                runtime_ref = r;
+            }
+        }
+    }
+}
 
 pub fn eval_operation(
     ast: &AST,
@@ -47,6 +72,9 @@ fn eval_operation_unary(
     };
 
     let operand_ref = eval(ast, ctx, operand)?;
+
+    let operand_ref = eval_eager(ast, ctx, operand_ref)?;
+
     let operand_value = ctx.objs.ref_get(operand_ref);
 
     let ret = match (op, &operand_value.variant) {
@@ -309,6 +337,14 @@ fn eval_operation_binary(
         .to_runtime_ref(ctx, ctx.curr_scope));
     }
     
+    // eagerly evaluate LHS, RHS before performing operation so e.g.
+    // if one side is a var we will get the value
+
+    let operand_refs = [
+        eval_eager(ast, ctx, operand_refs[0])?,
+        eval_eager(ast, ctx, operand_refs[1])?,
+    ];
+
     let operand_values = [
         ctx.objs.ref_get(operand_refs[0]),
         ctx.objs.ref_get(operand_refs[1]),
