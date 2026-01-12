@@ -260,6 +260,39 @@ fn eval_operation_period(
     }
 }
 
+fn do_assignment(
+    ast: &AST,
+    ctx: &mut ExecutionContext,
+    assign_to_ref: RuntimeReference,
+    new_value_ref: RuntimeReference,
+) {
+    let new_value = new_value_ref.dup_in_scope(ast, ctx, assign_to_ref.scope);
+
+    match ctx.objs.ref_get(assign_to_ref).variant {
+        ValueVariant::Identifier(member_id) => {
+            ctx.objs.instance_set(member_id, new_value);
+        }
+        _ => todo!("implement assignment to more than just simple idents")
+    }
+}
+
+fn expr_to_unit(
+    ast: &AST,
+    ctx: &mut ExecutionContext,
+    expr: ExprID,
+) -> RuntimeReference {
+    let type_id = match ast.objs.expr(expr).type_or_module {
+        TypeOrModule::Type(t) => Some(t),
+        TypeOrModule::Module(_) => panic!("eq operation should have type, not be a module"),
+    };
+
+    Value {
+        type_id,
+        variant: ValueVariant::Unit,
+    }
+    .to_runtime_ref(ctx, ctx.curr_scope)
+}
+
 fn eval_operation_eq(
     ast: &AST,
     ctx: &mut ExecutionContext,
@@ -270,25 +303,9 @@ fn eval_operation_eq(
     let assign_to_ref = eval(ast, ctx, operand1)?;
     let new_value_ref = eval(ast, ctx, operand2)?;
 
-    let new_value = new_value_ref.dup_in_scope(ast, ctx, assign_to_ref.scope);
+    do_assignment(ast, ctx, assign_to_ref, new_value_ref);
 
-    match ctx.objs.ref_get(assign_to_ref).variant {
-        ValueVariant::Identifier(member_id) => {
-            ctx.objs.instance_set(member_id, new_value);
-        }
-        _ => todo!("implement assignment to more than just simple idents")
-    }
-
-    let type_id = match ast.objs.expr(expr).type_or_module {
-        TypeOrModule::Type(t) => Some(t),
-        TypeOrModule::Module(_) => panic!("eq operation should have type, not be a module"),
-    };
-
-    Ok(Value {
-        type_id,
-        variant: ValueVariant::Unit,
-    }
-    .to_runtime_ref(ctx, ctx.curr_scope))
+    Ok(expr_to_unit(ast, ctx, expr))
 }
 
 fn eval_operation_binary(
@@ -319,7 +336,27 @@ fn eval_operation_binary(
         // for colon lhs is identifier(s), just return them
         TokenType::Colon => return eval_operation_colon(ast, ctx, expr, operand1, operand2),
         TokenType::Period => return eval_operation_period(ast, ctx, expr, operand1, operand2),
+
+        // currently same code can be used for Eq, ColonEq
         TokenType::Eq => return eval_operation_eq(ast, ctx, expr, operand1, operand2),
+        TokenType::ColonEq => {
+            let lhs =  eval(ast, ctx, operand1)?;
+
+            match ctx.objs.ref_get(lhs).variant {
+                ValueVariant::Identifier(member_id) => {
+                    ctx.objs.instance_alloc(ast, ctx.curr_scope, member_id);
+
+                    let rhs = eval(ast, ctx, operand2)?;
+
+                    do_assignment(ast, ctx, lhs, rhs);
+                }
+                _ => todo!("other assignment"),
+            }
+
+            return Ok(expr_to_unit(ast, ctx, expr));
+        }
+
+        // other case
         _ => (),
     }
 
