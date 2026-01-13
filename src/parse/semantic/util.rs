@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    constants::ERROR_TYPE,
+    constants::{ERROR_TYPE, UNIT_TYPE},
     parse::{
         AST, ExprReturns, ExprVariant, Member, MemberVariant, Scope, ScopeRefersTo, ScopeVariant, TokenOrString, Type, TypeOrModule, TypeVariant, Visibility, ast_contents::{ExprID, MemberID, ScopeID, TypeID}, errors::{InvalidOperation, MissingOperand, PatternError, SemanticError}, semantic::SemanticContext
     },
@@ -83,10 +83,20 @@ impl AST {
         member_id
     }
 
+    pub fn set_expr_returns_unit(&mut self, ctx: &mut SemanticContext, expr: ExprID) {
+        let unit_type = self.get_builtin_type_id(UNIT_TYPE);
+
+        let expr_mut = self.objs.expr_mut(expr);
+
+        expr_mut.expr_returns = ExprReturns::Unit;
+        expr_mut.type_or_module = TypeOrModule::Type(unit_type);
+    }
+
     // utility function get ID of current return type
     // (so assumption is that function is being analyzed)
     pub fn get_curr_return_type(&mut self, ctx: &mut SemanticContext) -> TypeID {
         let err_type = self.get_builtin_type_id(ERROR_TYPE);
+        let unit_type = self.get_builtin_type_id(UNIT_TYPE);
         
         // calling this function without current func or current func is malformed
         // is reason enough to just kill the program, so err_type will only be returned
@@ -108,7 +118,11 @@ impl AST {
                 // here we did get all the way to return type expr but it is either not finalized
                 // or is not a type itself and thus return error type from here
 
-                if !ret_type.finalized || ret_type.expr_returns != ExprReturns::Type {
+                if !ret_type.finalized {
+                    return err_type;
+                } else if ret_type.expr_returns == ExprReturns::Unit {
+                    return unit_type;
+                } else if ret_type.expr_returns != ExprReturns::Type {
                     return err_type;
                 }
 

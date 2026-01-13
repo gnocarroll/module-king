@@ -1,3 +1,5 @@
+use std::f32::consts::E;
+
 use crate::{
     constants::{BOOLEAN_TYPE, ERROR_TYPE, UNIT_TYPE},
     parse::{
@@ -201,10 +203,6 @@ impl AST {
                 self.invalid_operation(expr, "unary operation may not be applied to a module");
                 return;
             }
-            ExprReturns::Unit => {
-                self.invalid_operation(expr, "unary operation may not be applied to Unit");
-                return;
-            }
             ExprReturns::Type => {
                 let type_id = match op {
                     TokenType::Star => self.objs.type_push(Type::Ptr(operand_type)),
@@ -351,6 +349,41 @@ impl AST {
 
                 expr_mut.type_or_module = TypeOrModule::Type(boolean_type);
                 expr_mut.expr_returns = ExprReturns::Value;
+                expr_mut.finalized = true;
+
+                return;
+            }
+            TokenType::Return => {
+                if ctx.curr_func.is_none() {
+                    self.invalid_operation(expr, "cannot have return expression outside of any function");
+                    return;
+                }
+
+                let err_type = self.get_builtin_type_id(ERROR_TYPE);
+                let curr_ret_type = self.get_curr_return_type(ctx);
+
+                if curr_ret_type == err_type {
+                    return;
+                }
+
+                if curr_ret_type != operand_type {
+                    self.invalid_operation(expr, "type of return operand must match function return type");
+                    return;
+                }
+
+                self.set_expr_returns_unit(ctx, expr);
+
+                let expr_mut = self.objs.expr_mut(expr);
+
+                expr_mut.finalized = true;
+
+                return;
+            }
+            TokenType::Begin => {
+                self.set_expr_returns_unit(ctx, expr);
+
+                let expr_mut = self.objs.expr_mut(expr);
+
                 expr_mut.finalized = true;
 
                 return;

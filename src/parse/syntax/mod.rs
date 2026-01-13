@@ -216,7 +216,7 @@ impl AST {
             );
 
             // if body of function is block expr check for desired terminating token
-            // (name in case of named function, otherwise keyword "function")
+            // (keyword "function")
 
             let success = match ast.expr(body).variant {
                 ExprVariant::Operation(Operation {
@@ -273,7 +273,7 @@ impl AST {
 
         self.expr_push(Expr {
             tok: tok_idx,
-            end_tok: tokens.idx(), // TODO: correct
+            end_tok: tokens.idx(),
             variant: ExprVariant::FunctionLiteral(FunctionLiteral {
                 name: name,
                 params: params,
