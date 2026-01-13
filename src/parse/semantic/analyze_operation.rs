@@ -123,13 +123,15 @@ impl AST {
                 }
             }
             TokenType::Colon => {
-                self.analyze_instance_creation(
+                let (pattern, _) = self.analyze_instance_creation(
                     ctx,
                     scope,
                     expr,
                     operation.operand1,
                     operation.operand2,
                 );
+
+                self.scope_create_members_from_pattern(ctx, scope, pattern);
             }
             _ => {}
         }
@@ -466,7 +468,11 @@ impl AST {
         operand1: ExprID,
         operand2: ExprID,
     ) {
+        let old_analyzing_now = ctx.analyzing_now;
+
+        ctx.analyzing_now = AnalyzingNow::Type;
         self.analyze_expr(ctx, scope, operand2);
+        ctx.analyzing_now = old_analyzing_now;
 
         let name = match self.expr(operand1).variant {
             ExprVariant::Operation(Operation {
@@ -542,7 +548,7 @@ impl AST {
             return;
         }
 
-        let scope = match operand1_struct.type_or_module {
+        let type_scope = match operand1_struct.type_or_module {
             TypeOrModule::Module(scope) => scope,
             TypeOrModule::Type(t) => {
                 let mut type_id = t;
@@ -570,12 +576,22 @@ impl AST {
             }
         };
 
-        let member_id = if let Some(member_id) = self.objs.scope(scope).members.get(&name) {
+        let member_id = if let Some(member_id) = self.objs.scope(type_scope).members.get(&name) {
             *member_id
         } else {
             self.invalid_operation(expr, "member name on rhs not recognized");
             return;
         };
+
+        // set MemberID and variant of rhs of period
+
+        match &mut self.objs.expr_mut(operand2).variant {
+            ExprVariant::Identifier(ident) => {
+                ident.member_id = member_id;
+                ident.variant = IdentifierVariant::Member;
+            }
+            _ => panic!("should have already checked that it was ident on rhs")
+        }
 
         match (operand1_struct.expr_returns, self.objs.member(member_id).visibility) {
             // should only be accessing global fields through type
@@ -595,14 +611,6 @@ impl AST {
         let type_or_module = self.objs.member(member_id).type_or_module.clone();
 
         let expr_mut = self.objs.expr_mut(expr);
-
-        match &mut expr_mut.variant {
-            ExprVariant::Identifier(ident) => {
-                ident.member_id = member_id;
-                ident.variant = IdentifierVariant::Member;
-            }
-            _ => panic!("should have already checked that it was ident on rhs")
-        }
 
         expr_mut.expr_returns = expr_returns;
         expr_mut.type_or_module = type_or_module; 

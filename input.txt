@@ -1,3 +1,10 @@
-x : Integer = 5;
+type Point is record
+    x: Float;
+    y: Float;
+end record;
 
-x
+p: Point;
+
+p.x = 3.0;
+
+p.x
