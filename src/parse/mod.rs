@@ -4,7 +4,7 @@ pub mod operator;
 mod semantic;
 mod syntax;
 
-use std::{collections::HashMap, fmt::Formatter};
+use std::collections::HashMap;
 
 use crate::{
     parse::{

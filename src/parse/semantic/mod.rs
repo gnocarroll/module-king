@@ -11,7 +11,8 @@ use crate::{
         TypeOrModule, TypeVariant, Visibility,
         ast_contents::{ExprID, MemberID, PatternID, ScopeID, TypeID},
         errors::{
-            ExpectedExprReturns, ExprAndType, InvalidExpr, InvalidOperation, MissingOperand, PatternError, SemanticError, UnexpectedExpr
+            ExpectedExprReturns, ExprAndType, InvalidExpr, InvalidOperation, MissingOperand,
+            PatternError, SemanticError, UnexpectedExpr,
         },
         operator,
     },
@@ -440,7 +441,7 @@ impl AST {
         // record current function scope in context
 
         let old_curr_func = ctx.curr_func;
-        
+
         ctx.curr_func = Some(func_scope);
 
         let old_analyzing_now = ctx.analyzing_now;
@@ -460,9 +461,14 @@ impl AST {
 
         let ret_type_expr = self.objs.expr(func_literal.return_type);
 
-        match (ret_type_expr.finalized, ret_type_expr.expr_returns, &ret_type_expr.variant) {
+        match (
+            ret_type_expr.finalized,
+            ret_type_expr.expr_returns,
+            &ret_type_expr.variant,
+        ) {
             (false, ..) => (), // not finalized, don't test for err
-            (_, ExprReturns::Type, _) => { // Ok, record type
+            (_, ExprReturns::Type, _) => {
+                // Ok, record type
                 if let TypeOrModule::Type(t) = ret_type_expr.type_or_module {
                     ret_type_id = t;
                 } else {
@@ -471,10 +477,11 @@ impl AST {
             }
             (_, ExprReturns::Unit, ExprVariant::Unit) => (), // Ok, function returns Unit
             _ => {
-                self.semantic_errors.push(SemanticError::InvalidExpr(InvalidExpr {
-                    expr,
-                    msg: "either provide valid return type or omit return type"
-                }));
+                self.semantic_errors
+                    .push(SemanticError::InvalidExpr(InvalidExpr {
+                        expr,
+                        msg: "either provide valid return type or omit return type",
+                    }));
 
                 finalized = false;
             }
@@ -485,9 +492,14 @@ impl AST {
 
         // if any of the function's child exprs are not finalized, then set finalized to false
 
-        if [func_literal.params, func_literal.return_type, func_literal.body].iter().any(|expr| {
-            !self.objs.expr(*expr).finalized
-        }) {
+        if [
+            func_literal.params,
+            func_literal.return_type,
+            func_literal.body,
+        ]
+        .iter()
+        .any(|expr| !self.objs.expr(*expr).finalized)
+        {
             finalized = false;
         }
 
@@ -497,11 +509,20 @@ impl AST {
         ctx.curr_func = old_curr_func;
 
         let func_type = if finalized {
-            let type_vec: Vec<TypeID> = func_literal.param_info.iter().map(|pattern_id| {
-                self.objs.pattern(*pattern_id).type_id
-            }).collect();
+            let type_vec: Vec<TypeID> = func_literal
+                .param_info
+                .iter()
+                .map(|pattern_id| self.objs.pattern(*pattern_id).type_id)
+                .collect();
 
-            Some(self.type_vec_to_tuple(&type_vec))
+            let input_type = self.type_vec_to_tuple(&type_vec);
+
+            // input type -> ret type
+
+            Some(
+                self.objs
+                    .type_push(Type::Function((input_type, ret_type_id))),
+            )
         } else {
             None
         };
@@ -621,13 +642,13 @@ impl AST {
                     let member = self.objs.member(member_id);
 
                     let etype = member.type_or_module.clone();
-                    
+
                     let expr_returns = match member.variant {
                         MemberVariant::Module => ExprReturns::Module,
                         MemberVariant::Type => ExprReturns::Type,
                         MemberVariant::Instance => ExprReturns::Value,
                     };
-                    
+
                     let ident_variant = match member.variant {
                         MemberVariant::Module => IdentifierVariant::Module,
                         MemberVariant::Type => IdentifierVariant::Type,
