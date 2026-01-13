@@ -1,10 +1,4 @@
-type Point is record
-    x: Float;
-    y: Float;
-end record;
+function inc(x: Integer) Integer
+    return x + 1;
 
-p: Point;
-
-p.x = 3.0;
-
-p.x
+inc(0)

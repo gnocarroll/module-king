@@ -87,6 +87,13 @@ impl AST {
         member_id
     }
 
+    pub fn get_curr_return_type(
+        &mut self,
+        ctx: &mut SemanticContext,
+    ) -> TypeID {
+
+    }
+
     // search provided scope for a given name and received Member if said name
     // can be found, also recurse to parent if needed
     pub fn scope_search(&self, scope: ScopeID, name: &str) -> Option<MemberID> {

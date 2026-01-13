@@ -439,16 +439,27 @@ impl AST {
         });
 
         // record current function scope in context
+
+        let old_curr_func = ctx.curr_func;
+        
         ctx.curr_func = Some(func_scope);
+
+        let old_analyzing_now = ctx.analyzing_now;
 
         ctx.analyzing_now = AnalyzingNow::FuncParams;
         self.analyze_expr(ctx, func_scope, func_literal.params);
+
+        // at this point assuming things went normally will have params of function recorded
+        // and params added as instances in function scope
 
         ctx.analyzing_now = AnalyzingNow::Type;
         self.analyze_expr(ctx, func_scope, func_literal.return_type);
 
         ctx.analyzing_now = AnalyzingNow::Expr;
         self.analyze_expr(ctx, func_scope, func_literal.body);
+
+        ctx.analyzing_now = old_analyzing_now;
+        ctx.curr_func = old_curr_func;
     }
 
     fn semantic_analyze_type_literal(
