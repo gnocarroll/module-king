@@ -53,9 +53,8 @@ pub enum Type {
     // actually separate type
     Alias(TypeID),
 
-    // lhs is type, rhs is (optional) expr
-    // e.g. [Integer; 5] -> Integer, 5
-    Slice((TypeID, TypeID)),
+    // [Expr]Type
+    Slice((ExprID, TypeID)),
 
     // for tuple with > 2 elements second u32 will link to a RestOfTuple
     Tuple((TypeID, Option<TypeID>)),
