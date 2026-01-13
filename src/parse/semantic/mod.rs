@@ -508,6 +508,13 @@ impl AST {
         ctx.analyzing_now = old_analyzing_now;
         ctx.curr_func = old_curr_func;
 
+        // get updated FunctionLiteral struct after analyzing sub-exprs
+
+        let func_literal = match &self.objs.expr(expr).variant {
+            ExprVariant::FunctionLiteral(f) => f.clone(),
+            _ => panic!(),
+        };
+
         let func_type = if finalized {
             let type_vec: Vec<TypeID> = func_literal
                 .param_info
@@ -519,10 +526,13 @@ impl AST {
 
             // input type -> ret type
 
-            Some(
-                self.objs
-                    .type_push(Type::Function((input_type, ret_type_id))),
-            )
+            let func_type = self
+                .objs
+                .type_push(Type::Function((input_type, ret_type_id)));
+
+            eprintln!("TYPE: {}", self.type_to_string(ctx.tokens, func_type));
+
+            Some(func_type)
         } else {
             None
         };
