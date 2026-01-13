@@ -83,6 +83,8 @@ impl AST {
         member_id
     }
 
+    // utility function get ID of current return type
+    // (so assumption is that function is being analyzed)
     pub fn get_curr_return_type(&mut self, ctx: &mut SemanticContext) -> TypeID {
         let err_type = self.get_builtin_type_id(ERROR_TYPE);
         
@@ -102,6 +104,9 @@ impl AST {
         match &self.objs.expr(func_expr).variant {
             ExprVariant::FunctionLiteral(func_literal) => {
                 let ret_type = self.objs.expr(func_literal.return_type);
+
+                // here we did get all the way to return type expr but it is either not finalized
+                // or is not a type itself and thus return error type from here
 
                 if !ret_type.finalized || ret_type.expr_returns != ExprReturns::Type {
                     return err_type;

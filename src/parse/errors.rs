@@ -44,6 +44,12 @@ pub struct MissingOperand {
     pub operand_missing: u32,
 }
 
+#[derive(Clone)]
+pub struct InvalidExpr {
+    pub expr: ExprID,
+    pub msg: &'static str,
+}
+
 // maybe in the future should add more context
 // i.e. why is expr unexpected there
 #[derive(Clone)]
@@ -59,6 +65,7 @@ pub enum SemanticError {
     MissingOperand(MissingOperand),
     UnexpectedExpr(UnexpectedExpr),
     PatternError(PatternError),
+    InvalidExpr(InvalidExpr),
 }
 
 #[derive(Clone, Copy)]

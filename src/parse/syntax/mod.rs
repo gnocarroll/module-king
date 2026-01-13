@@ -7,7 +7,7 @@ use crate::{
         AST, Expr, ExprVariant, FunctionLiteral, Identifier, IdentifierVariant, Operation, Tokens,
         TypeLiteral, TypeVariant,
         ast_contents::{ExprID, MemberID},
-        errors::{NameMismatch, ParseError},
+        errors::{InvalidExpr, NameMismatch, ParseError, SemanticError, UnexpectedExpr},
         operator,
     },
     scan::{Token, TokenType},
@@ -201,39 +201,40 @@ impl AST {
                 );
             }
 
-            // prevent consumption of Eq after return type (if it is present)
-
             let return_type = ast.parse_expr(tokens);
 
-            // "do" token will precede function body
-
-            if ast.expect(tokens, TokenType::Do).is_err() {
-                return (false, params, return_type, ast.expr_unit(tokens.idx()));
-            }
-
-            // prevent consumption of semicolon if there is one after function
+            // prevent consumption of semicolon/comma if there is one after function
             // body since this could lead to e.g. a lot of the rest of the
             // file being consumed as part of func body
 
             let body = ast.parse_expr_bp(
                 tokens,
-                match operator::get_bp(TokenType::Semicolon, Infix) {
+                match operator::get_bp(TokenType::Comma, Infix) {
                     Some((l_bp, _)) => l_bp + 1,
-                    _ => panic!("semicolon is not infix op?"),
+                    _ => panic!("comma is not infix op?"),
                 },
             );
 
             // if body of function is block expr check for desired terminating token
             // (name in case of named function, otherwise keyword "function")
 
-            let success = if let ExprVariant::Operation(Operation {
-                op: TokenType::Begin,
-                ..
-            }) = ast.expr(body).variant
-            {
-                ast.expect(tokens, TokenType::Function).is_ok()
-            } else {
-                true
+            let success = match ast.expr(body).variant {
+                ExprVariant::Operation(Operation {
+                    op: TokenType::Begin,
+                    ..
+                }) => ast.expect(tokens, TokenType::Function).is_ok(),
+                ExprVariant::Operation(Operation {
+                    op: TokenType::Return,
+                    ..
+                }) => true,
+                _ => {
+                    ast.semantic_errors.push(SemanticError::InvalidExpr(InvalidExpr {
+                        expr: body,
+                        msg: "function body should be either block expr or return expr",
+                    }));
+
+                    false
+                }
             };
 
             (success, params, return_type, body)
@@ -245,7 +246,12 @@ impl AST {
         // recover by skipping ahead to one of these ttypes
 
         if !success {
-            let found = tokens.sync(&[TokenType::End, TokenType::Function, TokenType::Semicolon]);
+            let found = tokens.sync(&[
+                TokenType::End,
+                TokenType::Function,
+                TokenType::Semicolon,
+                TokenType::Comma,
+            ]);
 
             match found.ttype {
                 TokenType::End => {
