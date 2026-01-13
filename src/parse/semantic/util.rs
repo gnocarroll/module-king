@@ -3,11 +3,7 @@ use std::collections::HashMap;
 use crate::{
     constants::ERROR_TYPE,
     parse::{
-        AST, Member, MemberVariant, Scope, ScopeRefersTo, ScopeVariant, TokenOrString, Type,
-        TypeOrModule, TypeVariant, Visibility,
-        ast_contents::{ExprID, MemberID, ScopeID, TypeID},
-        errors::{InvalidOperation, MissingOperand, PatternError, SemanticError},
-        semantic::SemanticContext,
+        AST, ExprReturns, ExprVariant, Member, MemberVariant, Scope, ScopeRefersTo, ScopeVariant, TokenOrString, Type, TypeOrModule, TypeVariant, Visibility, ast_contents::{ExprID, MemberID, ScopeID, TypeID}, errors::{InvalidOperation, MissingOperand, PatternError, SemanticError}, semantic::SemanticContext
     },
 };
 
@@ -87,11 +83,39 @@ impl AST {
         member_id
     }
 
-    pub fn get_curr_return_type(
-        &mut self,
-        ctx: &mut SemanticContext,
-    ) -> TypeID {
+    pub fn get_curr_return_type(&mut self, ctx: &mut SemanticContext) -> TypeID {
+        let err_type = self.get_builtin_type_id(ERROR_TYPE);
+        
+        // calling this function without current func or current func is malformed
+        // is reason enough to just kill the program, so err_type will only be returned
+        // if function does not have ret type or something
 
+        let func_scope = ctx
+            .curr_func
+            .expect("TRIED TO GET CURRENT RETURN TYPE WITH NO CURRENT FUNCTION, KABOOM");
+
+        let func_expr = match self.objs.scope(func_scope).refers_to {
+            Some(ScopeRefersTo::Expr(expr)) => expr,
+            _ => panic!("FUNCTION SCOPE SHOULD REFER TO FUNC EXPR"),
+        };
+
+        match &self.objs.expr(func_expr).variant {
+            ExprVariant::FunctionLiteral(func_literal) => {
+                let ret_type = self.objs.expr(func_literal.return_type);
+
+                if !ret_type.finalized || ret_type.expr_returns != ExprReturns::Type {
+                    return err_type;
+                }
+
+                // here id is retrieved
+
+                match ret_type.type_or_module {
+                    TypeOrModule::Type(t) => t,
+                    _ => panic!("expr returns is type but found module in type or module")
+                }
+            },
+            _ => panic!("EXPECTED TO FIND FUNCTION LITERAL EXPR THROUGH CURR FUNC"),
+        }
     }
 
     // search provided scope for a given name and received Member if said name
