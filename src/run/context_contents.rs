@@ -32,6 +32,7 @@ pub enum ValueVariant {
     Float(f64),
     String(String),
     Identifier(MemberID),
+
     Record(HashMap<String, ValueID>),
 
     Ref(RuntimeReference),

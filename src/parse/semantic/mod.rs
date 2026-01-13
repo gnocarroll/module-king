@@ -11,8 +11,7 @@ use crate::{
         TypeOrModule, TypeVariant, Visibility,
         ast_contents::{ExprID, MemberID, PatternID, ScopeID, TypeID},
         errors::{
-            ExpectedExprReturns, ExprAndType, InvalidOperation, MissingOperand, PatternError,
-            SemanticError, UnexpectedExpr,
+            ExpectedExprReturns, ExprAndType, InvalidExpr, InvalidOperation, MissingOperand, PatternError, SemanticError, UnexpectedExpr
         },
         operator,
     },
@@ -455,11 +454,51 @@ impl AST {
         ctx.analyzing_now = AnalyzingNow::Type;
         self.analyze_expr(ctx, func_scope, func_literal.return_type);
 
+        let mut finalized = true;
+
+        let ret_type_expr = self.objs.expr(func_literal.return_type);
+
+        match (ret_type_expr.finalized, ret_type_expr.expr_returns, &ret_type_expr.variant) {
+            (false, ..) => (), // not finalized, don't test for err
+            (_, ExprReturns::Type, _) => (), // Ok
+            (_, ExprReturns::Unit, ExprVariant::Unit) => (), // Ok, function returns Unit
+            _ => {
+                self.semantic_errors.push(SemanticError::InvalidExpr(InvalidExpr {
+                    expr,
+                    msg: "either provide valid return type or omit return type"
+                }));
+
+                finalized = false;
+            }
+        }
+
         ctx.analyzing_now = AnalyzingNow::Expr;
         self.analyze_expr(ctx, func_scope, func_literal.body);
 
+        // if any of the function's child exprs are not finalized, then set finalized to false
+
+        if [func_literal.params, func_literal.return_type, func_literal.body].iter().any(|expr| {
+            !self.objs.expr(*expr).finalized
+        }) {
+            finalized = false;
+        }
+
+        // reset these to whatever they were before analyzing sub exprs
+
         ctx.analyzing_now = old_analyzing_now;
         ctx.curr_func = old_curr_func;
+
+        let expr_mut = self.objs.expr_mut(expr);
+
+        expr_mut.finalized = finalized;
+
+        if func_literal.name.is_some() {
+            self.set_expr_returns_unit(ctx, expr);
+        } else {
+            expr_mut.expr_returns = ExprReturns::Value;
+
+            // TODO: create function type and set expr type to that
+        }
     }
 
     fn semantic_analyze_type_literal(

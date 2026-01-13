@@ -151,7 +151,7 @@ pub enum ExprVariant {
 }
 
 #[derive(Clone, Copy, PartialEq)]
-enum ExprReturns {
+pub enum ExprReturns {
     Error,
     Unit,
     Value,

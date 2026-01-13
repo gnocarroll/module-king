@@ -5,7 +5,7 @@ mod error;
 mod eval_operation;
 
 use crate::{
-    parse::{AST, ExprVariant, TypeOrModule, ast_contents::ExprID},
+    parse::{AST, ExprReturns, ExprVariant, TypeOrModule, ast_contents::ExprID},
     run::{
         context_contents::{ContextObjects, RuntimeReference, RuntimeScopeID, Value, ValueVariant},
         error::{RuntimeError, RuntimeErrorVariant},
@@ -34,7 +34,9 @@ impl<'a> ExecutionContext<'a> {
 }
 
 fn eval(ast: &AST, ctx: &mut ExecutionContext, expr: ExprID) -> Result<RuntimeReference, RuntimeError> {
-    // 1. get language type of expr
+    // 1. collect some preliminary info on expr
+
+    let expr_returns = ast.objs.expr(expr).expr_returns;
 
     let type_id = match ast.objs.expr(expr).type_or_module {
         TypeOrModule::Type(t) => t,
@@ -49,9 +51,9 @@ fn eval(ast: &AST, ctx: &mut ExecutionContext, expr: ExprID) -> Result<RuntimeRe
     // 2. depending on expr variant we convert to value variant or maybe
     // immediately find out what the ret value of this function should be
 
-    let variant = match ast.objs.expr(expr).variant {
+    let variant = match &ast.objs.expr(expr).variant {
         ExprVariant::Unit => ValueVariant::Unit,
-        ExprVariant::IntegerLiteral(i) => ValueVariant::Integer(match i.try_into() {
+        ExprVariant::IntegerLiteral(i) => ValueVariant::Integer(match (*i).try_into() {
             Ok(i) => i,
             Err(_) => {
                 return Err(RuntimeError {
@@ -60,11 +62,22 @@ fn eval(ast: &AST, ctx: &mut ExecutionContext, expr: ExprID) -> Result<RuntimeRe
                 });
             }
         }),
-        ExprVariant::FloatLiteral(f) => ValueVariant::Float(f),
+        ExprVariant::FloatLiteral(f) => ValueVariant::Float(*f),
         ExprVariant::Operation(operation) => {
-            return eval_operation(ast, ctx, expr, operation);
+            return eval_operation(ast, ctx, expr, *operation);
         }
         ExprVariant::Identifier(ident) => ValueVariant::Identifier(ident.member_id),
+
+        // named function literal returns unit but if not named then return expr id
+
+        ExprVariant::FunctionLiteral(_) => if expr_returns == ExprReturns::Unit {
+            ValueVariant::Unit
+        } else {
+            ValueVariant::Function(expr)
+        },
+
+        // no handling for given expr variant
+
         _ => {
             return Err(RuntimeError {
                 expr,
