@@ -9,7 +9,19 @@ mod run;
 mod scan;
 mod tokens;
 
+const MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
+
 fn main() -> ExitCode {
+    if std::env::set_current_dir(MANIFEST_DIR).is_err() {
+        eprintln!("Failed to set working directory to crate directory.");
+        return 1.into();
+    }
+
+    let args: Vec<String> = std::env::args().skip(1).collect();
+
+    // always use input.txt for now
+    let args = vec!["input.txt"];
+
     let mut arg_parser = ArgParser::default();
 
     let arg_infos = [("input", ArgQuantity::Multiple), ("-o", ArgQuantity::One)];
@@ -26,13 +38,13 @@ fn main() -> ExitCode {
 
     println!("ARGS");
 
-    for arg in std::env::args() {
+    for arg in args.iter() {
         println!("{arg}");
     }
 
     // skip executable name in args
 
-    let args = match arg_parser.parse_args(std::env::args().skip(1)) {
+    let args = match arg_parser.parse_args(args.iter()) {
         Ok(map) => map,
         Err(msg) => {
             eprintln!("Bad args provided: {msg}");
