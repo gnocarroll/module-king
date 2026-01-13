@@ -1,11 +1,16 @@
 use std::ops::{Add, Div, Mul, Rem, Sub};
 
 use crate::{
-    constants::UNIT_TYPE, parse::{AST, Operation, TypeOrModule, ast_contents::ExprID}, run::{
-        self, ExecutionContext, Value, ValueVariant, context_contents::RuntimeReference, error::{RuntimeError, RuntimeErrorVariant}, eval
-    }, scan::TokenType
+    constants::UNIT_TYPE,
+    parse::{AST, Operation, TypeOrModule, ast_contents::ExprID},
+    run::{
+        self, ExecutionContext, Value, ValueVariant,
+        context_contents::RuntimeReference,
+        error::{RuntimeError, RuntimeErrorVariant},
+        eval,
+    },
+    scan::TokenType,
 };
-
 
 pub fn eval_eager(
     _ast: &AST,
@@ -268,19 +273,24 @@ fn do_assignment(
 ) {
     let new_value = new_value_ref.dup_in_scope(ast, ctx, assign_to_ref.scope);
 
+    // if lhs is identifier then find + overwrite value
+
     match ctx.objs.ref_get(assign_to_ref).variant {
         ValueVariant::Identifier(member_id) => {
             ctx.objs.instance_set(member_id, new_value);
+            return;
         }
-        _ => todo!("implement assignment to more than just simple idents")
+        _ => (),
     }
+
+    // otherwise use value id to replace value
+
+    ctx.objs
+        .runtime_scope_mut(assign_to_ref.scope)
+        .value_overwrite(assign_to_ref.value_id, new_value);
 }
 
-fn expr_to_unit(
-    ast: &AST,
-    ctx: &mut ExecutionContext,
-    expr: ExprID,
-) -> RuntimeReference {
+fn expr_to_unit(ast: &AST, ctx: &mut ExecutionContext, expr: ExprID) -> RuntimeReference {
     let type_id = match ast.objs.expr(expr).type_or_module {
         TypeOrModule::Type(t) => Some(t),
         TypeOrModule::Module(_) => panic!("eq operation should have type, not be a module"),
@@ -333,6 +343,9 @@ fn eval_operation_binary(
     ];
 
     match op {
+        // some operations are only relevant to semantic analysis and can be skipped here
+        TokenType::Is => return Ok(expr_to_unit(ast, ctx, expr)),
+
         // for colon lhs is identifier(s), just return them
         TokenType::Colon => return eval_operation_colon(ast, ctx, expr, operand1, operand2),
         TokenType::Period => return eval_operation_period(ast, ctx, expr, operand1, operand2),
@@ -340,7 +353,7 @@ fn eval_operation_binary(
         // currently same code can be used for Eq, ColonEq
         TokenType::Eq => return eval_operation_eq(ast, ctx, expr, operand1, operand2),
         TokenType::ColonEq => {
-            let lhs =  eval(ast, ctx, operand1)?;
+            let lhs = eval(ast, ctx, operand1)?;
 
             match ctx.objs.ref_get(lhs).variant {
                 ValueVariant::Identifier(member_id) => {
@@ -361,7 +374,7 @@ fn eval_operation_binary(
     }
 
     let operand_refs = [eval(ast, ctx, operand1)?, eval(ast, ctx, operand2)?];
-    
+
     if op == TokenType::Semicolon {
         eprintln!("RHS OF SEMI: {}", operand_refs[1].to_string(ast, ctx));
 
@@ -373,7 +386,7 @@ fn eval_operation_binary(
         }
         .to_runtime_ref(ctx, ctx.curr_scope));
     }
-    
+
     // eagerly evaluate LHS, RHS before performing operation so e.g.
     // if one side is a var we will get the value
 
