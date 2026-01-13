@@ -92,6 +92,32 @@ impl AST {
         expr_mut.type_or_module = TypeOrModule::Type(unit_type);
     }
 
+    // build tuple type of indefinite length from vector of type IDs
+    // if vec is of length 0 then Unit type is returned
+    pub fn type_vec_to_tuple(&mut self, type_vec: &Vec<TypeID>) -> TypeID {
+        if type_vec.len() == 0 {
+            return self.get_builtin_type_id(UNIT_TYPE);
+        } else if type_vec.len() == 1 {
+            return self.objs.type_push(Type::Tuple((type_vec[0], None)));
+        } else if type_vec.len() == 2 {
+            return self.objs.type_push(Type::Tuple((type_vec[0], Some(type_vec[1]))));
+        }
+
+        let mut rest_of_tuple = self.objs.type_push(Type::RestOfTuple((type_vec[1], type_vec[2])));
+
+        let ret = self.objs.type_push(Type::Tuple((type_vec[0], Some(rest_of_tuple))));
+
+        for idx in 2..(type_vec.len() - 1) {
+            let new_rest_of_tuple = self.objs.type_push(Type::RestOfTuple((type_vec[idx], type_vec[idx + 1])));
+
+            *self.objs.type_mut(rest_of_tuple) = Type::RestOfTuple((type_vec[idx - 1], new_rest_of_tuple));
+
+            rest_of_tuple = new_rest_of_tuple;
+        }
+
+        ret
+    }
+
     // utility function get ID of current return type
     // (so assumption is that function is being analyzed)
     pub fn get_curr_return_type(&mut self, ctx: &mut SemanticContext) -> TypeID {

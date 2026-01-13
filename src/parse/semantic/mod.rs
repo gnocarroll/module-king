@@ -454,13 +454,21 @@ impl AST {
         ctx.analyzing_now = AnalyzingNow::Type;
         self.analyze_expr(ctx, func_scope, func_literal.return_type);
 
+        let mut ret_type_id = self.get_builtin_type_id(UNIT_TYPE);
+
         let mut finalized = true;
 
         let ret_type_expr = self.objs.expr(func_literal.return_type);
 
         match (ret_type_expr.finalized, ret_type_expr.expr_returns, &ret_type_expr.variant) {
             (false, ..) => (), // not finalized, don't test for err
-            (_, ExprReturns::Type, _) => (), // Ok
+            (_, ExprReturns::Type, _) => { // Ok, record type
+                if let TypeOrModule::Type(t) = ret_type_expr.type_or_module {
+                    ret_type_id = t;
+                } else {
+                    panic!("expr returns type but found module in type or module");
+                }
+            }
             (_, ExprReturns::Unit, ExprVariant::Unit) => (), // Ok, function returns Unit
             _ => {
                 self.semantic_errors.push(SemanticError::InvalidExpr(InvalidExpr {
@@ -488,6 +496,16 @@ impl AST {
         ctx.analyzing_now = old_analyzing_now;
         ctx.curr_func = old_curr_func;
 
+        let func_type = if finalized {
+            let type_vec: Vec<TypeID> = func_literal.param_info.iter().map(|pattern_id| {
+                self.objs.pattern(*pattern_id).type_id
+            }).collect();
+
+            Some(self.type_vec_to_tuple(&type_vec))
+        } else {
+            None
+        };
+
         let expr_mut = self.objs.expr_mut(expr);
 
         expr_mut.finalized = finalized;
@@ -497,7 +515,9 @@ impl AST {
         } else {
             expr_mut.expr_returns = ExprReturns::Value;
 
-            // TODO: create function type and set expr type to that
+            if let Some(t) = func_type {
+                expr_mut.type_or_module = TypeOrModule::Type(t);
+            }
         }
     }
 
