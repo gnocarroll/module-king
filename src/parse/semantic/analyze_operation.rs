@@ -1,9 +1,7 @@
-use std::{f32::consts::E, intrinsics::float_to_int_unchecked, num::TryFromIntError};
-
 use crate::{
     constants::{BOOLEAN_TYPE, ERROR_TYPE, UNIT_TYPE},
     parse::{
-        AST, ExprReturns, ExprVariant, FunctionLiteral, IdentifierVariant, MemberVariant, Operation, ScopeRefersTo, ScopeVariant, Type, TypeOrModule, TypeVariant, Visibility, ast_contents::{ExprID, ScopeID, TypeID}, errors::{InvalidOperation, SemanticError}, operator, semantic::{AnalyzingNow, IsEnum, SemanticContext}
+        AST, ExprReturns, ExprVariant, IdentifierVariant, MemberVariant, Operation, ScopeRefersTo, ScopeVariant, Type, TypeOrModule, TypeVariant, Visibility, ast_contents::{ExprID, ScopeID, TypeID}, errors::{InvalidOperation, SemanticError}, operator, semantic::{AnalyzingNow, IsEnum, SemanticContext}
     },
     scan::TokenType,
     tokens::TokenOrString,

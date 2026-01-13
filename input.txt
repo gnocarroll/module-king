@@ -1,5 +1,5 @@
-function add4(x: Integer, y: Integer, z: Integer, w: Integer) Integer begin
-    return x + y + z + w;
+function add4(x: Integer, y: Integer, z: Float, w: Float) Integer begin
+    return x + y;
 end function;
 
 add4(0)
