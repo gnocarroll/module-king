@@ -1,7 +1,7 @@
 use crate::{
     constants::{BOOLEAN_TYPE, ERROR_TYPE, UNIT_TYPE},
     parse::{
-        AST, ExprReturns, ExprVariant, IdentifierVariant, MemberVariant, Operation, ScopeVariant, Type, TypeOrModule, TypeVariant, Visibility, ast_contents::{ExprID, ScopeID, TypeID}, errors::{InvalidOperation, SemanticError}, operator, semantic::{AnalyzingNow, IsEnum, SemanticContext}
+        AST, ExprReturns, ExprVariant, FunctionLiteral, IdentifierVariant, MemberVariant, Operation, ScopeRefersTo, ScopeVariant, Type, TypeOrModule, TypeVariant, Visibility, ast_contents::{ExprID, ScopeID, TypeID}, errors::{InvalidOperation, SemanticError}, operator, semantic::{AnalyzingNow, IsEnum, SemanticContext}
     },
     scan::TokenType,
     tokens::TokenOrString,
@@ -42,6 +42,19 @@ impl AST {
                 );
                 
                 // add param
+                let func_scope = ctx.curr_func.expect("should be current func recorded");
+
+                self.scope_create_members_from_pattern(ctx, func_scope, pattern);
+
+                let func_expr = match self.objs.scope(func_scope).refers_to {
+                    Some(ScopeRefersTo::Expr(expr)) => expr,
+                    _ => panic!("should be recorded that function scope refers to func expr"),
+                };
+
+                match &mut self.objs.expr_mut(func_expr).variant {
+                    ExprVariant::FunctionLiteral(func_literal) => func_literal.param_info.push(pattern),
+                    _ => panic!("should be function expr"),
+                }
             }
             TokenType::Eq | TokenType::ColonEq => {
                 // arg with default provided

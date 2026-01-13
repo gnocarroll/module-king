@@ -1,6 +1,9 @@
 use std::{collections::HashMap, fs, io::Read, process::ExitCode};
 
-use crate::{args::{ArgParser, ArgQuantity}, tokens::Tokens};
+use crate::{
+    args::{ArgParser, ArgQuantity},
+    tokens::Tokens,
+};
 
 mod args;
 mod constants;
@@ -9,10 +12,10 @@ mod run;
 mod scan;
 mod tokens;
 
-const MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
+const MANIFEST_PATH: &str = env!("CARGO_MANIFEST_DIR");
 
 fn main() -> ExitCode {
-    if std::env::set_current_dir(MANIFEST_DIR).is_err() {
+    if std::env::set_current_dir(MANIFEST_PATH).is_err() {
         eprintln!("Failed to set working directory to crate directory.");
         return 1.into();
     }
