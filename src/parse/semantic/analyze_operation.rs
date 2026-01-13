@@ -1,4 +1,4 @@
-use std::f32::consts::E;
+use std::{f32::consts::E, intrinsics::float_to_int_unchecked, num::TryFromIntError};
 
 use crate::{
     constants::{BOOLEAN_TYPE, ERROR_TYPE, UNIT_TYPE},
@@ -21,27 +21,47 @@ impl AST {
     ) {
         match operation.op {
             TokenType::Comma => {
+                let mut finalized = true;
+
                 if let Some(lhs) = operation.operand1 {
                     // scope remains same and still analyzing func params
                     self.analyze_expr(ctx, scope, lhs);
+
+                    if !self.objs.expr(lhs).finalized {
+                        finalized = false;
+                    }
                 } else {
                     // should be param on lhs
+                    finalized = false;
+
                     self.missing_operand(expr, 1);
                 }
 
                 // it is fine for rhs to be missing e.g. function f(0 : Integer,) ...
                 if let Some(rhs) = operation.operand2 {
                     self.analyze_expr(ctx, scope, rhs);
+
+                    if !self.objs.expr(rhs).finalized {
+                        finalized = false;
+                    }
                 }
+
+                self.set_expr_returns_unit(ctx, expr);
+
+                let expr_mut = self.expr_mut(expr);
+
+                expr_mut.finalized = finalized;
             }
             TokenType::Colon => {
-                let (pattern, _) = self.analyze_instance_creation(
+                let (pattern, err) = self.analyze_instance_creation(
                     ctx,
                     scope,
                     expr,
                     operation.operand1,
                     operation.operand2,
                 );
+
+                let finalized = err.is_none();
                 
                 // add param
                 let func_scope = ctx.curr_func.expect("should be current func recorded");
@@ -57,9 +77,24 @@ impl AST {
                     ExprVariant::FunctionLiteral(func_literal) => func_literal.param_info.push(pattern),
                     _ => panic!("should be function expr"),
                 }
+
+                if finalized {
+                    self.analyze_expr(ctx, scope, operation.operand1.expect("should be LHS"));
+
+                    self.set_expr_returns_unit(ctx, expr);
+
+                    let expr_mut = self.objs.expr_mut(expr);
+
+                    expr_mut.finalized = finalized;
+                }
             }
             TokenType::Eq | TokenType::ColonEq => {
                 // arg with default provided
+
+                self.invalid_operation(
+                    expr,
+                    "default values for params not implemented",
+                );
             }
             _ => {
                 self.invalid_operation(
