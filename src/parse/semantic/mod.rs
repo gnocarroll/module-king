@@ -428,15 +428,23 @@ impl AST {
             _ => panic!(),
         };
 
+        let function_id = func_literal.function_id;
+        let func_name = self.objs.function(function_id).name;
+
         // create function scope as child of parent then use it later on
 
         let func_scope = self.objs.scope_push(Scope {
             name: None,
             variant: ScopeVariant::Scope,
             parent_scope: scope,
-            refers_to: Some(ScopeRefersTo::Expr(expr)), // connect to function literal
+
+            // connect to function obj
+            refers_to: Some(ScopeRefersTo::Function(function_id)),
+
             members: HashMap::new(),
         });
+
+        self.objs.function_mut(function_id).scope = func_scope;
 
         // record current function scope in context
 
@@ -453,13 +461,13 @@ impl AST {
         // and params added as instances in function scope
 
         ctx.analyzing_now = AnalyzingNow::Type;
-        self.analyze_expr(ctx, func_scope, func_literal.return_type);
+        self.analyze_expr(ctx, func_scope, func_literal.return_type_expr);
 
         let mut ret_type_id = self.get_builtin_type_id(UNIT_TYPE);
 
         let mut finalized = true;
 
-        let ret_type_expr = self.objs.expr(func_literal.return_type);
+        let ret_type_expr = self.objs.expr(func_literal.return_type_expr);
 
         match (
             ret_type_expr.finalized,
@@ -487,15 +495,17 @@ impl AST {
             }
         }
 
+        let body_expr = self.objs.function(function_id).body;
+
         ctx.analyzing_now = AnalyzingNow::Expr;
-        self.analyze_expr(ctx, func_scope, func_literal.body);
+        self.analyze_expr(ctx, func_scope, body_expr);
 
         // if any of the function's child exprs are not finalized, then set finalized to false
 
         if [
             func_literal.params,
-            func_literal.return_type,
-            func_literal.body,
+            func_literal.return_type_expr,
+            body_expr,
         ]
         .iter()
         .any(|expr| !self.objs.expr(*expr).finalized)
@@ -508,18 +518,13 @@ impl AST {
         ctx.analyzing_now = old_analyzing_now;
         ctx.curr_func = old_curr_func;
 
-        // get updated FunctionLiteral struct after analyzing sub-exprs
-
-        let func_literal = match &self.objs.expr(expr).variant {
-            ExprVariant::FunctionLiteral(f) => f.clone(),
-            _ => panic!(),
-        };
-
         let func_type = if finalized {
-            let type_vec: Vec<TypeID> = func_literal
-                .param_info
+            let type_vec: Vec<TypeID> = self
+                .objs
+                .function(function_id)
+                .params
                 .iter()
-                .map(|pattern_id| self.objs.pattern(*pattern_id).type_id)
+                .map(|param_info| param_info.type_id)
                 .collect();
 
             let input_type = self.type_vec_to_tuple(&type_vec);
@@ -532,23 +537,27 @@ impl AST {
 
             eprintln!("TYPE: {}", self.type_to_string(ctx.tokens, func_type));
 
-            Some(func_type)
+            func_type
         } else {
-            None
+            self.get_builtin_type_id(ERROR_TYPE)
         };
+
+        let func_mut = self.objs.function_mut(function_id);
+
+        func_mut.return_type = ret_type_id;
+        func_mut.func_type = func_type;
 
         let expr_mut = self.objs.expr_mut(expr);
 
         expr_mut.finalized = finalized;
 
-        if func_literal.name.is_some() {
+        // named function literal returns Unit, otherwise return function itself from expr
+
+        if func_name.is_some() {
             self.set_expr_returns_unit(ctx, expr);
         } else {
             expr_mut.expr_returns = ExprReturns::Value;
-
-            if let Some(t) = func_type {
-                expr_mut.type_or_module = TypeOrModule::Type(t);
-            }
+            expr_mut.type_or_module = TypeOrModule::Type(func_type);
         }
     }
 

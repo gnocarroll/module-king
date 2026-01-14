@@ -271,6 +271,7 @@ pub struct Member {
 pub enum ScopeRefersTo {
     Type(TypeID),
     Expr(ExprID),
+    Function(FunctionID),
 }
 
 // a scope may refer to a scope for a code block or
