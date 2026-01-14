@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::{
     parse::{
         AST, ExprVariant, MemberVariant, ScopeVariant, Type, TypeOrModule, TypeVariant, Visibility,
-        ast_contents::{ExprID, MemberID, ScopeID, TypeID},
+        ast_contents::{ExprID, FunctionID, MemberID, ScopeID, TypeID},
     },
     run::ExecutionContext,
 };
@@ -39,7 +39,7 @@ pub enum ValueVariant {
     ImplicitRef(RuntimeReference),
 
     Module(ScopeID),
-    Function(ExprID),
+    Function(FunctionID),
 }
 
 #[derive(Clone)]
@@ -98,17 +98,14 @@ impl RuntimeReference {
                 format!("module {}", name_string)
             }
             ValueVariant::Function(func) => {
-                let expr = ast.objs.expr(*func);
+                let func = ast.objs.function(*func);
 
-                let func_name_string = match &expr.variant {
-                    ExprVariant::FunctionLiteral(func) => match &func.name {
-                        Some(t) => ctx.tokens.tok_as_str(t),
-                        None => "(anonymous)",
-                    },
-                    _ => "ERR_EXPR_IS_NOT_FUNC",
+                let func_name_str = match func.name {
+                    Some(t) => ctx.tokens.tok_as_str(&t),
+                    None => "(anonymous)"
                 };
 
-                format!("function {}", func_name_string)
+                format!("function {}", func_name_str)
             }
             ValueVariant::Identifier(member_id) => match ctx.objs.instance_get(*member_id) {
                 Some(runtime_ref) => runtime_ref.to_string(ast, ctx),

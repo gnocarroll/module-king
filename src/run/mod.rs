@@ -70,10 +70,10 @@ fn eval(ast: &AST, ctx: &mut ExecutionContext, expr: ExprID) -> Result<RuntimeRe
 
         // named function literal returns unit but if not named then return expr id
 
-        ExprVariant::FunctionLiteral(_) => if expr_returns == ExprReturns::Unit {
+        ExprVariant::FunctionLiteral(func) => if expr_returns == ExprReturns::Unit {
             ValueVariant::Unit
         } else {
-            ValueVariant::Function(expr)
+            ValueVariant::Function(func.function_id)
         },
 
         // no handling for given expr variant
