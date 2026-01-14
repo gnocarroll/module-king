@@ -407,7 +407,6 @@ impl AST {
 
     fn parse_lhs(&mut self, tokens: &mut Tokens) -> ExprID {
         let tok = tokens.peek();
-        let tok_idx = tokens.idx();
 
         // see if you have prefix op
 

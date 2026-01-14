@@ -41,8 +41,6 @@ pub struct SemanticContext<'a> {
     curr_func: Option<FunctionID>,
 }
 
-use operator::OperatorVariant::*;
-
 impl AST {
     fn scope_create_members_from_pattern(
         &mut self,

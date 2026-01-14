@@ -346,7 +346,7 @@ impl AST {
         self.parse_errors.len() > 0 || self.semantic_errors.len() > 0
     }
 
-    pub fn display_parse_errors(&self, tokens: &Tokens) {
+    pub fn display_parse_errors(&self, _tokens: &Tokens) {
         for err in &self.parse_errors {
             match err {
                 ParseError::ExpectedToken(ExpectedToken { expected, found }) => {
@@ -360,7 +360,7 @@ impl AST {
         }
     }
 
-    pub fn display_semantic_errors(&self, tokens: &Tokens) {
+    pub fn display_semantic_errors(&self, _tokens: &Tokens) {
         for err in &self.semantic_errors {
             match err {
                 SemanticError::InvalidOperation(invalid_op) => {

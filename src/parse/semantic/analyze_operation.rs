@@ -1,7 +1,12 @@
 use crate::{
     constants::{BOOLEAN_TYPE, ERROR_TYPE, UNIT_TYPE},
     parse::{
-        AST, ExprReturns, ExprVariant, IdentifierVariant, MemberVariant, Operation, ScopeRefersTo, ScopeVariant, Type, TypeOrModule, TypeVariant, Visibility, ast_contents::{ExprID, ScopeID, TypeID}, errors::{InvalidOperation, SemanticError}, operator, semantic::{AnalyzingNow, IsEnum, SemanticContext}
+        AST, ExprReturns, ExprVariant, IdentifierVariant, MemberVariant, Operation, ScopeVariant,
+        Type, TypeOrModule, TypeVariant, Visibility,
+        ast_contents::{ExprID, ScopeID, TypeID},
+        errors::{InvalidOperation, SemanticError},
+        operator,
+        semantic::{AnalyzingNow, IsEnum, SemanticContext},
     },
     scan::TokenType,
     tokens::TokenOrString,
@@ -60,21 +65,15 @@ impl AST {
                 );
 
                 let finalized = err.is_none();
-                
+
                 // add param
-                let func_scope = ctx.curr_func.expect("should be current func recorded");
+                let curr_func = ctx.curr_func.expect("should be current func recorded");
+
+                let func_scope = self.objs.function(curr_func).scope;
 
                 self.scope_create_members_from_pattern(ctx, func_scope, pattern);
 
-                let func_expr = match self.objs.scope(func_scope).refers_to {
-                    Some(ScopeRefersTo::Expr(expr)) => expr,
-                    _ => panic!("should be recorded that function scope refers to func expr"),
-                };
-
-                match &mut self.objs.expr_mut(func_expr).variant {
-                    ExprVariant::FunctionLiteral(func_literal) => func_literal.param_info.push(pattern),
-                    _ => panic!("should be function expr"),
-                }
+                self.objs.function_mut(curr_func).params.push(pattern);
 
                 if finalized {
                     self.analyze_expr(ctx, scope, operation.operand1.expect("should be LHS"));
@@ -89,10 +88,7 @@ impl AST {
             TokenType::Eq | TokenType::ColonEq => {
                 // arg with default provided
 
-                self.invalid_operation(
-                    expr,
-                    "default values for params not implemented",
-                );
+                self.invalid_operation(expr, "default values for params not implemented");
             }
             _ => {
                 self.invalid_operation(
@@ -388,7 +384,10 @@ impl AST {
             }
             TokenType::Return => {
                 if ctx.curr_func.is_none() {
-                    self.invalid_operation(expr, "cannot have return expression outside of any function");
+                    self.invalid_operation(
+                        expr,
+                        "cannot have return expression outside of any function",
+                    );
                     return;
                 }
 
@@ -400,7 +399,10 @@ impl AST {
                 }
 
                 if curr_ret_type != operand_type {
-                    self.invalid_operation(expr, "type of return operand must match function return type");
+                    self.invalid_operation(
+                        expr,
+                        "type of return operand must match function return type",
+                    );
                     return;
                 }
 
@@ -669,10 +671,13 @@ impl AST {
                 ident.member_id = member_id;
                 ident.variant = IdentifierVariant::Member;
             }
-            _ => panic!("should have already checked that it was ident on rhs")
+            _ => panic!("should have already checked that it was ident on rhs"),
         }
 
-        match (operand1_struct.expr_returns, self.objs.member(member_id).visibility) {
+        match (
+            operand1_struct.expr_returns,
+            self.objs.member(member_id).visibility,
+        ) {
             // should only be accessing global fields through type
             (ExprReturns::Type, Visibility::Export | Visibility::Private) => {
                 self.invalid_operation(expr, "only global fields may be accessed through type, not ones specific to an instance");
@@ -692,7 +697,7 @@ impl AST {
         let expr_mut = self.objs.expr_mut(expr);
 
         expr_mut.expr_returns = expr_returns;
-        expr_mut.type_or_module = type_or_module; 
+        expr_mut.type_or_module = type_or_module;
 
         expr_mut.is_var = true;
         expr_mut.finalized = true;

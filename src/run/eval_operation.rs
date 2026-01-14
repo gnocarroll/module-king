@@ -4,7 +4,7 @@ use crate::{
     constants::UNIT_TYPE,
     parse::{AST, Operation, TypeOrModule, ast_contents::ExprID},
     run::{
-        self, ExecutionContext, Value, ValueVariant,
+        ExecutionContext, Value, ValueVariant,
         context_contents::RuntimeReference,
         error::{RuntimeError, RuntimeErrorVariant},
         eval,
@@ -180,9 +180,9 @@ fn allocate_instances_from_ref(
 fn eval_operation_colon(
     ast: &AST,
     ctx: &mut ExecutionContext,
-    expr: ExprID,
+    _expr: ExprID,
     operand1: ExprID,
-    operand2: ExprID,
+    _operand2: ExprID,
 ) -> Result<RuntimeReference, RuntimeError> {
     let ret = eval(ast, ctx, operand1);
 

@@ -1,6 +1,13 @@
 // error structs for syntax, semantic analysis
 
-use crate::{parse::{Expr, ExprReturns, Operation, ast_contents::{ExprID, TypeID}}, scan::{Token, TokenType}, tokens::ExpectedToken};
+use crate::{
+    parse::{
+        ExprReturns,
+        ast_contents::{ExprID, TypeID},
+    },
+    scan::Token,
+    tokens::ExpectedToken,
+};
 
 // e.g. function beginning, end name does not match
 #[derive(Clone, Copy)]
@@ -73,7 +80,6 @@ pub struct ExprAndType {
     pub expr: ExprID,
     pub type_id: TypeID,
 }
-
 
 #[derive(Clone)]
 pub enum PatternError {

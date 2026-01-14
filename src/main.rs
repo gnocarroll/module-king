@@ -20,7 +20,7 @@ fn main() -> ExitCode {
         return 1.into();
     }
 
-    let args: Vec<String> = std::env::args().skip(1).collect();
+    let _args: Vec<String> = std::env::args().skip(1).collect();
 
     // always use input.txt for now
     let args = vec!["input.txt"];

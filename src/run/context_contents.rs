@@ -5,7 +5,7 @@ use crate::{
         AST, ExprVariant, MemberVariant, ScopeVariant, Type, TypeOrModule, TypeVariant, Visibility,
         ast_contents::{ExprID, MemberID, ScopeID, TypeID},
     },
-    run::{ExecutionContext, error::RuntimeErrorVariant},
+    run::ExecutionContext,
 };
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]

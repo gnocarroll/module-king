@@ -3,7 +3,11 @@ use std::collections::HashMap;
 use crate::{
     constants::{ERROR_TYPE, UNIT_TYPE},
     parse::{
-        AST, ExprReturns, ExprVariant, Member, MemberVariant, Scope, ScopeRefersTo, ScopeVariant, TokenOrString, Type, TypeOrModule, TypeVariant, Visibility, ast_contents::{ExprID, MemberID, ScopeID, TypeID}, errors::{InvalidOperation, MissingOperand, PatternError, SemanticError}, semantic::SemanticContext
+        AST, ExprReturns, Member, MemberVariant, Scope, ScopeRefersTo, ScopeVariant, TokenOrString,
+        Type, TypeOrModule, TypeVariant, Visibility,
+        ast_contents::{ExprID, MemberID, ScopeID, TypeID},
+        errors::{InvalidOperation, MissingOperand, PatternError, SemanticError},
+        semantic::SemanticContext,
     },
 };
 
@@ -83,7 +87,7 @@ impl AST {
         member_id
     }
 
-    pub fn set_expr_returns_unit(&mut self, ctx: &mut SemanticContext, expr: ExprID) {
+    pub fn set_expr_returns_unit(&mut self, _ctx: &mut SemanticContext, expr: ExprID) {
         let unit_type = self.get_builtin_type_id(UNIT_TYPE);
 
         let expr_mut = self.objs.expr_mut(expr);
@@ -100,17 +104,26 @@ impl AST {
         } else if type_vec.len() == 1 {
             return self.objs.type_push(Type::Tuple((type_vec[0], None)));
         } else if type_vec.len() == 2 {
-            return self.objs.type_push(Type::Tuple((type_vec[0], Some(type_vec[1]))));
+            return self
+                .objs
+                .type_push(Type::Tuple((type_vec[0], Some(type_vec[1]))));
         }
 
-        let mut rest_of_tuple = self.objs.type_push(Type::RestOfTuple((type_vec[1], type_vec[2])));
+        let mut rest_of_tuple = self
+            .objs
+            .type_push(Type::RestOfTuple((type_vec[1], type_vec[2])));
 
-        let ret = self.objs.type_push(Type::Tuple((type_vec[0], Some(rest_of_tuple))));
+        let ret = self
+            .objs
+            .type_push(Type::Tuple((type_vec[0], Some(rest_of_tuple))));
 
         for idx in 2..(type_vec.len() - 1) {
-            let new_rest_of_tuple = self.objs.type_push(Type::RestOfTuple((type_vec[idx], type_vec[idx + 1])));
+            let new_rest_of_tuple = self
+                .objs
+                .type_push(Type::RestOfTuple((type_vec[idx], type_vec[idx + 1])));
 
-            *self.objs.type_mut(rest_of_tuple) = Type::RestOfTuple((type_vec[idx - 1], new_rest_of_tuple));
+            *self.objs.type_mut(rest_of_tuple) =
+                Type::RestOfTuple((type_vec[idx - 1], new_rest_of_tuple));
 
             rest_of_tuple = new_rest_of_tuple;
         }
@@ -121,46 +134,11 @@ impl AST {
     // utility function get ID of current return type
     // (so assumption is that function is being analyzed)
     pub fn get_curr_return_type(&mut self, ctx: &mut SemanticContext) -> TypeID {
-        let err_type = self.get_builtin_type_id(ERROR_TYPE);
-        let unit_type = self.get_builtin_type_id(UNIT_TYPE);
-        
-        // calling this function without current func or current func is malformed
-        // is reason enough to just kill the program, so err_type will only be returned
-        // if function does not have ret type or something
-
-        let func_scope = ctx
+        let curr_func = ctx
             .curr_func
-            .expect("TRIED TO GET CURRENT RETURN TYPE WITH NO CURRENT FUNCTION, KABOOM");
+            .expect("tried to get current return type without current function");
 
-        let func_expr = match self.objs.scope(func_scope).refers_to {
-            Some(ScopeRefersTo::Expr(expr)) => expr,
-            _ => panic!("FUNCTION SCOPE SHOULD REFER TO FUNC EXPR"),
-        };
-
-        match &self.objs.expr(func_expr).variant {
-            ExprVariant::FunctionLiteral(func_literal) => {
-                let ret_type = self.objs.expr(func_literal.return_type);
-
-                // here we did get all the way to return type expr but it is either not finalized
-                // or is not a type itself and thus return error type from here
-
-                if !ret_type.finalized {
-                    return err_type;
-                } else if ret_type.expr_returns == ExprReturns::Unit {
-                    return unit_type;
-                } else if ret_type.expr_returns != ExprReturns::Type {
-                    return err_type;
-                }
-
-                // here id is retrieved
-
-                match ret_type.type_or_module {
-                    TypeOrModule::Type(t) => t,
-                    _ => panic!("expr returns is type but found module in type or module")
-                }
-            },
-            _ => panic!("EXPECTED TO FIND FUNCTION LITERAL EXPR THROUGH CURR FUNC"),
-        }
+        self.objs.function(curr_func).return_type
     }
 
     // search provided scope for a given name and received Member if said name
