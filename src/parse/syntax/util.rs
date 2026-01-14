@@ -1,5 +1,8 @@
 use crate::{
-    parse::{AST, ExprVariant, ScopeVariant, Type, TypeVariant, ast_contents::{ExprID, TypeID}},
+    parse::{
+        AST, ExprVariant, ScopeVariant, Type,
+        ast_contents::{ExprID, TypeID},
+    },
     tokens::Tokens,
 };
 
@@ -86,15 +89,17 @@ impl AST {
                 )
             }
             ExprVariant::FunctionLiteral(function_literal) => {
+                let func = self.objs.function(function_literal.function_id);
+
                 format!(
                     "(function {}{} => {} = {})",
-                    match function_literal.name {
+                    match func.name {
                         Some(tok) => format!("{} ", tokens.tok_as_str(&tok),),
                         None => "".to_string(),
                     },
                     self.expr_to_string(tokens, function_literal.params),
-                    self.expr_to_string(tokens, function_literal.return_type),
-                    self.expr_to_string(tokens, function_literal.body),
+                    self.expr_to_string(tokens, function_literal.return_type_expr),
+                    self.expr_to_string(tokens, func.body),
                 )
             }
             ExprVariant::TypeLiteral(type_literal) => {

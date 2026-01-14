@@ -9,12 +9,11 @@ use crate::{
         AST, ExprReturns, ExprVariant, IdentifierVariant, Member, MemberVariant, Operation,
         Pattern, PatternVariant, Scope, ScopeRefersTo, ScopeVariant, TokenOrString, Tokens, Type,
         TypeOrModule, TypeVariant, Visibility,
-        ast_contents::{ExprID, MemberID, PatternID, ScopeID, TypeID},
+        ast_contents::{ExprID, FunctionID, PatternID, ScopeID, TypeID},
         errors::{
-            ExpectedExprReturns, ExprAndType, InvalidExpr, InvalidOperation, MissingOperand,
-            PatternError, SemanticError, UnexpectedExpr,
+            ExpectedExprReturns, ExprAndType, InvalidExpr, PatternError, SemanticError,
+            UnexpectedExpr,
         },
-        operator,
     },
     scan::TokenType,
 };
@@ -38,8 +37,8 @@ pub struct SemanticContext<'a> {
     tokens: &'a Tokens<'a>,
     analyzing_now: AnalyzingNow,
 
-    // scope id of current function
-    curr_func: Option<ScopeID>,
+    // ID of current function, if one is being analyzed
+    curr_func: Option<FunctionID>,
 }
 
 use operator::OperatorVariant::*;
@@ -86,27 +85,21 @@ impl AST {
     // - append correct param information to func
     // - add correct instances to function scope
     fn pattern_process_for_func_params(&mut self, ctx: &mut SemanticContext, pattern: PatternID) {
-        let func_scope = if let Some(curr_func) = ctx.curr_func {
+        let func = if let Some(curr_func) = ctx.curr_func {
             curr_func
         } else {
             return;
         };
 
-        let func_expr = match self.objs.scope(func_scope).refers_to {
-            Some(ScopeRefersTo::Expr(expr)) => expr,
-            _ => {
-                return;
-            }
-        };
-
         // add pattern to vec for func
 
-        match &mut self.objs.expr_mut(func_expr).variant {
-            ExprVariant::FunctionLiteral(func_literal) => func_literal.param_info.push(pattern),
-            _ => (),
-        }
+        let func_mut = self.objs.function_mut(func);
 
-        self.scope_create_members_from_pattern(ctx, func_scope, pattern);
+        func_mut.params.push(pattern);
+
+        let scope = func_mut.scope;
+
+        self.scope_create_members_from_pattern(ctx, scope, pattern);
     }
 
     // function to attempt pattern matching between identifier(s) in pattern and type
@@ -450,7 +443,7 @@ impl AST {
 
         let old_curr_func = ctx.curr_func;
 
-        ctx.curr_func = Some(func_scope);
+        ctx.curr_func = Some(function_id);
 
         let old_analyzing_now = ctx.analyzing_now;
 
@@ -524,7 +517,7 @@ impl AST {
                 .function(function_id)
                 .params
                 .iter()
-                .map(|param_info| param_info.type_id)
+                .map(|pattern| self.objs.pattern(*pattern).type_id)
                 .collect();
 
             let input_type = self.type_vec_to_tuple(&type_vec);

@@ -88,16 +88,6 @@ pub struct FunctionLiteral {
     pub function_id: FunctionID,
 }
 
-// info on params, each function may have some of these
-#[derive(Clone, Default)]
-pub struct ParamInfo {
-    pub name: Option<Token>,
-    pub type_id: TypeID,
-    pub pattern: PatternID,
-
-    pub member_id: MemberID,
-}
-
 #[derive(Clone, Default)]
 pub struct Function {
     pub name: Option<Token>,
@@ -111,7 +101,7 @@ pub struct Function {
     pub func_type: TypeID,
 
     // order in Vec should be order they are listed in program
-    pub params: Vec<ParamInfo>,
+    pub params: Vec<PatternID>,
 }
 
 #[derive(Clone, Copy, PartialEq)]
