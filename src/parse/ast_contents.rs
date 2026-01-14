@@ -1,7 +1,7 @@
 // ID structs in this module enable use of strongly-typed IDs
 // replacing previous use of u32 for various AST objects
 
-use crate::parse::{Expr, Member, Pattern, Scope, Type};
+use crate::parse::{Expr, Function, Member, Pattern, Scope, Type};
 
 #[derive(Clone, Default)]
 pub struct ASTContents {
@@ -15,10 +15,17 @@ pub struct ASTContents {
     pub members: Vec<Member>,
 
     pub patterns: Vec<Pattern>,
+
+    pub functions: Vec<Function>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub struct ExprID {
+    id: u32,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+pub struct FunctionID {
     id: u32,
 }
 
@@ -121,5 +128,21 @@ impl ASTContents {
 
     pub fn pattern_mut(&mut self, pattern: PatternID) -> &mut Pattern {
         &mut self.patterns[pattern.id as usize]
+    }
+
+    // Function
+
+    pub fn function_push(&mut self, function: Function) -> FunctionID {
+        self.functions.push(function);
+
+        FunctionID { id: self.functions.len() as u32 - 1 }
+    }
+
+    pub fn function(&self, function: FunctionID) -> &Function {
+        &self.functions[function.id as usize]
+    }
+
+    pub fn function_mut(&mut self, function: FunctionID) -> &mut Function {
+        &mut self.functions[function.id as usize]
     }
 }

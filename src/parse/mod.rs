@@ -8,7 +8,7 @@ use std::collections::HashMap;
 
 use crate::{
     parse::{
-        ast_contents::{ASTContents, ExprID, MemberID, PatternID, ScopeID, TypeID},
+        ast_contents::{ASTContents, ExprID, FunctionID, MemberID, PatternID, ScopeID, TypeID},
         errors::{ParseError, SemanticError},
     },
     scan::{Token, TokenType},
@@ -76,15 +76,42 @@ pub enum ScopeVariant {
 
 #[derive(Clone, Default)]
 pub struct FunctionLiteral {
-    pub name: Option<Token>,
+    // this expr is not needed by function struct itself
+    // not relevant once semantic analysis is complete
     pub params: ExprID,
 
     // return type is an expr id rather than Type struct
-    pub return_type: ExprID,
+    // once type is determined it will be stored in
+    // Function struct
+    pub return_type_expr: ExprID,
+    
+    pub function_id: FunctionID,
+}
+
+// info on params, each function may have some of these
+#[derive(Clone, Default)]
+pub struct ParamInfo {
+    pub name: Option<Token>,
+    pub type_id: TypeID,
+    pub pattern: PatternID,
+
+    pub member_id: MemberID,
+}
+
+#[derive(Clone, Default)]
+pub struct Function {
+    pub name: Option<Token>,
+
+    pub return_type: TypeID,
+
+    pub scope: ScopeID,
     pub body: ExprID,
 
-    // for semantic analysis record pattern id for each param
-    pub param_info: Vec<PatternID>,
+    // overall type of function itself
+    pub func_type: TypeID,
+
+    // order in Vec should be order they are listed in program
+    pub params: Vec<ParamInfo>,
 }
 
 #[derive(Clone, Copy, PartialEq)]

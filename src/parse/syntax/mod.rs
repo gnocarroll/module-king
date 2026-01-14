@@ -5,11 +5,7 @@ use operator::OperatorVariant::*;
 
 use crate::{
     parse::{
-        AST, Expr, ExprVariant, FunctionLiteral, Identifier, IdentifierVariant, Operation, Tokens,
-        TypeLiteral, TypeVariant,
-        ast_contents::{ExprID, MemberID},
-        errors::{InvalidExpr, NameMismatch, ParseError, SemanticError},
-        operator,
+        AST, Expr, ExprVariant, Function, FunctionLiteral, Identifier, IdentifierVariant, Operation, Tokens, TypeLiteral, TypeVariant, ast_contents::{ExprID, MemberID}, errors::{InvalidExpr, NameMismatch, ParseError, SemanticError}, operator
     },
     scan::{Token, TokenType},
     tokens::ExpectedToken,
@@ -273,15 +269,19 @@ impl AST {
             };
         }
 
+        let function_id = self.objs.function_push(Function {
+            name,
+            body,
+            ..Default::default()
+        });
+
         self.expr_push(Expr {
             tok: tok_idx,
             end_tok: tokens.idx(),
             variant: ExprVariant::FunctionLiteral(FunctionLiteral {
-                name: name,
                 params: params,
-                return_type: return_type,
-                body: body,
-                ..Default::default()
+                return_type_expr: return_type,
+                function_id,
             }),
             ..Default::default()
         })
