@@ -551,10 +551,11 @@ impl AST {
             expr_mut.type_or_module = TypeOrModule::Type(func_type);
         }
 
+        // IF FINALIZED AND FUNCTION IS NAMED,
         // add function as member of parent scope
 
-        if finalized {
-
+        if let (true, Some(name)) = (finalized, func_name) {
+            self.scope_add_function(ctx.tokens, scope, name, function_id);
         }
     }
 
