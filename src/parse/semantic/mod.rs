@@ -486,6 +486,8 @@ impl AST {
             }
         }
 
+        self.objs.function_mut(function_id).return_type = ret_type_id;
+
         let body_expr = self.objs.function(function_id).body;
 
         ctx.analyzing_now = AnalyzingNow::Expr;
@@ -533,10 +535,7 @@ impl AST {
             self.get_builtin_type_id(ERROR_TYPE)
         };
 
-        let func_mut = self.objs.function_mut(function_id);
-
-        func_mut.return_type = ret_type_id;
-        func_mut.func_type = func_type;
+        self.objs.function_mut(function_id).func_type = func_type;
 
         let expr_mut = self.objs.expr_mut(expr);
 
