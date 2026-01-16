@@ -110,6 +110,7 @@ pub enum IdentifierVariant {
     Module,
     Type,
     Instance,
+    Function,
     Member, // e.g. for point.x would be "x"
 }
 

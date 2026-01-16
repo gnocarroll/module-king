@@ -281,4 +281,18 @@ impl AST {
 
         type_id
     }
+
+    pub fn member_type_or_module(
+        &mut self,
+        member: MemberID,
+    ) -> TypeOrModule {
+        match self.objs.member(member).variant {
+            MemberVariant::Function(function_id) => {
+                TypeOrModule::Type(self.objs.function(function_id).func_type)
+            }
+            MemberVariant::Instance(type_id) => TypeOrModule::Type(type_id),
+            MemberVariant::Type(type_id) => TypeOrModule::Type(type_id),
+            MemberVariant::Module(scope_id) => TypeOrModule::Module(scope_id),
+        }
+    }
 }

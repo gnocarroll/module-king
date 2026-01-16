@@ -653,9 +653,9 @@ impl AST {
                 let name = ctx.tokens.tok_as_str(&ident.name);
 
                 if let Some(member_id) = self.scope_search(scope, name) {
-                    let member = self.objs.member(member_id);
+                    let type_or_module = self.member_type_or_module(member_id);
 
-                    let etype = member.type_or_module.clone();
+                    let member = self.objs.member(member_id);
 
                     let expr_returns = match member.variant {
                         MemberVariant::Module(_) => ExprReturns::Module,
@@ -668,12 +668,12 @@ impl AST {
                         MemberVariant::Module(_) => IdentifierVariant::Module,
                         MemberVariant::Type(_) => IdentifierVariant::Type,
                         MemberVariant::Instance(_) => IdentifierVariant::Instance,
-                        MemberVariant::Function(_) => ,
+                        MemberVariant::Function(_) => IdentifierVariant::Function,
                     };
 
                     let expr_mut = self.expr_mut(expr);
 
-                    expr_mut.type_or_module = etype;
+                    expr_mut.type_or_module = type_or_module;
 
                     if let ExprVariant::Identifier(ident) = &mut expr_mut.variant {
                         ident.member_id = member_id;
@@ -762,8 +762,7 @@ impl AST {
                         let member = self.objs.member_push(Member {
                             name: TokenOrString::String(name.to_string()),
                             visibility: Visibility::Global,
-                            variant: MemberVariant::Instance,
-                            type_or_module: TypeOrModule::Type(boolean_type),
+                            variant: MemberVariant::Instance(boolean_type),
                         });
 
                         self.scope_add_member(&mut ctx, scope, member);
