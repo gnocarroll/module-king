@@ -5,10 +5,12 @@ use crate::{
     parse::{
         AST, ExprReturns, Member, MemberVariant, Scope, ScopeRefersTo, ScopeVariant, TokenOrString,
         Type, TypeOrModule, TypeVariant, Visibility,
-        ast_contents::{ExprID, MemberID, ScopeID, TypeID},
+        ast_contents::{ExprID, FunctionID, MemberID, ScopeID, TypeID},
         errors::{InvalidOperation, MissingOperand, PatternError, SemanticError},
         semantic::SemanticContext,
     },
+    scan::Token,
+    tokens::Tokens,
 };
 
 impl AST {
@@ -282,10 +284,7 @@ impl AST {
         type_id
     }
 
-    pub fn member_type_or_module(
-        &mut self,
-        member: MemberID,
-    ) -> TypeOrModule {
+    pub fn member_type_or_module(&mut self, member: MemberID) -> TypeOrModule {
         match self.objs.member(member).variant {
             MemberVariant::Function(function_id) => {
                 TypeOrModule::Type(self.objs.function(function_id).func_type)
@@ -294,5 +293,30 @@ impl AST {
             MemberVariant::Type(type_id) => TypeOrModule::Type(type_id),
             MemberVariant::Module(scope_id) => TypeOrModule::Module(scope_id),
         }
+    }
+
+    pub fn scope_add_function(
+        &mut self,
+        ctx: &Tokens,
+        scope: ScopeID,
+        name: Token,
+        function: FunctionID,
+    ) -> MemberID {
+        // create member struct and get ID
+
+        let member_id = self.objs.member_push(Member {
+            name: TokenOrString::Token(name),
+            visibility: Visibility::Export,
+            variant: MemberVariant::Function(function),
+        });
+
+        // insert to provided scope
+
+        self.objs
+            .scope_mut(scope)
+            .members
+            .insert(ctx.tok_as_str(&name).to_string(), member_id);
+
+        member_id
     }
 }
