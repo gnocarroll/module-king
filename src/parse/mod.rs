@@ -42,7 +42,18 @@ pub struct TypeLiteral {
 
 #[derive(Clone)]
 pub enum Type {
+    AnyType,
+    AnyModule,
+
+    // is a type as opposed to a value
+    // (a value could be e.g. the number 5 w/ type Integer)
+    Type(TypeID),
+
+    // is a module
+    Module(ScopeID),
+
     // link to scope containing type information e.g. members
+    // this covers types which are integers, floats, records, etc.
     Scope(ScopeID),
 
     // u32 is type id
@@ -182,12 +193,12 @@ pub struct Expr {
     pub tok: u32,
     pub end_tok: u32,
 
-    // ID of language type (or module if expr is module)
-    pub type_or_module: TypeOrModule,
+    // TypeID
+    // will also indicate if the expression is a type itself
+    // or a module
+    pub type_id: TypeID,
 
     pub variant: ExprVariant,
-
-    pub expr_returns: ExprReturns,
 
     // is a variable which implies you can take certain action e.g. take address
     pub is_var: bool,
@@ -202,9 +213,8 @@ impl Default for Expr {
         Expr {
             tok: 0,
             end_tok: 0,
-            type_or_module: TypeOrModule::default(),
+            type_id: TypeID::default(),
             variant: ExprVariant::Unit,
-            expr_returns: ExprReturns::Unit,
             is_var: false,
             finalized: false,
         }

@@ -368,6 +368,21 @@ impl AST {
         expr_mut.type_or_module = TypeOrModule::Type(ret_type)
     }
 
+    // glue values or type together into tuple
+    fn analyze_operation_comma(
+        &mut self,
+        ctx: &mut SemanticContext,
+        scope: ScopeID,
+        expr: ExprID,
+        operand1: ExprID,
+        operand2: ExprID,
+    ) {
+        self.analyze_expr(ctx, scope, operand1);
+        self.analyze_expr(ctx, scope, operand2);
+
+        let finalized = self.expr(operand1).finalized && self.expr(operand2).finalized;
+    }
+
     pub fn analyze_operation_binary(
         &mut self,
         ctx: &mut SemanticContext,
@@ -443,6 +458,10 @@ impl AST {
             }
             TokenType::LParen => {
                 self.analyze_operation_apply(ctx, scope, expr, operand1, operand2);
+                return;
+            }
+            TokenType::Comma => {
+                self.analyze_operation_comma(ctx, scope, expr, operand1, operand2);
                 return;
             }
             TokenType::Semicolon => {

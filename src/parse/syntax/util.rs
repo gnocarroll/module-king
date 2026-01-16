@@ -11,6 +11,8 @@ impl AST {
         let type_ref = self.objs.type_get(type_id);
 
         match type_ref.clone() {
+            Type::AnyType | Type::Type(_) => "type".to_string(),
+            Type::AnyModule | Type::Module(_) => "module".to_string(),
             Type::Alias(t) => self.type_to_string(tokens, t),
             Type::Ptr(t) => format!("*{}", self.type_to_string(tokens, t)),
             Type::Ref(t) => format!("&{}", self.type_to_string(tokens, t)),

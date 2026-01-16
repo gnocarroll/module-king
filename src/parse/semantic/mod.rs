@@ -1,7 +1,7 @@
 mod analyze_operation;
 mod util;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, intrinsics::three_way_compare};
 
 use crate::{
     constants::{BOOLEAN_TYPE, ERROR_TYPE, FLOAT_TYPE, INTEGER_TYPE, STRING_TYPE, UNIT_TYPE},
@@ -343,30 +343,15 @@ impl AST {
         let mut type_id = self.get_builtin_type_id(ERROR_TYPE);
 
         if let (Some(ident_expr), type_expr) = (operand1, operand2) {
-            let type_expr_struct = type_expr.map(|type_expr| self.objs.expr(type_expr).clone());
+            let maybe_type_id = if let Some(type_expr) = type_expr {
+                let expr = self.objs.expr(type_expr);
 
-            // ensure that analyze "type expr" is actually a type
+                match self.objs.type_get(expr.type_id) {
+                    Type::Type(t) => Some(*t),
+                    _ => {
+                        let expr_returns = self.expr_returns(type_expr);
 
-            let expr_returns = type_expr_struct
-                .as_ref()
-                .map_or(ExprReturns::Error, |type_expr_struct| {
-                    type_expr_struct.expr_returns
-                });
-
-            let expr_returns_type = expr_returns == ExprReturns::Type;
-
-            if !expr_returns_type {
-                err = Some(self.expected_expr_returns(expr, ExprReturns::Type, expr_returns));
-            }
-
-            let maybe_type_id = if let (Some(type_expr_struct), true) =
-                (type_expr_struct, expr_returns_type)
-            {
-                match type_expr_struct.type_or_module {
-                    TypeOrModule::Type(t) => Some(t),
-                    TypeOrModule::Module(_) => {
-                        err =
-                            Some(self.expected_expr_returns(expr, ExprReturns::Type, expr_returns));
+                        err = Some(self.expected_expr_returns(type_expr, ExprReturns::Type, expr_returns));
 
                         None
                     }
@@ -406,8 +391,7 @@ impl AST {
 
         let expr_mut = self.objs.expr_mut(expr);
 
-        expr_mut.type_or_module = TypeOrModule::Type(type_id);
-        expr_mut.expr_returns = ExprReturns::Value;
+        expr_mut.type_id = type_id;
         expr_mut.is_var = true;
         expr_mut.finalized = err.is_none();
 
@@ -463,19 +447,15 @@ impl AST {
 
         match (
             ret_type_expr.finalized,
-            ret_type_expr.expr_returns,
+            self.objs.type_get(ret_type_expr.type_id),
             &ret_type_expr.variant,
         ) {
             (false, ..) => (), // not finalized, don't test for err
-            (_, ExprReturns::Type, _) => {
+            (_, _, ExprVariant::Unit) => (), // Ok, function returns Unit
+            (_, Type::Type(t), _) => {
                 // Ok, record type
-                if let TypeOrModule::Type(t) = ret_type_expr.type_or_module {
-                    ret_type_id = t;
-                } else {
-                    panic!("expr returns type but found module in type or module");
-                }
+                ret_type_id = *t;
             }
-            (_, ExprReturns::Unit, ExprVariant::Unit) => (), // Ok, function returns Unit
             _ => {
                 self.semantic_errors
                     .push(SemanticError::InvalidExpr(InvalidExpr {
@@ -547,8 +527,7 @@ impl AST {
         if func_name.is_some() {
             self.set_expr_returns_unit(ctx, expr);
         } else {
-            expr_mut.expr_returns = ExprReturns::Value;
-            expr_mut.type_or_module = TypeOrModule::Type(func_type);
+            expr_mut.type_id = func_type;
         }
 
         // IF FINALIZED AND FUNCTION IS NAMED,
@@ -592,13 +571,13 @@ impl AST {
         self.analyze_expr(ctx, type_scope, type_literal.body);
         ctx.analyzing_now = old_analyzing_now;
 
-        // type of named type literal is Unit (cannot assign it to something)
-        // type of unnamed type literal is whatever type in question is
+        // this is how we indicate that expr is returning type itself rather than a value
+
+        let type_id = self.objs.type_push(Type::Type(type_id));
 
         let expr_mut = self.objs.expr_mut(expr);
 
-        expr_mut.type_or_module = TypeOrModule::Type(type_id);
-        expr_mut.expr_returns = ExprReturns::Type;
+        expr_mut.type_id = type_id;
         expr_mut.finalized = true;
     }
 
@@ -643,45 +622,39 @@ impl AST {
 
                 let expr = self.expr_mut(expr);
 
-                if type_name != UNIT_TYPE {
-                    expr.expr_returns = ExprReturns::Value;
-                }
-
-                expr.type_or_module = TypeOrModule::Type(type_id);
+                expr.type_id = type_id;
                 expr.finalized = true;
             }
             ExprVariant::Identifier(ident) => {
                 let name = ctx.tokens.tok_as_str(&ident.name);
 
                 if let Some(member_id) = self.scope_search(scope, name) {
-                    let type_or_module = self.member_type_or_module(member_id);
-
                     let member = self.objs.member(member_id);
 
-                    let expr_returns = match member.variant {
-                        MemberVariant::Module(_) => ExprReturns::Module,
-                        MemberVariant::Type(_) => ExprReturns::Type,
-                        MemberVariant::Instance(_) => ExprReturns::Value,
-                        MemberVariant::Function(_) => ExprReturns::Value,
-                    };
-
-                    let ident_variant = match member.variant {
-                        MemberVariant::Module(_) => IdentifierVariant::Module,
-                        MemberVariant::Type(_) => IdentifierVariant::Type,
-                        MemberVariant::Instance(_) => IdentifierVariant::Instance,
-                        MemberVariant::Function(_) => IdentifierVariant::Function,
+                    let (type_id, ident_variant) = match member.variant {
+                        MemberVariant::Module(scope_id) => (
+                            self.objs.type_push(Type::Module(scope_id)),
+                            IdentifierVariant::Module,
+                        ),
+                        MemberVariant::Type(type_id) => (
+                            self.objs.type_push(Type::Type(type_id)),
+                            IdentifierVariant::Type,
+                        ),
+                        MemberVariant::Instance(type_id) => (type_id, IdentifierVariant::Instance),
+                        MemberVariant::Function(function_id) => (
+                            self.objs.function(function_id).func_type,
+                            IdentifierVariant::Function
+                        ),
                     };
 
                     let expr_mut = self.expr_mut(expr);
 
-                    expr_mut.type_or_module = type_or_module;
+                    expr_mut.type_id = type_id;
 
                     if let ExprVariant::Identifier(ident) = &mut expr_mut.variant {
                         ident.member_id = member_id;
                         ident.variant = ident_variant;
                     }
-
-                    expr_mut.expr_returns = expr_returns;
 
                     expr_mut.is_var = true;
                     expr_mut.finalized = true;

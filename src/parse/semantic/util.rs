@@ -3,11 +3,7 @@ use std::collections::HashMap;
 use crate::{
     constants::{ERROR_TYPE, UNIT_TYPE},
     parse::{
-        AST, ExprReturns, Member, MemberVariant, Scope, ScopeRefersTo, ScopeVariant, TokenOrString,
-        Type, TypeOrModule, TypeVariant, Visibility,
-        ast_contents::{ExprID, FunctionID, MemberID, ScopeID, TypeID},
-        errors::{InvalidOperation, MissingOperand, PatternError, SemanticError},
-        semantic::SemanticContext,
+        AST, ExprReturns, Member, MemberVariant, Scope, ScopeRefersTo, ScopeVariant, TokenOrString, Type, TypeOrModule, TypeVariant, Visibility, ast_contents::{ExprID, FunctionID, MemberID, ScopeID, TypeID}, errors::{InvalidOperation, MissingOperand, PatternError, SemanticError}, semantic::SemanticContext
     },
     scan::Token,
     tokens::Tokens,
@@ -89,12 +85,11 @@ impl AST {
     }
 
     pub fn set_expr_returns_unit(&mut self, _ctx: &mut SemanticContext, expr: ExprID) {
-        let unit_type = self.get_builtin_type_id(UNIT_TYPE);
+        let unit_type_id = self.get_builtin_type_id(UNIT_TYPE);
 
         let expr_mut = self.objs.expr_mut(expr);
 
-        expr_mut.expr_returns = ExprReturns::Unit;
-        expr_mut.type_or_module = TypeOrModule::Type(unit_type);
+        expr_mut.type_id = unit_type_id;
     }
 
     // build tuple type of indefinite length from vector of type IDs
@@ -318,5 +313,20 @@ impl AST {
             .insert(ctx.tok_as_str(&name).to_string(), member_id);
 
         member_id
+    }
+
+    pub fn expr_returns(&self, expr: ExprID) -> ExprReturns {
+        let unit_type_id = self.get_builtin_type_id(UNIT_TYPE);
+        let expr = self.objs.expr(expr);
+
+        if expr.type_id == unit_type_id {
+            return ExprReturns::Unit;
+        }
+
+        match self.objs.type_get(expr.type_id) {
+            Type::AnyType | Type::Type(_) => ExprReturns::Type,
+            Type::AnyModule | Type::Module(_) => ExprReturns::Module,
+            _ => ExprReturns::Value,
+        }
     }
 }

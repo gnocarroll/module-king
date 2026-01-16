@@ -2,12 +2,12 @@ use std::ops::{Add, Div, Mul, Rem, Sub};
 
 use crate::{
     constants::UNIT_TYPE,
-    parse::{AST, Operation, TypeOrModule, ast_contents::ExprID},
+    parse::{AST, Operation, ast_contents::ExprID},
     run::{
         ExecutionContext, Value, ValueVariant,
         context_contents::RuntimeReference,
         error::{RuntimeError, RuntimeErrorVariant},
-        eval,
+        eval, expr_to_unit,
     },
     scan::TokenType,
 };
@@ -69,12 +69,7 @@ fn eval_operation_unary(
         variant: RuntimeErrorVariant::InvalidOperation,
     });
 
-    let type_id = match ast.objs.expr(operand).type_or_module {
-        TypeOrModule::Type(t) => t,
-        TypeOrModule::Module(_) => {
-            return invalid_op;
-        }
-    };
+    let type_id = ast.objs.expr(operand).type_id;
 
     let operand_ref = eval(ast, ctx, operand)?;
 
@@ -290,19 +285,6 @@ fn do_assignment(
         .value_overwrite(assign_to_ref.value_id, new_value);
 }
 
-fn expr_to_unit(ast: &AST, ctx: &mut ExecutionContext, expr: ExprID) -> RuntimeReference {
-    let type_id = match ast.objs.expr(expr).type_or_module {
-        TypeOrModule::Type(t) => Some(t),
-        TypeOrModule::Module(_) => panic!("eq operation should have type, not be a module"),
-    };
-
-    Value {
-        type_id,
-        variant: ValueVariant::Unit,
-    }
-    .to_runtime_ref(ctx, ctx.curr_scope)
-}
-
 fn eval_operation_eq(
     ast: &AST,
     ctx: &mut ExecutionContext,
@@ -332,14 +314,8 @@ fn eval_operation_binary(
     });
 
     let type_ids = [
-        match ast.objs.expr(operand1).type_or_module {
-            TypeOrModule::Type(t) => t,
-            TypeOrModule::Module(_) => return invalid_op,
-        },
-        match ast.objs.expr(operand2).type_or_module {
-            TypeOrModule::Type(t) => t,
-            TypeOrModule::Module(_) => return invalid_op,
-        },
+        ast.objs.expr(operand1).type_id,
+        ast.objs.expr(operand2).type_id,
     ];
 
     match op {

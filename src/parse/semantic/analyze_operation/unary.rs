@@ -1,8 +1,8 @@
 use crate::{
-    constants::{BOOLEAN_TYPE, ERROR_TYPE},
+    constants::{BOOLEAN_TYPE, ERROR_TYPE, UNIT_TYPE},
     parse::{
-        AST, ExprReturns, ScopeVariant, Type, TypeOrModule, TypeVariant,
-        ast_contents::{ExprID, ScopeID, TypeID},
+        AST, ScopeVariant, Type, TypeVariant,
+        ast_contents::{ExprID, ScopeID},
         errors::{InvalidOperation, SemanticError},
         operator,
         semantic::SemanticContext,
@@ -35,49 +35,43 @@ impl AST {
             return;
         }
 
-        let operand_type_or_module = self.expr(operand).type_or_module.clone();
+        let operand_struct = self.expr(operand);
+
+        let operand_is_var = operand_struct.is_var;
+        let operand_type_id = operand_struct.type_id;
 
         // can surround type or module with parentheses
 
         if op == TokenType::LParen {
-            let expr_returns = self.expr(operand).expr_returns;
-
             let expr_mut = self.objs.expr_mut(expr);
 
-            expr_mut.expr_returns = expr_returns;
-            expr_mut.type_or_module = operand_type_or_module;
+            expr_mut.type_id = operand_type_id;
+            expr_mut.is_var = operand_is_var;
             expr_mut.finalized = true;
 
             return;
         }
 
-        let operand_type = match self.expr(operand).type_or_module {
-            TypeOrModule::Type(t) => t,
-            TypeOrModule::Module(_) => {
+        match self.objs.type_get(operand_type_id) {
+            Type::Module(_) => {
                 self.invalid_operation(expr, "unary operation may not be applied to a module");
                 return;
             }
-        };
-
-        match self.expr(operand).expr_returns {
-            ExprReturns::Module => {
-                self.invalid_operation(expr, "unary operation may not be applied to a module");
-                return;
-            }
-            ExprReturns::Type => {
-                let type_id = match op {
-                    TokenType::Star => self.objs.type_push(Type::Ptr(operand_type)),
-                    TokenType::Ampersand => self.objs.type_push(Type::Ref(operand_type)),
+            Type::Type(t) => {
+                let expr_returns = match op {
+                    TokenType::Star => self.objs.type_push(Type::Ptr(*t)),
+                    TokenType::Ampersand => self.objs.type_push(Type::Ref(*t)),
                     _ => {
                         self.invalid_operation(expr, "this operation is not supported for types");
                         return;
                     }
                 };
 
-                let expr_mut = &mut self.objs.expr_mut(expr);
+                let type_id = self.objs.type_push(Type::Type(expr_returns));
 
-                expr_mut.expr_returns = ExprReturns::Type;
-                expr_mut.type_or_module = TypeOrModule::Type(type_id);
+                let expr_mut = self.objs.expr_mut(expr);
+
+                expr_mut.type_id = type_id;
                 expr_mut.finalized = true;
 
                 return;
@@ -89,7 +83,7 @@ impl AST {
             TokenType::Plus | TokenType::Minus | TokenType::PlusPlus | TokenType::MinusMinus => {
                 let err_msg = "this unary operation is only supported for integers and floats";
 
-                let type_variant = match self.objs.type_get(operand_type) {
+                let type_variant = match self.objs.type_get(operand_type_id) {
                     Type::Scope(scope) => match self.objs.scope(*scope).variant {
                         ScopeVariant::Type(variant) => Some(variant),
                         _ => None,
@@ -110,15 +104,16 @@ impl AST {
                     return;
                 }
 
-                let (expr_type, expr_returns) = match op {
-                    TokenType::Plus | TokenType::Minus => (operand_type, ExprReturns::Value),
-                    _ => (TypeID::default(), ExprReturns::Unit),
+                let unit_type_id = self.get_builtin_type_id(UNIT_TYPE);
+
+                let expr_type = match op {
+                    TokenType::Plus | TokenType::Minus => operand_type_id,
+                    _ => unit_type_id,
                 };
 
                 let expr_mut = self.objs.expr_mut(expr);
 
-                expr_mut.type_or_module = TypeOrModule::Type(expr_type);
-                expr_mut.expr_returns = expr_returns;
+                expr_mut.type_id = expr_type;
                 expr_mut.finalized = true;
 
                 return;
@@ -132,12 +127,11 @@ impl AST {
                 }
 
                 // type of finalized type is reference to whatever type operand is
-                let expr_type = self.objs.type_push(Type::Ref(operand_type));
+                let expr_type = self.objs.type_push(Type::Ref(operand_type_id));
 
                 let expr_mut = self.objs.expr_mut(expr);
 
-                expr_mut.type_or_module = TypeOrModule::Type(expr_type);
-                expr_mut.expr_returns = ExprReturns::Value;
+                expr_mut.type_id = expr_type;
                 expr_mut.finalized = true;
 
                 return;
@@ -146,7 +140,7 @@ impl AST {
                 // i.e. deref
                 let err_msg = "you may only dereference a pointer or reference";
 
-                let expr_type = match self.objs.type_get(operand_type) {
+                let expr_type = match self.objs.type_get(operand_type_id) {
                     Type::Ptr(t) | Type::Ref(t) => *t,
                     _ => {
                         self.invalid_operation(expr, err_msg);
@@ -156,8 +150,7 @@ impl AST {
 
                 let expr_mut = self.objs.expr_mut(expr);
 
-                expr_mut.type_or_module = TypeOrModule::Type(expr_type);
-                expr_mut.expr_returns = ExprReturns::Value;
+                expr_mut.type_id = expr_type;
                 expr_mut.finalized = true;
 
                 return;
@@ -165,7 +158,7 @@ impl AST {
             TokenType::Tilde => {
                 let err_msg = "this unary operation is only supported for integers";
 
-                let type_variant = match self.objs.type_get(operand_type) {
+                let type_variant = match self.objs.type_get(operand_type_id) {
                     Type::Scope(scope) => match self.objs.scope(*scope).variant {
                         ScopeVariant::Type(variant) => Some(variant),
                         _ => None,
@@ -188,8 +181,7 @@ impl AST {
 
                 let expr_mut = &mut self.objs.expr_mut(expr);
 
-                expr_mut.type_or_module = TypeOrModule::Type(operand_type);
-                expr_mut.expr_returns = ExprReturns::Value;
+                expr_mut.type_id = operand_type_id;
                 expr_mut.finalized = true;
 
                 return;
@@ -201,15 +193,14 @@ impl AST {
 
                 let boolean_type = self.get_builtin_type_id(BOOLEAN_TYPE);
 
-                if operand_type != boolean_type {
+                if operand_type_id != boolean_type {
                     self.invalid_operation(expr, err_msg);
                     return;
                 }
 
                 let expr_mut = self.objs.expr_mut(expr);
 
-                expr_mut.type_or_module = TypeOrModule::Type(boolean_type);
-                expr_mut.expr_returns = ExprReturns::Value;
+                expr_mut.type_id = boolean_type;
                 expr_mut.finalized = true;
 
                 return;
@@ -230,7 +221,7 @@ impl AST {
                     return;
                 }
 
-                if curr_ret_type != operand_type {
+                if curr_ret_type != operand_type_id {
                     self.invalid_operation(
                         expr,
                         "type of return operand must match function return type",

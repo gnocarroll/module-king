@@ -5,13 +5,11 @@ mod error;
 mod eval_operation;
 
 use crate::{
-    parse::{AST, ExprReturns, ExprVariant, TypeOrModule, ast_contents::ExprID},
-    run::{
+    constants::UNIT_TYPE, parse::{AST, ExprReturns, ExprVariant, Type, ast_contents::ExprID}, run::{
         context_contents::{ContextObjects, RuntimeReference, RuntimeScopeID, Value, ValueVariant},
         error::{RuntimeError, RuntimeErrorVariant},
         eval_operation::eval_operation,
-    },
-    tokens::Tokens,
+    }, tokens::Tokens
 };
 
 pub struct ExecutionContext<'a> {
@@ -33,20 +31,31 @@ impl<'a> ExecutionContext<'a> {
     }
 }
 
+fn expr_to_unit(ast: &AST, ctx: &mut ExecutionContext, expr: ExprID) -> RuntimeReference {
+    let type_id = ast.objs.expr(expr).type_id;
+
+    Value {
+        type_id: Some(type_id),
+        variant: ValueVariant::Unit,
+    }
+    .to_runtime_ref(ctx, ctx.curr_scope)
+}
+
 fn eval(ast: &AST, ctx: &mut ExecutionContext, expr: ExprID) -> Result<RuntimeReference, RuntimeError> {
     // 1. collect some preliminary info on expr
 
-    let expr_returns = ast.objs.expr(expr).expr_returns;
+    let type_id = ast.objs.expr(expr).type_id;
 
-    let type_id = match ast.objs.expr(expr).type_or_module {
-        TypeOrModule::Type(t) => t,
-        TypeOrModule::Module(scope) => {
-            return Ok(Value {
-                type_id: None,
-                variant: ValueVariant::Module(scope),
-            }.to_runtime_ref(ctx, ctx.curr_scope));
+    // if expr is a type itself or a module do not need to do any work
+
+    match ast.objs.type_get(type_id) {
+        Type::Type(_) | Type::Module(_) => {
+            return Ok(expr_to_unit(ast, ctx, expr))
         }
-    };
+        _ => (),
+    }
+
+    let unit_type_id = ast.get_builtin_type_id(UNIT_TYPE);
 
     // 2. depending on expr variant we convert to value variant or maybe
     // immediately find out what the ret value of this function should be
@@ -70,7 +79,7 @@ fn eval(ast: &AST, ctx: &mut ExecutionContext, expr: ExprID) -> Result<RuntimeRe
 
         // named function literal returns unit but if not named then return expr id
 
-        ExprVariant::FunctionLiteral(func) => if expr_returns == ExprReturns::Unit {
+        ExprVariant::FunctionLiteral(func) => if type_id == unit_type_id {
             ValueVariant::Unit
         } else {
             ValueVariant::Function(func.function_id)
