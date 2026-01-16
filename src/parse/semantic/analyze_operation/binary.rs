@@ -1,8 +1,10 @@
+use std::num::TryFromIntError;
+
 use crate::{
     constants::{BOOLEAN_TYPE, ERROR_TYPE, UNIT_TYPE},
     parse::{
-        AST, ExprReturns, ExprVariant, IdentifierVariant, MemberVariant, Operation, ScopeVariant,
-        Type, TypeOrModule, TypeVariant, Visibility,
+        AST, ExprReturns, ExprVariant, Function, IdentifierVariant, MemberVariant, Operation,
+        ScopeVariant, Type, TypeOrModule, TypeVariant, Visibility,
         ast_contents::{ExprID, ScopeID, TypeID},
         operator,
         semantic::{AnalyzingNow, SemanticContext},
@@ -12,6 +14,14 @@ use crate::{
 };
 
 use operator::OperatorVariant::*;
+
+// if doing apply operator (e.g. "f()") what are you doing
+// (e.g. are you calling a function or casting to other type)
+#[derive(Clone, Copy, PartialEq)]
+enum ApplyCase {
+    Cast,
+    Function,
+}
 
 impl AST {
     // first return value is supported type variants for args
@@ -299,6 +309,63 @@ impl AST {
         operand2: ExprID,
     ) {
         self.analyze_expr(ctx, scope, operand1);
+
+        let mut finalized = true;
+        let mut ret_type = self.get_builtin_type_id(ERROR_TYPE);
+
+        let operand1_struct = self.expr(operand1);
+
+        let mut apply_case = ApplyCase::Function;
+
+        match (
+            operand1_struct.finalized,
+            operand1_struct.expr_returns,
+            &operand1_struct.type_or_module,
+        ) {
+            (false, _, _) => (),
+
+            // type cast
+
+            (true, ExprReturns::Type, TypeOrModule::Type(t)) => {
+                apply_case = ApplyCase::Cast;
+                ret_type = *t;
+            }
+
+            // function call, check if type is function
+
+            (true, ExprReturns::Value, TypeOrModule::Type(t))
+                if matches!(self.objs.type_get(*t), Type::Function(_)) => {
+
+                if let Type::Function((_, ret_t)) = self.objs.type_get(*t) {
+                    ret_type = *ret_t;
+                } else {
+                    panic!("should already have been determined that type is function");
+                }
+            }
+
+            // invalid
+
+            _ => {
+                self.invalid_operation(expr, "should be type cast or function call");
+                finalized = false;
+            }
+        }
+
+        let old_analyzing_now = ctx.analyzing_now;
+
+        ctx.analyzing_now = AnalyzingNow::FuncArgs;
+        self.analyze_expr(ctx, scope, operand2);
+        ctx.analyzing_now = old_analyzing_now;
+
+        if !self.expr(operand1).finalized || !self.expr(operand2).finalized {
+            finalized = false;
+        }
+
+        let expr_mut = self.objs.expr_mut(expr);
+
+        expr_mut.finalized = finalized;
+        expr_mut.expr_returns = ExprReturns::Value;
+        expr_mut.type_or_module = TypeOrModule::Type(ret_type)
     }
 
     pub fn analyze_operation_binary(
