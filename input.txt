@@ -1,5 +1,2 @@
-function add4(x: Integer, y: Integer, z: Float, w: Float) Integer begin
-    return x + y;
-end function;
-
-add4(0)
+function inc(x: Integer) Integer
+    return x + 1

@@ -413,7 +413,7 @@ impl AST {
         (pattern, err)
     }
 
-    fn semantic_analyze_func(&mut self, ctx: &mut SemanticContext, scope: ScopeID, expr: ExprID) {
+    fn analyze_func(&mut self, ctx: &mut SemanticContext, scope: ScopeID, expr: ExprID) {
         let func_literal = match &self.objs.expr(expr).variant {
             ExprVariant::FunctionLiteral(f) => f.clone(),
             _ => panic!(),
@@ -688,7 +688,7 @@ impl AST {
                     return;
                 }
 
-                self.semantic_analyze_func(ctx, scope, expr);
+                self.analyze_func(ctx, scope, expr);
             }
             ExprVariant::TypeLiteral(_) => {
                 if self
