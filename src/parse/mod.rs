@@ -228,9 +228,10 @@ pub enum Visibility {
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum MemberVariant {
-    Module,
-    Type,
-    Instance,
+    Module(ScopeID),
+    Type(TypeID),
+    Instance(TypeID),
+    Function(FunctionID),
 }
 
 #[derive(Clone)]
@@ -251,10 +252,6 @@ pub struct Member {
     pub visibility: Visibility,
 
     pub variant: MemberVariant,
-
-    // instance or type => type
-    // if this member is a module => module
-    pub type_or_module: TypeOrModule,
 }
 
 #[derive(Clone)]

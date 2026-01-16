@@ -267,13 +267,17 @@ impl AST {
             _ => (),
         }
 
-        let expr_returns = match self.objs.member(member_id).variant {
-            MemberVariant::Instance => ExprReturns::Value,
-            MemberVariant::Type => ExprReturns::Type,
-            MemberVariant::Module => ExprReturns::Module,
+        let (expr_returns, type_or_module) = match self.objs.member(member_id).variant {
+            MemberVariant::Instance(type_id) => (ExprReturns::Value, TypeOrModule::Type(type_id)),
+            MemberVariant::Type(type_id) => (ExprReturns::Type, TypeOrModule::Type(type_id)),
+            MemberVariant::Module(scope_id) => {
+                (ExprReturns::Module, TypeOrModule::Module(scope_id))
+            }
+            MemberVariant::Function(function_id) => (
+                ExprReturns::Value,
+                TypeOrModule::Type(self.objs.function(function_id).func_type),
+            ),
         };
-
-        let type_or_module = self.objs.member(member_id).type_or_module.clone();
 
         let expr_mut = self.objs.expr_mut(expr);
 
@@ -295,8 +299,6 @@ impl AST {
         operand2: ExprID,
     ) {
         self.analyze_expr(ctx, scope, operand1);
-
-        
     }
 
     pub fn analyze_operation_binary(

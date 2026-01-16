@@ -550,6 +550,12 @@ impl AST {
             expr_mut.expr_returns = ExprReturns::Value;
             expr_mut.type_or_module = TypeOrModule::Type(func_type);
         }
+
+        // add function as member of parent scope
+
+        if finalized {
+
+        }
     }
 
     fn semantic_analyze_type_literal(
