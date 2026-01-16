@@ -466,6 +466,15 @@ impl AST {
     fn parse_expr_bp(&mut self, tokens: &mut Tokens, min_bp: u8) -> ExprID {
         let mut lhs = self.parse_lhs(tokens);
 
+        // if lhs is Unit then do not try to parse further operators
+        // there is no Infix, Postfix, or PostfixAround operator where it would be
+        // valid to omit LHS
+
+        match self.objs.expr(lhs).variant {
+            ExprVariant::Unit => return lhs,
+            _ => (),
+        }
+
         loop {
             let op = tokens.peek();
 

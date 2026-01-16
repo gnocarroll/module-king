@@ -156,6 +156,7 @@ pub enum ExprVariant {
     Unit,
     Underscore,
     KWType, // the keyword "type" e.g. type(x)
+    KWModule, // the keyword "module"
     DollarNumber(u64),
     IntegerLiteral(u64),
     FloatLiteral(f64),
