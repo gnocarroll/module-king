@@ -638,9 +638,7 @@ impl AST {
                     _ => panic!("only unit, integer, float here"),
                 };
 
-                let member = self.get_builtin_type(type_name);
-
-                let type_id = self.objs.member(member).type_or_module.clone();
+                let type_id = self.get_builtin_type_id(type_name);
 
                 let expr = self.expr_mut(expr);
 
@@ -648,7 +646,7 @@ impl AST {
                     expr.expr_returns = ExprReturns::Value;
                 }
 
-                expr.type_or_module = type_id;
+                expr.type_or_module = TypeOrModule::Type(type_id);
                 expr.finalized = true;
             }
             ExprVariant::Identifier(ident) => {
@@ -660,15 +658,17 @@ impl AST {
                     let etype = member.type_or_module.clone();
 
                     let expr_returns = match member.variant {
-                        MemberVariant::Module => ExprReturns::Module,
-                        MemberVariant::Type => ExprReturns::Type,
-                        MemberVariant::Instance => ExprReturns::Value,
+                        MemberVariant::Module(_) => ExprReturns::Module,
+                        MemberVariant::Type(_) => ExprReturns::Type,
+                        MemberVariant::Instance(_) => ExprReturns::Value,
+                        MemberVariant::Function(_) => ExprReturns::Value,
                     };
 
                     let ident_variant = match member.variant {
-                        MemberVariant::Module => IdentifierVariant::Module,
-                        MemberVariant::Type => IdentifierVariant::Type,
-                        MemberVariant::Instance => IdentifierVariant::Instance,
+                        MemberVariant::Module(_) => IdentifierVariant::Module,
+                        MemberVariant::Type(_) => IdentifierVariant::Type,
+                        MemberVariant::Instance(_) => IdentifierVariant::Instance,
+                        MemberVariant::Function(_) => ,
                     };
 
                     let expr_mut = self.expr_mut(expr);

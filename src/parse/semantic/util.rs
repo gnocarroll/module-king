@@ -14,7 +14,7 @@ use crate::{
 impl AST {
     pub fn get_builtin_type(&self, name: &str) -> MemberID {
         if let Some(member) = self.scope_search(ScopeID::default(), name) {
-            if self.objs.member(member).variant != MemberVariant::Type {
+            if let MemberVariant::Type(_) = self.objs.member(member).variant {
                 panic!("Not a type")
             }
 
@@ -34,8 +34,8 @@ impl AST {
     pub fn get_builtin_type_id(&self, name: &str) -> TypeID {
         let member = self.get_builtin_type(name);
 
-        match self.objs.member(member).type_or_module {
-            TypeOrModule::Type(t) => t,
+        match self.objs.member(member).variant {
+            MemberVariant::Type(t) => t,
             _ => panic!("builtin type should not be a module"),
         }
     }
@@ -78,8 +78,7 @@ impl AST {
         let member_id = self.objs.member_push(Member {
             name,
             visibility: Visibility::Private,
-            variant: MemberVariant::Instance,
-            type_or_module: TypeOrModule::Type(type_id),
+            variant: MemberVariant::Instance(type_id),
         });
 
         self.scope_add_member(ctx, scope, member_id);
@@ -219,8 +218,7 @@ impl AST {
         let member_id = self.objs.member_push(Member {
             name: name.expect("CURRENTLY CAN ONLY ADD NAMED TYPE AS SCOPE MEMBER"),
             visibility: Visibility::Private,
-            variant: MemberVariant::Type,
-            type_or_module: TypeOrModule::Type(type_id),
+            variant: MemberVariant::Type(type_id),
         });
 
         self.scope_add_member(ctx, scope, member_id);
@@ -255,8 +253,7 @@ impl AST {
         let member_id = self.objs.member_push(Member {
             name: name,
             visibility: Visibility::Private,
-            variant: MemberVariant::Type,
-            type_or_module: TypeOrModule::Type(type_id),
+            variant: MemberVariant::Type(type_id),
         });
 
         self.scope_add_member(ctx, scope, member_id);
@@ -277,8 +274,7 @@ impl AST {
         let member_id = self.objs.member_push(Member {
             name: name,
             visibility: Visibility::Private,
-            variant: MemberVariant::Type,
-            type_or_module: TypeOrModule::Type(type_id),
+            variant: MemberVariant::Type(type_id),
         });
 
         self.scope_add_member(ctx, scope, member_id);

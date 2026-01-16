@@ -102,7 +102,7 @@ impl RuntimeReference {
 
                 let func_name_str = match func.name {
                     Some(t) => ctx.tokens.tok_as_str(&t),
-                    None => "(anonymous)"
+                    None => "(anonymous)",
                 };
 
                 format!("function {}", func_name_str)
@@ -143,16 +143,28 @@ impl RuntimeReference {
                     .dup_in_scope(ast, ctx, target_scope);
             }
             ValueVariant::Record(map) => {
-                let new_map: HashMap<String, ValueID> = map.iter().map(|(name, value_id)| {
-                    let new_value = RuntimeReference {
-                        scope: self.scope,
-                        value_id: *value_id,
-                    }.dup_in_scope(ast, ctx, target_scope);
+                let new_map: HashMap<String, ValueID> = map
+                    .iter()
+                    .map(|(name, value_id)| {
+                        let new_value = RuntimeReference {
+                            scope: self.scope,
+                            value_id: *value_id,
+                        }
+                        .dup_in_scope(ast, ctx, target_scope);
 
-                    (name.clone(), ctx.objs.runtime_scope_mut(target_scope).value_push(new_value))
-                }).collect();
+                        (
+                            name.clone(),
+                            ctx.objs
+                                .runtime_scope_mut(target_scope)
+                                .value_push(new_value),
+                        )
+                    })
+                    .collect();
 
-                Value { type_id: value.type_id, variant: ValueVariant::Record(new_map) }
+                Value {
+                    type_id: value.type_id,
+                    variant: ValueVariant::Record(new_map),
+                }
             }
         };
 
@@ -221,16 +233,10 @@ fn type_to_value_id(ast: &AST, runtime_scope: &mut RuntimeScope, type_id: TypeID
                         .filter_map(|(name, member_id)| {
                             let member = ast.objs.member(*member_id);
 
-                            match (member.variant, member.visibility) {
-                                (MemberVariant::Module, _) => return None,
-                                (MemberVariant::Type, _) => return None,
+                            let type_id = match (member.variant, member.visibility) {
                                 (_, Visibility::Global) => return None,
-                                _ => (),
-                            };
-
-                            let type_id = match member.type_or_module {
-                                TypeOrModule::Type(t) => t,
-                                TypeOrModule::Module(_) => return None,
+                                (MemberVariant::Instance(t), _) => t,
+                                (_, _) => return None,
                             };
 
                             let value_id = type_to_value_id(ast, runtime_scope, type_id);
@@ -303,7 +309,10 @@ impl ContextObjects {
 
     // give new value to member
     pub fn instance_set(&mut self, member_id: MemberID, new_value: Value) {
-        let scope_id = *(self.member_map.get(&member_id).expect("member not allocated"));
+        let scope_id = *(self
+            .member_map
+            .get(&member_id)
+            .expect("member not allocated"));
 
         let scope = self.runtime_scope_mut(scope_id);
 
@@ -320,12 +329,10 @@ impl ContextObjects {
     ) -> RuntimeReference {
         let member = ast.objs.member(member_id);
 
-        let type_id = match member.type_or_module {
-            TypeOrModule::Type(t) => t,
-            TypeOrModule::Module(_) => {
-                panic!(
-                    "attempted to allocate module in interpreter, doesn't make sense/isn't supported"
-                );
+        let type_id = match member.variant {
+            MemberVariant::Instance(t) => t,
+            _ => {
+                panic!("can only allocate member which is an instance in interpreter");
             }
         };
 
