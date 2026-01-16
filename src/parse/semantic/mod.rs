@@ -28,6 +28,7 @@ pub enum IsEnum {
 pub enum AnalyzingNow {
     Type,
     TypeBody(IsEnum),
+    FuncArgs,
     FuncParams,
     Pattern, // e.g. (x, y) so certain ops not permitted
     Expr,    // if specification is unnecessary

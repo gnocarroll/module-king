@@ -284,6 +284,21 @@ impl AST {
         expr_mut.finalized = true;
     }
 
+    // apply a function e.g. f()
+    // TokenType is actually LParen
+    fn analyze_operation_apply(
+        &mut self,
+        ctx: &mut SemanticContext,
+        scope: ScopeID,
+        expr: ExprID,
+        operand1: ExprID,
+        operand2: ExprID,
+    ) {
+        self.analyze_expr(ctx, scope, operand1);
+
+        
+    }
+
     pub fn analyze_operation_binary(
         &mut self,
         ctx: &mut SemanticContext,
@@ -355,6 +370,10 @@ impl AST {
             }
             TokenType::Period => {
                 self.analyze_operation_period(ctx, scope, expr, operand1, operand2);
+                return;
+            }
+            TokenType::LParen => {
+                self.analyze_operation_apply(ctx, scope, expr, operand1, operand2);
                 return;
             }
             TokenType::Semicolon => {
