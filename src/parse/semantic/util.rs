@@ -15,10 +15,10 @@ impl AST {
     pub fn get_builtin_type(&self, name: &str) -> MemberID {
         if let Some(member) = self.scope_search(ScopeID::default(), name) {
             if let MemberVariant::Type(_) = self.objs.member(member).variant {
+                member
+            } else {
                 panic!("Not a type")
             }
-
-            member
         } else {
             panic!("Builtin type not found: {name}");
         }
