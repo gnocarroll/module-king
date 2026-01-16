@@ -98,15 +98,21 @@ impl AST {
                 }
                 _ => match self.objs.type_get(operand1_struct.type_id) {
                     Type::Type(_) => {
-                        self.invalid_operation(expr, "use \"is\" to assign to/create types (type on LHS)");
+                        self.invalid_operation(
+                            expr,
+                            "use \"is\" to assign to/create types (type on LHS)",
+                        );
                         err_type
                     }
                     Type::Module(_) => {
-                        self.invalid_operation(expr, "use \"is\" to assign to/create modules (module on LHS)");
+                        self.invalid_operation(
+                            expr,
+                            "use \"is\" to assign to/create modules (module on LHS)",
+                        );
                         err_type
                     }
                     _ => operand1_struct.type_id,
-                }
+                },
             }
         } else {
             self.invalid_operation(expr, "lhs of assignment should be an assignable variable");
@@ -117,14 +123,20 @@ impl AST {
 
         let rhs_type = if !operand2_struct.finalized {
             err_type
-        } else  {
+        } else {
             match self.objs.type_get(operand2_struct.type_id) {
                 Type::Type(_) => {
-                    self.invalid_operation(expr, "use \"is\" to assign to/create types (type on RHS)");
+                    self.invalid_operation(
+                        expr,
+                        "use \"is\" to assign to/create types (type on RHS)",
+                    );
                     err_type
                 }
                 Type::Module(_) => {
-                    self.invalid_operation(expr, "use \"is\" to assign to/create modules (module on RHS)");
+                    self.invalid_operation(
+                        expr,
+                        "use \"is\" to assign to/create modules (module on RHS)",
+                    );
                     err_type
                 }
                 _ => operand2_struct.type_id,
@@ -329,9 +341,13 @@ impl AST {
 
         let old_analyzing_now = ctx.analyzing_now;
 
-        ctx.analyzing_now = AnalyzingNow::FuncArgs;
+        // ctx.analyzing_now = AnalyzingNow::FuncArgs;
         self.analyze_expr(ctx, scope, operand2);
         ctx.analyzing_now = old_analyzing_now;
+
+        eprintln!("{}", self.type_to_string(ctx.tokens, self.objs.expr(operand2).type_id));
+
+        panic!("PRINTED");
 
         let mut finalized = true;
 
@@ -396,7 +412,77 @@ impl AST {
 
         let finalized = self.expr(operand1).finalized && self.expr(operand2).finalized;
 
-        // TODO: finish writing this func
+        let operand2_struct = self.expr(operand2);
+
+        let operand2_type_id = operand2_struct.type_id;
+
+        // suppose it is known that operand2 is the "rest of" this tuple rather than a standalone tuple
+        // (indicated by fact that it is also using comma operator)
+        // then type should be transformed in the following way
+        // if no RHS -> type becomes just LHS type
+        // if both LHS, RHS -> type becomes RestOfTuple(LHS, RHS) instead of Tuple(LHS, RHS)
+
+        let tuple_type_to_singular_or_rest_of = |ast: &mut AST, type_id: TypeID| -> TypeID {
+            match ast.objs.type_get(type_id) {
+                Type::Tuple((t, None)) => *t,
+                Type::Tuple((t1, Some(t2))) => ast.objs.type_push(Type::RestOfTuple((*t1, *t2))),
+                _ => panic!("type should be guaranteed to be Tuple"),
+            }
+        };
+
+        match operand2_struct.variant {
+            ExprVariant::Operation(Operation {
+                op: TokenType::Comma,
+                ..
+            }) => {
+                match self.objs.type_get(operand2_type_id) {
+                    // if operand2 is returning some Tuple type (rather than tuple expr)
+                    // then apply transformation to "inner type" i.e. returned type
+                    Type::Type(t) => {
+                        let new_inner_type_id = tuple_type_to_singular_or_rest_of(self, *t);
+
+                        let new_type_id = self.objs.type_push(Type::Type(new_inner_type_id));
+
+                        self.objs.expr_mut(operand2).type_id = new_type_id;
+                    }
+
+                    // otherwise if it is tuple expr just transform type id itself
+                    _ => {
+                        let new_type_id = tuple_type_to_singular_or_rest_of(self, operand2_type_id);
+
+                        self.objs.expr_mut(operand2).type_id = new_type_id;
+                    }
+                }
+            }
+            _ => (),
+        }
+
+        let (operand1_type_id, operand2_type_id) = (
+            self.expr(operand1).type_id,
+            self.expr(operand2).type_id,
+        );
+
+        // determine type of this expr from operand types
+
+        let type_id = match (self.objs.type_get(operand1_type_id), self.objs.type_get(operand2_type_id)) {
+            (Type::Type(operand1_inner_type_id), Type::Type(operand2_inner_type_id)) => {
+                let inner_type_id = self.objs.type_push(Type::Tuple((*operand1_inner_type_id, Some(*operand2_inner_type_id))));
+
+                // LHS, RHS are both return types (not values) => this expr also type (tuple type)
+
+                self.objs.type_push(Type::Type(inner_type_id))
+            },
+
+            // one of LHS, RHS is not type => return tuple value rather than tuple type
+            (_, _) => {
+                self.objs.type_push(Type::Tuple((operand1_type_id, Some(operand2_type_id))))
+            }
+        };
+
+        let expr_mut = self.objs.expr_mut(expr);
+
+        expr_mut.type_id = type_id;
+        expr_mut.finalized = finalized;
     }
 
     pub fn analyze_operation_binary(
