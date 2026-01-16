@@ -1,11 +1,9 @@
-use std::num::TryFromIntError;
-
 use crate::{
     constants::{BOOLEAN_TYPE, ERROR_TYPE, UNIT_TYPE},
     parse::{
-        AST, ExprReturns, ExprVariant, Function, IdentifierVariant, MemberVariant, Operation,
-        ScopeVariant, Type, TypeOrModule, TypeVariant, Visibility,
-        ast_contents::{ExprID, ScopeID, TypeID},
+        AST, ExprVariant, IdentifierVariant, MemberVariant, Operation, ScopeVariant, Type,
+        TypeVariant, Visibility,
+        ast_contents::{ExprID, FunctionID, ScopeID, TypeID},
         operator,
         semantic::{AnalyzingNow, SemanticContext},
     },
@@ -19,8 +17,8 @@ use operator::OperatorVariant::*;
 // (e.g. are you calling a function or casting to other type)
 #[derive(Clone, Copy, PartialEq)]
 enum ApplyCase {
-    Cast,
-    Function,
+    Cast(TypeID),
+    Function(FunctionID),
 }
 
 impl AST {
@@ -85,12 +83,16 @@ impl AST {
         let lhs_type = if !operand1_struct.finalized {
             err_type
         } else if operand1_struct.is_var {
-            match operand1_struct.type_or_module {
-                TypeOrModule::Type(t) => t,
-                TypeOrModule::Module(_) => {
+            match self.objs.type_get(operand1_struct.type_id) {
+                Type::Type(_) => {
+                    self.invalid_operation(expr, "use \"is\" to assign to/create types");
+                    err_type
+                }
+                Type::Module(_) => {
                     self.invalid_operation(expr, "use \"is\" to assign to/create modules");
                     err_type
                 }
+                _ => operand1_struct.type_id,
             }
         } else {
             self.invalid_operation(expr, "lhs of assignment should be an assignable variable");
@@ -101,14 +103,20 @@ impl AST {
 
         let rhs_type = if !operand2_struct.finalized {
             err_type
-        } else if operand2_struct.expr_returns == ExprReturns::Value {
-            match operand2_struct.type_or_module {
-                TypeOrModule::Type(t) => t,
-                TypeOrModule::Module(_) => {
-                    panic!("expr returns value but Module found");
+        } else if operand2_struct.is_var {
+            match self.objs.type_get(operand2_struct.type_id) {
+                Type::Type(_) => {
+                    self.invalid_operation(expr, "use \"is\" to assign to/create types");
+                    err_type
                 }
+                Type::Module(_) => {
+                    self.invalid_operation(expr, "use \"is\" to assign to/create modules");
+                    err_type
+                }
+                _ => operand2_struct.type_id,
             }
         } else {
+            self.invalid_operation(expr, "lhs of assignment should be an assignable variable");
             err_type
         };
 
@@ -123,12 +131,11 @@ impl AST {
             finalized = true;
         }
 
-        let unit_type = self.get_builtin_type_id(UNIT_TYPE);
+        let unit_type_id = self.get_builtin_type_id(UNIT_TYPE);
 
         let expr_mut = self.objs.expr_mut(expr);
 
-        expr_mut.expr_returns = ExprReturns::Unit;
-        expr_mut.type_or_module = TypeOrModule::Type(unit_type);
+        expr_mut.type_id = unit_type_id;
         expr_mut.finalized = finalized;
     }
 
@@ -178,14 +185,14 @@ impl AST {
 
         let mut finalized = false;
 
-        if let (ExprReturns::Type, TypeOrModule::Type(type_id), Some(name)) =
-            (rhs.expr_returns, rhs.type_or_module.clone(), name)
+        if let (true, Type::Type(type_id), Some(name)) =
+            (rhs.finalized, self.objs.type_get(rhs.type_id), name)
         {
             self.scope_add_member_type_from_name_and_id(
                 ctx,
                 scope,
                 TokenOrString::Token(name),
-                type_id,
+                *type_id,
             );
 
             finalized = true;
@@ -193,12 +200,11 @@ impl AST {
             self.invalid_operation(expr, "creation of new type could not be completed");
         }
 
-        let unit_type = self.get_builtin_type_id(UNIT_TYPE);
+        let unit_type_id = self.get_builtin_type_id(UNIT_TYPE);
 
         let expr_mut = self.objs.expr_mut(expr);
 
-        expr_mut.expr_returns = ExprReturns::Unit;
-        expr_mut.type_or_module = TypeOrModule::Type(unit_type);
+        expr_mut.type_id = unit_type_id;
         expr_mut.finalized = finalized;
     }
 
@@ -220,10 +226,13 @@ impl AST {
             return;
         }
 
-        let type_scope = match operand1_struct.type_or_module {
-            TypeOrModule::Module(scope) => scope,
-            TypeOrModule::Type(t) => {
-                let mut type_id = t;
+        // TODO: search global/shared members of types
+        // right now only doing modules and instances
+
+        let search_scope = match self.objs.type_get(operand1_struct.type_id) {
+            Type::Module(scope) => *scope,
+            _ => {
+                let mut type_id = operand1_struct.type_id;
 
                 let scope = loop {
                     match self.objs.type_get(type_id) {
@@ -248,7 +257,7 @@ impl AST {
             }
         };
 
-        let member_id = if let Some(member_id) = self.objs.scope(type_scope).members.get(&name) {
+        let member_id = if let Some(member_id) = self.objs.scope(search_scope).members.get(&name) {
             *member_id
         } else {
             self.invalid_operation(expr, "member name on rhs not recognized");
@@ -266,33 +275,30 @@ impl AST {
         }
 
         match (
-            operand1_struct.expr_returns,
+            self.objs.type_get(operand1_struct.type_id),
             self.objs.member(member_id).visibility,
         ) {
             // should only be accessing global fields through type
-            (ExprReturns::Type, Visibility::Export | Visibility::Private) => {
+            (Type::Type(_), Visibility::Export | Visibility::Private) => {
                 self.invalid_operation(expr, "only global fields may be accessed through type, not ones specific to an instance");
                 return;
             }
             _ => (),
         }
 
-        let (expr_returns, type_or_module) = match self.objs.member(member_id).variant {
-            MemberVariant::Instance(type_id) => (ExprReturns::Value, TypeOrModule::Type(type_id)),
-            MemberVariant::Type(type_id) => (ExprReturns::Type, TypeOrModule::Type(type_id)),
-            MemberVariant::Module(scope_id) => {
-                (ExprReturns::Module, TypeOrModule::Module(scope_id))
-            }
-            MemberVariant::Function(function_id) => (
-                ExprReturns::Value,
-                TypeOrModule::Type(self.objs.function(function_id).func_type),
-            ),
+        let expr_type_id = match self.objs.member(member_id).variant {
+            MemberVariant::Instance(type_id) => type_id,
+            MemberVariant::Type(type_id) => self.objs.type_push(Type::Type(type_id)),
+            MemberVariant::Module(scope_id) => self.objs.type_push(Type::Module(scope_id)),
+
+            // TODO: if function is being accessed through instance should return function with first param
+            // bound to certain instance
+            MemberVariant::Function(function_id) => self.objs.function(function_id).func_type,
         };
 
         let expr_mut = self.objs.expr_mut(expr);
 
-        expr_mut.expr_returns = expr_returns;
-        expr_mut.type_or_module = type_or_module;
+        expr_mut.type_id = expr_type_id;
 
         expr_mut.is_var = true;
         expr_mut.finalized = true;
@@ -310,62 +316,59 @@ impl AST {
     ) {
         self.analyze_expr(ctx, scope, operand1);
 
-        let mut finalized = true;
-        let mut ret_type = self.get_builtin_type_id(ERROR_TYPE);
-
-        let operand1_struct = self.expr(operand1);
-
-        let mut apply_case = ApplyCase::Function;
-
-        match (
-            operand1_struct.finalized,
-            operand1_struct.expr_returns,
-            &operand1_struct.type_or_module,
-        ) {
-            (false, _, _) => (),
-
-            // type cast
-
-            (true, ExprReturns::Type, TypeOrModule::Type(t)) => {
-                apply_case = ApplyCase::Cast;
-                ret_type = *t;
-            }
-
-            // function call, check if type is function
-
-            (true, ExprReturns::Value, TypeOrModule::Type(t))
-                if matches!(self.objs.type_get(*t), Type::Function(_)) => {
-
-                if let Type::Function((_, ret_t)) = self.objs.type_get(*t) {
-                    ret_type = *ret_t;
-                } else {
-                    panic!("should already have been determined that type is function");
-                }
-            }
-
-            // invalid
-
-            _ => {
-                self.invalid_operation(expr, "should be type cast or function call");
-                finalized = false;
-            }
-        }
-
         let old_analyzing_now = ctx.analyzing_now;
 
         ctx.analyzing_now = AnalyzingNow::FuncArgs;
         self.analyze_expr(ctx, scope, operand2);
         ctx.analyzing_now = old_analyzing_now;
 
+        let mut finalized = true;
+
+        let operand1_struct = self.expr(operand1);
+
+        let mut ret_type = self.get_builtin_type_id(ERROR_TYPE);
+        let apply_case;
+
+        match (
+            operand1_struct.finalized,
+            self.objs.type_get(operand1_struct.type_id),
+        ) {
+            (false, _) => (),
+
+            // type cast
+            (true, Type::Type(t)) => {
+                apply_case = ApplyCase::Cast(*t);
+                ret_type = *t;
+            }
+
+            // function call, check if type is function
+            (true, Type::Function((_, ret_t))) => {
+                let function_id = self
+                    .expr_get_function_id(operand1)
+                    .expect("expr should be guaranteed to be function");
+
+                apply_case = ApplyCase::Function(function_id);
+                ret_type = *ret_t;
+            }
+            _ => {
+                self.invalid_operation(expr, "should be type cast or function call");
+                finalized = false;
+                return;
+            }
+        }
+
         if !self.expr(operand1).finalized || !self.expr(operand2).finalized {
             finalized = false;
+        }
+
+        if finalized {
+            // TODO: analyze if apply operation can actually be done
         }
 
         let expr_mut = self.objs.expr_mut(expr);
 
         expr_mut.finalized = finalized;
-        expr_mut.expr_returns = ExprReturns::Value;
-        expr_mut.type_or_module = TypeOrModule::Type(ret_type)
+        expr_mut.type_id = ret_type;
     }
 
     // glue values or type together into tuple
@@ -381,6 +384,8 @@ impl AST {
         self.analyze_expr(ctx, scope, operand2);
 
         let finalized = self.expr(operand1).finalized && self.expr(operand2).finalized;
+
+        // TODO: finish writing this func
     }
 
     pub fn analyze_operation_binary(
@@ -426,16 +431,24 @@ impl AST {
 
                 self.analyze_expr(ctx, scope, operand2);
 
-                let type_id = if self.objs.expr(operand2).finalized {
-                    match self.objs.expr(operand2).type_or_module {
-                        TypeOrModule::Type(t) => Some(t),
-                        _ => None,
+                let maybe_type_id = if self.objs.expr(operand2).finalized {
+                    let type_id = self.objs.expr(operand2).type_id;
+
+                    match self.objs.type_get(type_id) {
+                        Type::Type(_) | Type::Module(_) => {
+                            self.invalid_operation(
+                                expr,
+                                "\":=\" is only for assigning values, not modules or types",
+                            );
+                            None
+                        }
+                        _ => Some(type_id),
                     }
                 } else {
                     None
                 };
 
-                let (pattern, _) = self.pattern_matching(ctx, scope, operand1, type_id);
+                let (pattern, _) = self.pattern_matching(ctx, scope, operand1, maybe_type_id);
 
                 self.scope_create_members_from_pattern(ctx, scope, pattern);
 
@@ -474,8 +487,7 @@ impl AST {
 
                 let expr_mut = self.objs.expr_mut(expr);
 
-                expr_mut.expr_returns = ExprReturns::Unit;
-                expr_mut.type_or_module = TypeOrModule::Type(unit_type);
+                expr_mut.type_id = unit_type;
                 expr_mut.finalized = finalized;
 
                 return;
@@ -500,20 +512,18 @@ impl AST {
         let mut type_variants = [TypeVariant::Error, TypeVariant::Error];
 
         for (idx, operand) in operands.iter().enumerate() {
-            let expr_returns = self.objs.expr(*operand).expr_returns;
+            let mut type_id = self.objs.expr(*operand).type_id;
 
-            if expr_returns == ExprReturns::Module {
-                found_module = true;
-                continue;
-            } else if expr_returns == ExprReturns::Type {
-                operand_is_type[idx] = true;
-            }
-
-            let type_id = match self.objs.expr(*operand).type_or_module {
-                TypeOrModule::Type(t) => t,
-                TypeOrModule::Module(_) => {
+            match self.objs.type_get(type_id) {
+                Type::Type(t) => {
+                    operand_is_type[idx] = true;
+                    type_id = *t;
+                }
+                Type::Module(_) => {
+                    found_module = true;
                     continue;
                 }
+                _ => (),
             };
 
             operand_types[idx] = type_id;
@@ -577,7 +587,7 @@ impl AST {
             return;
         }
 
-        let expr_type = if returns_bool {
+        let expr_type_id = if returns_bool {
             boolean_type
         } else {
             operand_types[0]
@@ -585,8 +595,7 @@ impl AST {
 
         let expr_mut = self.objs.expr_mut(expr);
 
-        expr_mut.expr_returns = ExprReturns::Value;
-        expr_mut.type_or_module = TypeOrModule::Type(expr_type);
+        expr_mut.type_id = expr_type_id;
         expr_mut.finalized = true;
     }
 }

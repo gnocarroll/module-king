@@ -1,14 +1,14 @@
 mod analyze_operation;
 mod util;
 
-use std::{collections::HashMap, intrinsics::three_way_compare};
+use std::collections::HashMap;
 
 use crate::{
     constants::{BOOLEAN_TYPE, ERROR_TYPE, FLOAT_TYPE, INTEGER_TYPE, STRING_TYPE, UNIT_TYPE},
     parse::{
         AST, ExprReturns, ExprVariant, IdentifierVariant, Member, MemberVariant, Operation,
         Pattern, PatternVariant, Scope, ScopeRefersTo, ScopeVariant, TokenOrString, Tokens, Type,
-        TypeOrModule, TypeVariant, Visibility,
+        TypeVariant, Visibility,
         ast_contents::{ExprID, FunctionID, PatternID, ScopeID, TypeID},
         errors::{
             ExpectedExprReturns, ExprAndType, InvalidExpr, PatternError, SemanticError,
@@ -351,7 +351,11 @@ impl AST {
                     _ => {
                         let expr_returns = self.expr_returns(type_expr);
 
-                        err = Some(self.expected_expr_returns(type_expr, ExprReturns::Type, expr_returns));
+                        err = Some(self.expected_expr_returns(
+                            type_expr,
+                            ExprReturns::Type,
+                            expr_returns,
+                        ));
 
                         None
                     }
@@ -450,7 +454,7 @@ impl AST {
             self.objs.type_get(ret_type_expr.type_id),
             &ret_type_expr.variant,
         ) {
-            (false, ..) => (), // not finalized, don't test for err
+            (false, ..) => (),               // not finalized, don't test for err
             (_, _, ExprVariant::Unit) => (), // Ok, function returns Unit
             (_, Type::Type(t), _) => {
                 // Ok, record type
@@ -643,7 +647,7 @@ impl AST {
                         MemberVariant::Instance(type_id) => (type_id, IdentifierVariant::Instance),
                         MemberVariant::Function(function_id) => (
                             self.objs.function(function_id).func_type,
-                            IdentifierVariant::Function
+                            IdentifierVariant::Function,
                         ),
                     };
 

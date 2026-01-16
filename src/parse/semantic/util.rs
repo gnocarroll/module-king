@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::{
     constants::{ERROR_TYPE, UNIT_TYPE},
     parse::{
-        AST, ExprReturns, Member, MemberVariant, Scope, ScopeRefersTo, ScopeVariant, TokenOrString, Type, TypeOrModule, TypeVariant, Visibility, ast_contents::{ExprID, FunctionID, MemberID, ScopeID, TypeID}, errors::{InvalidOperation, MissingOperand, PatternError, SemanticError}, semantic::SemanticContext
+        AST, ExprReturns, ExprVariant, FunctionLiteral, Identifier, Member, MemberVariant, Scope, ScopeRefersTo, ScopeVariant, TokenOrString, Type, TypeOrModule, TypeVariant, Visibility, ast_contents::{ExprID, FunctionID, MemberID, ScopeID, TypeID}, errors::{InvalidOperation, MissingOperand, PatternError, SemanticError}, semantic::SemanticContext
     },
     scan::Token,
     tokens::Tokens,
@@ -327,6 +327,28 @@ impl AST {
             Type::AnyType | Type::Type(_) => ExprReturns::Type,
             Type::AnyModule | Type::Module(_) => ExprReturns::Module,
             _ => ExprReturns::Value,
+        }
+    }
+
+    pub fn expr_get_function_id(
+        &self,
+        expr: ExprID,
+    ) -> Option<FunctionID> {
+        match self.objs.expr(expr).variant {
+            ExprVariant::FunctionLiteral(FunctionLiteral {
+                function_id: function_id,
+                ..
+            }) => Some(function_id),
+            ExprVariant::Identifier(Identifier {
+                member_id: member_id,
+                ..
+            }) => {
+                match self.objs.member(member_id).variant {
+                    MemberVariant::Function(function_id) => Some(function_id),
+                    _ => None
+                }
+            }
+            _ => None
         }
     }
 }
