@@ -83,16 +83,30 @@ impl AST {
         let lhs_type = if !operand1_struct.finalized {
             err_type
         } else if operand1_struct.is_var {
-            match self.objs.type_get(operand1_struct.type_id) {
-                Type::Type(_) => {
-                    self.invalid_operation(expr, "use \"is\" to assign to/create types");
-                    err_type
+            match operand1_struct.variant {
+                ExprVariant::Operation(Operation {
+                    op: TokenType::Colon,
+                    operand1: Some(_),
+                    operand2: Some(type_expr),
+                }) => {
+                    let type_id = self.objs.expr(type_expr).type_id;
+
+                    match self.objs.type_get(type_id) {
+                        Type::Type(t) => *t,
+                        _ => err_type,
+                    }
                 }
-                Type::Module(_) => {
-                    self.invalid_operation(expr, "use \"is\" to assign to/create modules");
-                    err_type
+                _ => match self.objs.type_get(operand1_struct.type_id) {
+                    Type::Type(_) => {
+                        self.invalid_operation(expr, "use \"is\" to assign to/create types (type on LHS)");
+                        err_type
+                    }
+                    Type::Module(_) => {
+                        self.invalid_operation(expr, "use \"is\" to assign to/create modules (module on LHS)");
+                        err_type
+                    }
+                    _ => operand1_struct.type_id,
                 }
-                _ => operand1_struct.type_id,
             }
         } else {
             self.invalid_operation(expr, "lhs of assignment should be an assignable variable");
@@ -103,21 +117,18 @@ impl AST {
 
         let rhs_type = if !operand2_struct.finalized {
             err_type
-        } else if operand2_struct.is_var {
+        } else  {
             match self.objs.type_get(operand2_struct.type_id) {
                 Type::Type(_) => {
-                    self.invalid_operation(expr, "use \"is\" to assign to/create types");
+                    self.invalid_operation(expr, "use \"is\" to assign to/create types (type on RHS)");
                     err_type
                 }
                 Type::Module(_) => {
-                    self.invalid_operation(expr, "use \"is\" to assign to/create modules");
+                    self.invalid_operation(expr, "use \"is\" to assign to/create modules (module on RHS)");
                     err_type
                 }
                 _ => operand2_struct.type_id,
             }
-        } else {
-            self.invalid_operation(expr, "lhs of assignment should be an assignable variable");
-            err_type
         };
 
         let mut finalized = false;
@@ -410,7 +421,7 @@ impl AST {
                 // var creation
                 // helper function will look at pairing of pattern, type
                 // e.g. (x, y) : (Float, Float)
-                let (pattern, _) = self.analyze_instance_creation(
+                let (pattern, err) = self.analyze_instance_creation(
                     ctx,
                     scope,
                     expr,
@@ -422,6 +433,19 @@ impl AST {
 
                 // after creation of members analyze lhs (now relevant vars should exist)
                 self.analyze_expr(ctx, scope, operand1);
+
+                let finalized = self.objs.expr(operand1).finalized
+                    && self.objs.expr(operand2).finalized
+                    && err.is_none();
+
+                let unit_type_id = self.get_builtin_type_id(UNIT_TYPE);
+
+                let expr_mut = self.objs.expr_mut(expr);
+
+                expr_mut.type_id = unit_type_id;
+                expr_mut.is_var = true;
+
+                expr_mut.finalized = finalized;
 
                 return;
             }
