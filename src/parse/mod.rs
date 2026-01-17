@@ -1,6 +1,7 @@
 pub mod ast_contents;
 mod errors;
 pub mod operator;
+pub mod scope_members;
 mod semantic;
 mod syntax;
 
@@ -349,7 +350,10 @@ pub struct Pattern {
 
 impl Default for Pattern {
     fn default() -> Self {
-        Pattern { type_id: TypeID::error(), variant: PatternVariant::IgnoreOne }
+        Pattern {
+            type_id: TypeID::error(),
+            variant: PatternVariant::IgnoreOne,
+        }
     }
 }
 

@@ -110,7 +110,7 @@ impl AST {
                     .operand1
                     .expect("Block should always contain Expr");
 
-                match self.objs.expr(expr).variant {
+                match self.objs.expr(child_expr).variant {
                     ExprVariant::Operation(Operation {
                         op: TokenType::Begin,
                         ..
