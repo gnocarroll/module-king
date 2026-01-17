@@ -1,1 +1,6 @@
-f(Integer, )
+type Token is record
+    offset: Integer;
+    width: Integer;
+end record;
+
+Token(1, 1)

@@ -179,6 +179,7 @@ impl AST {
         let expr_mut = self.expr_mut(expr);
 
         expr_mut.type_id = cast_to;
+        expr_mut.finalized = true;
     }
 
     // ret value indicates success
