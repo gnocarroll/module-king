@@ -116,11 +116,27 @@ impl AST {
                         simple_cast = false;
 
                         // can be some other integer type being casted
+
+                        match self.type_get_variant(arg_type) {
+                            Some(TypeVariant::Integer) | Some(TypeVariant::Float) => (),
+                            _ => {
+                                self.invalid_operation(expr, "when casting to integer type argument must be integer or float type");
+                                return;
+                            }
+                        }
                     }
                     ScopeVariant::Type(TypeVariant::Float) => {
                         simple_cast = false;
 
                         // can be some other float type being casted
+
+                        match self.type_get_variant(arg_type) {
+                            Some(TypeVariant::Integer) | Some(TypeVariant::Float) => (),
+                            _ => {
+                                self.invalid_operation(expr, "when casting to float type argument must be integer or float type");
+                                return;
+                            }
+                        }
                     }
                     ScopeVariant::Type(TypeVariant::Record) => {
                         simple_cast = false;
