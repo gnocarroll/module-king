@@ -1,7 +1,7 @@
 use crate::{
     constants::ERROR_TYPE,
     parse::{
-        AST, ScopeVariant, Type, TypeVariant, ast_contents::{ExprID, FunctionID, ScopeID, TypeID}, semantic::SemanticContext
+        AST, MemberVariant, ScopeVariant, Type, TypeVariant, Visibility, ast_contents::{ExprID, FunctionID, ScopeID, TypeID}, semantic::SemanticContext
     },
 };
 
@@ -110,8 +110,8 @@ impl AST {
                 self.invalid_operation(expr, "cannot cast to this type");
                 return;
             }
-            Type::Scope(scope_id) => {
-                match self.objs.scope(*scope_id).variant {
+            Type::Scope(cast_type_scope_id) => {
+                match self.objs.scope(*cast_type_scope_id).variant {
                     ScopeVariant::Type(TypeVariant::Integer) => {
                         simple_cast = false;
 
@@ -141,7 +141,29 @@ impl AST {
                     ScopeVariant::Type(TypeVariant::Record) => {
                         simple_cast = false;
 
-                        // TODO: args should be provided in same order as record fields
+                        let scope_ref = self.objs.scope(*cast_type_scope_id);
+
+                        let mut member_type_ids = Vec::<TypeID>::new();
+
+                        for member_idx in 0..scope_ref.members.member_count() {
+                            let member_id = scope_ref.members.nth_member(member_idx);
+                            let member = self.objs.member(member_id);
+
+                            let member_type_id = match (member.visibility, member.variant) {
+                                (Visibility::Global, _) => continue,
+                                (_, MemberVariant::Instance(t)) => t,
+                                _ => continue,
+                            };
+
+                            member_type_ids.push(member_type_id);
+                        }
+
+                        let member_types_tuple = self.type_vec_to_tuple(&member_type_ids);
+
+                        if !self.type_eq(arg_type, member_types_tuple) {
+                            self.invalid_operation(expr, "provide args in order members are declared in record and with matching types");
+                            return;
+                        }
                     }
                     _ => (),
                 }
