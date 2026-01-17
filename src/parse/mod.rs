@@ -81,6 +81,16 @@ pub enum Type {
 
     // args, ret type (args can be tuple)
     Function((TypeID, TypeID)),
+
+    // in this initial Rust interpreter will not have full generics
+    // however will support lists of a given Type
+    // and maps from String -> some Type
+
+    // List of Type
+    List(TypeID),
+
+    // Map String -> Type
+    Map(TypeID),
 }
 
 impl Default for Type {

@@ -3,7 +3,13 @@
 
 use std::collections::HashMap;
 
-use crate::{constants::{ERROR_TYPE, STRING_TYPE, UNIT_TYPE}, parse::{Expr, Function, Member, MemberVariant, Pattern, Scope, ScopeVariant, Type, Visibility}, tokens::TokenOrString};
+use crate::{
+    constants::{ERROR_TYPE, STRING_TYPE, UNIT_TYPE},
+    parse::{
+        Expr, Function, Member, MemberVariant, Pattern, Scope, ScopeVariant, Type, Visibility,
+    },
+    tokens::TokenOrString,
+};
 
 #[derive(Clone)]
 pub struct ASTContents {
@@ -53,7 +59,7 @@ impl Default for ASTContents {
         let error_type_id = ret.type_push(Type::Error);
         let unit_type_id = ret.type_push(Type::Unit);
 
-        // for now String will also just be built-in but later should go in 
+        // for now String will also just be built-in but later should go in
         // std library
 
         let string_type_id = ret.type_push(Type::String);
@@ -69,10 +75,9 @@ impl Default for ASTContents {
                 variant: MemberVariant::Type(type_id),
             });
 
-            ret.scope_mut(ScopeID::global()).members.insert(
-                name.to_string(),
-                member_id
-            );
+            ret.scope_mut(ScopeID::global())
+                .members
+                .insert(name.to_string(), member_id);
         }
 
         ret
@@ -95,6 +100,8 @@ pub struct ScopeID {
 }
 
 impl ScopeID {
+    // Default for ASTContents should guarantee these IDs are correct
+
     pub fn global() -> Self {
         ScopeID { id: 1 }
     }
@@ -109,15 +116,15 @@ impl TypeID {
     // Default for ASTContents should guarantee these IDs are correct
 
     pub fn error() -> Self {
-        return TypeID { id: 1 }
+        return TypeID { id: 1 };
     }
 
     pub fn unit() -> Self {
-        return TypeID { id: 2 }
+        return TypeID { id: 2 };
     }
 
     pub fn string() -> Self {
-        return TypeID { id: 3 }
+        return TypeID { id: 3 };
     }
 }
 
@@ -137,7 +144,9 @@ impl ASTContents {
     pub fn expr_push(&mut self, expr: Expr) -> ExprID {
         self.exprs.push(expr);
 
-        ExprID { id: self.exprs.len() as u32 - 1 }
+        ExprID {
+            id: self.exprs.len() as u32 - 1,
+        }
     }
 
     pub fn expr(&self, expr: ExprID) -> &Expr {
@@ -161,7 +170,9 @@ impl ASTContents {
     pub fn scope_push(&mut self, scope: Scope) -> ScopeID {
         self.scopes.push(scope);
 
-        ScopeID { id: self.scopes.len() as u32 - 1 }
+        ScopeID {
+            id: self.scopes.len() as u32 - 1,
+        }
     }
 
     pub fn scope(&self, scope: ScopeID) -> &Scope {
@@ -185,7 +196,9 @@ impl ASTContents {
     pub fn type_push(&mut self, type_struct: Type) -> TypeID {
         self.types.push(type_struct);
 
-        TypeID { id: self.types.len() as u32 - 1 }
+        TypeID {
+            id: self.types.len() as u32 - 1,
+        }
     }
 
     pub fn type_get(&self, type_id: TypeID) -> &Type {
@@ -209,7 +222,9 @@ impl ASTContents {
     pub fn member_push(&mut self, member: Member) -> MemberID {
         self.members.push(member);
 
-        MemberID { id: self.members.len() as u32 - 1 }
+        MemberID {
+            id: self.members.len() as u32 - 1,
+        }
     }
 
     pub fn member(&self, member: MemberID) -> &Member {
@@ -233,7 +248,9 @@ impl ASTContents {
     pub fn pattern_push(&mut self, pattern: Pattern) -> PatternID {
         self.patterns.push(pattern);
 
-        PatternID { id: self.patterns.len() as u32 - 1 }
+        PatternID {
+            id: self.patterns.len() as u32 - 1,
+        }
     }
 
     pub fn pattern(&self, pattern: PatternID) -> &Pattern {
@@ -257,7 +274,9 @@ impl ASTContents {
     pub fn function_push(&mut self, function: Function) -> FunctionID {
         self.functions.push(function);
 
-        FunctionID { id: self.functions.len() as u32 - 1 }
+        FunctionID {
+            id: self.functions.len() as u32 - 1,
+        }
     }
 
     pub fn function(&self, function: FunctionID) -> &Function {
