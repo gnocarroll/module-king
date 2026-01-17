@@ -1,6 +1,4 @@
-type Token is record
-    offset: Integer;
-    width: Integer;
-end record;
+function inc(x: Integer) Integer
+    return x + 1;
 
-Token(1, 1)
+inc(0)

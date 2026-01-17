@@ -195,8 +195,21 @@ impl AST {
 
         let expr_type_id = function.return_type;
 
+        let found_arg_type = self.type_resolve_aliasing(self.objs.expr(args).type_id);
+
+        let actual_arg_type = match self.objs.type_get(function.func_type) {
+            Type::Function((actual_arg_type, _)) => *actual_arg_type,
+            _ => return,
+        };
+
+        if !self.type_eq(actual_arg_type, found_arg_type) {
+            self.invalid_operation(expr, "did not provide correct number or type of args");
+            return;
+        }
+
         let expr_mut = self.expr_mut(expr);
 
         expr_mut.type_id = expr_type_id;
+        expr_mut.finalized = true;
     }
 }
