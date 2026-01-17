@@ -214,13 +214,13 @@ pub struct ContextObjects {
 
 fn type_to_value_id(ast: &AST, runtime_scope: &mut RuntimeScope, type_id: TypeID) -> ValueID {
     let variant = match ast.objs.type_get(type_id) {
+        Type::Error => panic!("error type in type_to_value"),
+        Type::Unit => ValueVariant::Unit,
+        Type::String => ValueVariant::String("".to_string()),
         Type::Scope(scope) => match &ast.objs.scope(*scope).variant {
             ScopeVariant::Type(variant) => match variant {
-                TypeVariant::Error => panic!("error type in type_to_value"),
-                TypeVariant::Unit => ValueVariant::Unit,
                 TypeVariant::Integer => ValueVariant::Integer(0),
                 TypeVariant::Float => ValueVariant::Float(0.0),
-                TypeVariant::String => ValueVariant::String("".to_string()),
                 TypeVariant::Record => {
                     // filter map function will look at members of Record and for ones that are not global (i.e. shared)
                     // and are instances it will use this function type_to_value to create a corresponding value recursively

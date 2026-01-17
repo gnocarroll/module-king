@@ -706,25 +706,14 @@ impl AST {
                 curr_func: None,
             };
 
-            let global_scope = self.objs.scope_push(Scope {
-                name: Some(TokenOrString::String("GLOBAL".to_string())),
-                variant: ScopeVariant::Module,
-                parent_scope: ScopeID::default(),
-                refers_to: None,
-                members: HashMap::new(),
-            });
-
             for (name, variant) in [
-                (ERROR_TYPE, TypeVariant::Error),
                 (INTEGER_TYPE, TypeVariant::Integer),
                 (FLOAT_TYPE, TypeVariant::Float),
-                (UNIT_TYPE, TypeVariant::Unit),
                 (BOOLEAN_TYPE, TypeVariant::Enum),
-                (STRING_TYPE, TypeVariant::String),
             ] {
                 self.scope_add_member_type(
                     &mut ctx,
-                    global_scope,
+                    ScopeID::global(),
                     TokenOrString::String(name.to_string()),
                     variant,
                 );
@@ -754,7 +743,7 @@ impl AST {
             let module_scope = self.objs.scope_push(Scope {
                 name: Some(TokenOrString::String(module_name.to_string())),
                 variant: ScopeVariant::Module,
-                parent_scope: global_scope,
+                parent_scope: ScopeID::global(),
                 refers_to: None,
                 members: HashMap::new(),
             });

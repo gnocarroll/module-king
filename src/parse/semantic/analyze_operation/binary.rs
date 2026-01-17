@@ -345,7 +345,10 @@ impl AST {
         self.analyze_expr(ctx, scope, operand2);
         ctx.analyzing_now = old_analyzing_now;
 
-        eprintln!("{}", self.type_to_string(ctx.tokens, self.objs.expr(operand2).type_id));
+        eprintln!(
+            "{}",
+            self.type_to_string(ctx.tokens, self.objs.expr(operand2).type_id)
+        );
 
         panic!("PRINTED");
 
@@ -412,9 +415,25 @@ impl AST {
 
         let finalized = self.expr(operand1).finalized && self.expr(operand2).finalized;
 
+        let operand1_is_type = matches!(
+            self.objs.type_get(self.objs.expr(operand1).type_id),
+            Type::Type(_),
+        );
+
         let operand2_struct = self.expr(operand2);
 
         let operand2_type_id = operand2_struct.type_id;
+
+        let operand2_is_unit = operand2_type_id == self.get_builtin_type_id(UNIT_TYPE);
+
+        if operand2_is_unit && !matches!(operand2_struct.variant, ExprVariant::Unit) {
+            self.invalid_operation(
+                expr,
+                "expr returning unit not allowed on RHS of comma unless it is empty expr",
+            );
+        }
+
+        let operand2_struct = self.expr(operand2);
 
         // suppose it is known that operand2 is the "rest of" this tuple rather than a standalone tuple
         // (indicated by fact that it is also using comma operator)
@@ -441,7 +460,18 @@ impl AST {
                     Type::Type(t) => {
                         let new_inner_type_id = tuple_type_to_singular_or_rest_of(self, *t);
 
-                        let new_type_id = self.objs.type_push(Type::Type(new_inner_type_id));
+                        let new_type_id = if operand1_is_type
+                            || !matches!(
+                                self.objs.type_get(new_inner_type_id),
+                                Type::RestOfTuple(_)
+                            ) {
+                            self.objs.type_push(Type::Type(new_inner_type_id))
+                        } else {
+                            // operand1 is a value AND operand2 is Type(RestOfTuple(_))
+                            // => make operand2 into just RestOfTuple(_) since full tuple w/ operand1 is not a type
+
+                            new_inner_type_id
+                        };
 
                         self.objs.expr_mut(operand2).type_id = new_type_id;
                     }
@@ -457,26 +487,35 @@ impl AST {
             _ => (),
         }
 
-        let (operand1_type_id, operand2_type_id) = (
-            self.expr(operand1).type_id,
-            self.expr(operand2).type_id,
-        );
+        let (operand1_type_id, operand2_type_id) =
+            (self.expr(operand1).type_id, self.expr(operand2).type_id);
 
         // determine type of this expr from operand types
 
-        let type_id = match (self.objs.type_get(operand1_type_id), self.objs.type_get(operand2_type_id)) {
+        let type_id = match (
+            self.objs.type_get(operand1_type_id),
+            self.objs.type_get(operand2_type_id),
+        ) {
             (Type::Type(operand1_inner_type_id), Type::Type(operand2_inner_type_id)) => {
-                let inner_type_id = self.objs.type_push(Type::Tuple((*operand1_inner_type_id, Some(*operand2_inner_type_id))));
+                let inner_type_id = self.objs.type_push(Type::Tuple((
+                    *operand1_inner_type_id,
+                    Some(*operand2_inner_type_id),
+                )));
 
                 // LHS, RHS are both return types (not values) => this expr also type (tuple type)
 
                 self.objs.type_push(Type::Type(inner_type_id))
-            },
+            }
 
             // one of LHS, RHS is not type => return tuple value rather than tuple type
-            (_, _) => {
-                self.objs.type_push(Type::Tuple((operand1_type_id, Some(operand2_type_id))))
-            }
+            (_, _) => self.objs.type_push(Type::Tuple((
+                operand1_type_id,
+                if !operand2_is_unit {
+                    Some(operand2_type_id)
+                } else {
+                    None
+                },
+            ))),
         };
 
         let expr_mut = self.objs.expr_mut(expr);
@@ -619,7 +658,7 @@ impl AST {
         let mut found_module = false;
         let mut operand_is_type = [false, false];
         let mut operand_types = [TypeID::default(), TypeID::default()];
-        let mut type_variants = [TypeVariant::Error, TypeVariant::Error];
+        let mut type_variants: [Option<TypeVariant>; 2] = [None, None];
 
         for (idx, operand) in operands.iter().enumerate() {
             let mut type_id = self.objs.expr(*operand).type_id;
@@ -641,7 +680,7 @@ impl AST {
             match self.objs.type_get(type_id) {
                 Type::Scope(scope) => match self.objs.scope(*scope).variant {
                     ScopeVariant::Type(variant) => {
-                        type_variants[idx] = variant;
+                        type_variants[idx] = Some(variant);
                     }
                     _ => (),
                 },
@@ -649,7 +688,7 @@ impl AST {
             }
 
             if operand_types[idx] == boolean_type {
-                type_variants[idx] = TypeVariant::Boolean;
+                type_variants[idx] = Some(TypeVariant::Boolean);
             }
         }
 
@@ -682,6 +721,20 @@ impl AST {
             self.invalid_operation(expr, "operand types must be the same for this operation");
             return;
         }
+
+        // check if it was possible to retrieve type variants, need to have certain type variants
+        // for operations (e.g. for addition one possibility is Integers)
+
+        let type_variants = match type_variants {
+            [Some(v1), Some(v2)] => [v1, v2],
+            _ => {
+                self.invalid_operation(
+                    expr,
+                    "only certain variants of types permitted for this operation",
+                );
+                return;
+            }
+        };
 
         // check if for ALL operand type variants
         // one of the allowed type variants matches

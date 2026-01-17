@@ -15,11 +15,11 @@ use crate::{
     tokens::{ExpectedToken, TokenOrString, Tokens},
 };
 
+// this is only for the basic types that a user can build on top of
+// e.g. a user can create a new Integer type
+// it is not for types which will remain truly built-in e.g. Unit
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum TypeVariant {
-    Error, // e.g. type could not be determined, other problem
-    Unit,
-    String,
     Integer,
     Float,
     Record,  // class keyword can also be used for this
@@ -42,6 +42,11 @@ pub struct TypeLiteral {
 
 #[derive(Clone)]
 pub enum Type {
+    Error,
+    Unit,
+
+    String,
+
     AnyType,
     AnyModule,
 
@@ -78,6 +83,12 @@ pub enum Type {
     Function((TypeID, TypeID)),
 }
 
+impl Default for Type {
+    fn default() -> Self {
+        Type::Unit
+    }
+}
+
 #[derive(Clone, Copy)]
 pub enum ScopeVariant {
     Scope, // e.g. scope for a for loop or other block
@@ -95,7 +106,7 @@ pub struct FunctionLiteral {
     // once type is determined it will be stored in
     // Function struct
     pub return_type_expr: ExprID,
-    
+
     pub function_id: FunctionID,
 }
 
@@ -155,7 +166,7 @@ pub struct If {
 pub enum ExprVariant {
     Unit,
     Underscore,
-    KWType, // the keyword "type" e.g. type(x)
+    KWType,   // the keyword "type" e.g. type(x)
     KWModule, // the keyword "module"
     DollarNumber(u64),
     IntegerLiteral(u64),
@@ -177,6 +188,12 @@ pub enum ExprVariant {
     FunctionLiteral(FunctionLiteral),
 
     TypeLiteral(TypeLiteral),
+}
+
+impl Default for ExprVariant {
+    fn default() -> Self {
+        ExprVariant::Unit
+    }
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -266,6 +283,16 @@ pub struct Member {
     pub variant: MemberVariant,
 }
 
+impl Default for Member {
+    fn default() -> Self {
+        Member {
+            name: TokenOrString::String("".to_string()),
+            visibility: Visibility::Private,
+            variant: MemberVariant::Instance(TypeID::error()),
+        }
+    }
+}
+
 #[derive(Clone)]
 pub enum ScopeRefersTo {
     Type(TypeID),
@@ -292,10 +319,28 @@ pub struct Scope {
     pub members: HashMap<String, MemberID>,
 }
 
+impl Default for Scope {
+    fn default() -> Self {
+        Scope {
+            name: None,
+            variant: ScopeVariant::Scope,
+            parent_scope: ScopeID::default(),
+            refers_to: None,
+            members: HashMap::new(),
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct Pattern {
     type_id: TypeID,
     variant: PatternVariant,
+}
+
+impl Default for Pattern {
+    fn default() -> Self {
+        Pattern { type_id: TypeID::error(), variant: PatternVariant::IgnoreOne }
+    }
 }
 
 #[derive(Clone)]

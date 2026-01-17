@@ -11,6 +11,9 @@ impl AST {
         let type_ref = self.objs.type_get(type_id);
 
         match type_ref.clone() {
+            Type::String => "String".to_string(),
+            Type::Error => "error".to_string(),
+            Type::Unit => "Unit".to_string(),
             Type::AnyType => "type".to_string(),
             Type::Type(t) => format!(
                 "type({})",
