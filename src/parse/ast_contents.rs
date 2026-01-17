@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use crate::{
     constants::{ERROR_TYPE, STRING_TYPE, UNIT_TYPE},
     parse::{
-        Expr, Function, Member, MemberVariant, Pattern, Scope, ScopeVariant, Type, Visibility,
+        AST, Expr, Function, Member, MemberVariant, Pattern, Scope, ScopeVariant, TupleIterator, Type, Visibility
     },
     tokens::TokenOrString,
 };
@@ -110,6 +110,17 @@ impl ScopeID {
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub struct TypeID {
     id: u32,
+}
+
+impl TypeID {
+    pub fn to_tuple_iterator<'a>(&self, ast: &'a AST) -> TupleIterator<'a> {
+        TupleIterator {
+            ast,
+            type_id: *self,
+            idx: 0,
+            done: false,
+        }
+    }
 }
 
 impl TypeID {

@@ -93,6 +93,65 @@ pub enum Type {
     Map(TypeID),
 }
 
+pub struct TupleIterator<'a> {
+    ast: &'a AST,
+    type_id: TypeID,
+    idx: usize,
+    done: bool,
+}
+
+// iterate through types in tuple type
+impl Iterator for TupleIterator<'_> {
+    type Item = TypeID;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.done {
+            return None;
+        }
+
+        loop {
+            match self.ast.objs.type_get(self.type_id) {
+                Type::Tuple((t1, maybe_t2)) => {
+                    if self.idx == 0 {
+                        self.idx += 1;
+
+                        return Some(*t1);
+                    } else {
+                        self.idx = 0;
+
+                        match maybe_t2 {
+                            Some(t2) => {
+                                self.type_id = *t2;
+                            }
+                            None => {
+                                self.done = true;
+
+                                return None;
+                            }
+                        }
+                    }
+                }
+                Type::RestOfTuple((t1, t2)) => {
+                    if self.idx == 0 {
+                        self.idx += 1;
+
+                        return Some(*t1);
+                    } else {
+                        self.idx = 0;
+
+                        self.type_id = *t2;
+                    }
+                }
+                _ => {
+                    self.done = true;
+                    
+                    return Some(self.type_id);
+                }
+            }
+        }
+    }
+}
+
 impl Default for Type {
     fn default() -> Self {
         Type::Unit
