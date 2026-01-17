@@ -1,9 +1,7 @@
 use crate::{
     constants::ERROR_TYPE,
     parse::{
-        AST, Type,
-        ast_contents::{ExprID, FunctionID, ScopeID, TypeID},
-        semantic::SemanticContext,
+        AST, ScopeVariant, Type, TypeVariant, ast_contents::{ExprID, FunctionID, ScopeID, TypeID}, semantic::SemanticContext
     },
 };
 
@@ -43,7 +41,7 @@ impl AST {
 
         let operand1_struct = self.expr(operand1);
 
-        let mut apply_case= ApplyCase::Cast(TypeID::error());
+        let mut apply_case = ApplyCase::Cast(TypeID::error());
 
         match (
             operand1_struct.finalized,
@@ -95,7 +93,54 @@ impl AST {
         cast_to: TypeID,
         args: ExprID, // args
     ) {
+        let cast_to = self.type_resolve_aliasing(cast_to);
 
+        let arg_type = self.type_resolve_aliasing(self.objs.expr(args).type_id);
+
+        if cast_to == TypeID::error() || arg_type == TypeID::error() {
+            return;
+        }
+
+        // simple cast means args type must match type being casted to
+
+        let mut simple_cast = true;
+
+        match self.objs.type_get(cast_to) {
+            Type::Type(_) | Type::Unit => {
+                self.invalid_operation(expr, "cannot cast to this type");
+                return;
+            }
+            Type::Scope(scope_id) => {
+                match self.objs.scope(*scope_id).variant {
+                    ScopeVariant::Type(TypeVariant::Integer) => {
+                        simple_cast = false;
+
+                        // can be some other integer type being casted
+                    }
+                    ScopeVariant::Type(TypeVariant::Float) => {
+                        simple_cast = false;
+
+                        // can be some other float type being casted
+                    }
+                    ScopeVariant::Type(TypeVariant::Record) => {
+                        simple_cast = false;
+
+                        // TODO: args should be provided in same order as record fields
+                    }
+                    _ => (),
+                }
+            }
+            _ => (),
+        }
+
+        if simple_cast && cast_to != arg_type {
+            self.invalid_operation(expr, "type of args does not match type you are casting to");
+            return;
+        }
+
+        let expr_mut = self.expr_mut(expr);
+
+        expr_mut.type_id = cast_to;
     }
 
     // ret value indicates success
@@ -107,6 +152,12 @@ impl AST {
         function: FunctionID,
         args: ExprID, // args
     ) {
+        let function = self.objs.function(function);
 
+        let expr_type_id = function.return_type;
+
+        let expr_mut = self.expr_mut(expr);
+
+        expr_mut.type_id = expr_type_id;
     }
 }

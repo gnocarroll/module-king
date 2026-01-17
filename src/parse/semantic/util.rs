@@ -351,4 +351,39 @@ impl AST {
             _ => None
         }
     }
+
+    pub fn type_resolve_aliasing(
+        &self,
+        type_id: TypeID,
+    ) -> TypeID {
+        let mut ret = type_id;
+
+        loop {
+            match self.objs.type_get(type_id) {
+                Type::Alias(t) => {
+                    ret = *t;
+                }
+                _ => {
+                    break;
+                }
+            }
+        }
+
+        ret
+    }
+
+    pub fn type_get_variant(
+        &self,
+        type_id: TypeID,
+    ) -> Option<TypeVariant> {
+        match self.objs.type_get(type_id) {
+            Type::Scope(scope_id) => {
+                match self.objs.scope(*scope_id).variant {
+                    ScopeVariant::Type(variant) => Some(variant),
+                    _ => panic!("should be a type and thus guaranteed to have TypeVariant"),
+                }
+            }
+            _ => None,
+        }
+    }
 }
