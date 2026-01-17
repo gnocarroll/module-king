@@ -39,14 +39,11 @@ impl AST {
             self.type_to_string(ctx.tokens, self.objs.expr(operand2).type_id)
         );
 
-        panic!("PRINTED");
-
         let mut finalized = true;
 
         let operand1_struct = self.expr(operand1);
 
-        let mut ret_type = self.get_builtin_type_id(ERROR_TYPE);
-        let apply_case;
+        let mut apply_case= ApplyCase::Cast(TypeID::error());
 
         match (
             operand1_struct.finalized,
@@ -57,22 +54,19 @@ impl AST {
             // type cast
             (true, Type::Type(t)) => {
                 apply_case = ApplyCase::Cast(*t);
-                ret_type = *t;
             }
 
             // function call, check if type is function
-            (true, Type::Function((_, ret_t))) => {
+            (true, Type::Function(_)) => {
                 let function_id = self
                     .expr_get_function_id(operand1)
                     .expect("expr should be guaranteed to be function");
 
                 apply_case = ApplyCase::Function(function_id);
-                ret_type = *ret_t;
             }
             _ => {
                 self.invalid_operation(expr, "should be type cast or function call");
                 finalized = false;
-                return;
             }
         }
 
@@ -81,12 +75,38 @@ impl AST {
         }
 
         if finalized {
-            // TODO: analyze if apply operation can actually be done
+            match apply_case {
+                ApplyCase::Cast(cast_to) => {
+                    self.analyze_cast(ctx, scope, expr, cast_to, operand2);
+                }
+                ApplyCase::Function(function) => {
+                    self.analyze_function_call(ctx, scope, expr, function, operand2);
+                }
+            }
         }
+    }
 
-        let expr_mut = self.objs.expr_mut(expr);
+    // ret value indicates success
+    pub fn analyze_cast(
+        &mut self,
+        ctx: &mut SemanticContext,
+        scope: ScopeID,
+        expr: ExprID,
+        cast_to: TypeID,
+        args: ExprID, // args
+    ) {
 
-        expr_mut.finalized = finalized;
-        expr_mut.type_id = ret_type;
+    }
+
+    // ret value indicates success
+    pub fn analyze_function_call(
+        &mut self,
+        ctx: &mut SemanticContext,
+        scope: ScopeID,
+        expr: ExprID,
+        function: FunctionID,
+        args: ExprID, // args
+    ) {
+
     }
 }
