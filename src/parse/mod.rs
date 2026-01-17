@@ -5,12 +5,11 @@ pub mod scope_members;
 mod semantic;
 mod syntax;
 
-use std::collections::HashMap;
-
 use crate::{
     parse::{
         ast_contents::{ASTContents, ExprID, FunctionID, MemberID, PatternID, ScopeID, TypeID},
         errors::{ParseError, SemanticError},
+        scope_members::ScopeMembers,
     },
     scan::{Token, TokenType},
     tokens::{ExpectedToken, TokenOrString, Tokens},
@@ -327,7 +326,7 @@ pub struct Scope {
     // (if present)
     pub refers_to: Option<ScopeRefersTo>,
 
-    pub members: HashMap<String, MemberID>,
+    pub members: ScopeMembers,
 }
 
 impl Default for Scope {
@@ -337,7 +336,7 @@ impl Default for Scope {
             variant: ScopeVariant::Scope,
             parent_scope: ScopeID::default(),
             refers_to: None,
-            members: HashMap::new(),
+            members: ScopeMembers::default(),
         }
     }
 }

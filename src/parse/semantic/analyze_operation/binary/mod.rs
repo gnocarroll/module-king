@@ -275,7 +275,7 @@ impl AST {
         };
 
         let member_id = if let Some(member_id) = self.objs.scope(search_scope).members.get(&name) {
-            *member_id
+            member_id
         } else {
             self.invalid_operation(expr, "member name on rhs not recognized");
             return;

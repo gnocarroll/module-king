@@ -141,12 +141,13 @@ impl AST {
     // can be found, also recurse to parent if needed
     pub fn scope_search(&self, scope: ScopeID, name: &str) -> Option<MemberID> {
         let mut scope = scope;
+        let name = name.to_string();
 
         loop {
             let scope_ref = self.objs.scope(scope);
 
-            if let Some(member) = scope_ref.members.get(name) {
-                return Some(*member);
+            if let Some(member) = scope_ref.members.get(&name) {
+                return Some(member);
             } else if scope_ref.parent_scope == scope {
                 return None;
             }
@@ -193,7 +194,7 @@ impl AST {
             variant: ScopeVariant::Type(variant),
             parent_scope: scope,
             refers_to: None,
-            members: HashMap::new(),
+            ..Default::default()
         });
 
         self.objs.type_push(Type::Scope(scope_id))

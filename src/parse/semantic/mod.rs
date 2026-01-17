@@ -421,7 +421,7 @@ impl AST {
             // connect to function obj
             refers_to: Some(ScopeRefersTo::Function(function_id)),
 
-            members: HashMap::new(),
+            ..Default::default()
         });
 
         self.objs.function_mut(function_id).scope = func_scope;
@@ -558,7 +558,8 @@ impl AST {
             variant: ScopeVariant::Type(type_literal.variant),
             parent_scope: scope,
             refers_to: None,
-            members: HashMap::new(),
+
+            ..Default::default()
         });
 
         let type_id = self.type_push_scope(type_scope);
@@ -745,7 +746,8 @@ impl AST {
                 variant: ScopeVariant::Module,
                 parent_scope: ScopeID::global(),
                 refers_to: None,
-                members: HashMap::new(),
+                
+                ..Default::default()
             });
 
             // analyze root expr and provided new scope as scope

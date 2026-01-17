@@ -49,7 +49,7 @@ impl Default for ASTContents {
             variant: ScopeVariant::Module,
             parent_scope: ScopeID::global(),
             refers_to: None,
-            members: HashMap::new(),
+            ..Default::default()
         });
 
         // error, unit will have IDs 1, 2 respectively

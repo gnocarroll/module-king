@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 use crate::parse::ast_contents::MemberID;
 
+#[derive(Clone, Default)]
 pub struct ScopeMembers {
     map: HashMap<String, MemberID>,
     order: Vec<String>,
@@ -18,6 +19,10 @@ impl ScopeMembers {
         let key = &self.order[idx];
 
         self.map[key]
+    }
+
+    pub fn get_map(&self) -> &HashMap<String, MemberID> {
+        &self.map
     }
 
     pub fn member_count(&self) -> usize {

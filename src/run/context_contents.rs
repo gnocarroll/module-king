@@ -229,6 +229,7 @@ fn type_to_value_id(ast: &AST, runtime_scope: &mut RuntimeScope, type_id: TypeID
                         .objs
                         .scope(*scope)
                         .members
+                        .get_map()
                         .iter()
                         .filter_map(|(name, member_id)| {
                             let member = ast.objs.member(*member_id);
