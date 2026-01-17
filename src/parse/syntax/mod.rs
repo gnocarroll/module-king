@@ -198,7 +198,10 @@ impl AST {
                 );
             }
 
-            let return_type = ast.parse_expr(tokens);
+            let return_type = match tokens.peek().ttype {
+                TokenType::Return => ast.expr_unit(tokens.idx()),
+                _ => ast.parse_expr(tokens),
+            };
 
             // prevent consumption of semicolon/comma if there is one after function
             // body since this could lead to e.g. a lot of the rest of the

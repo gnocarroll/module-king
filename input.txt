@@ -1,4 +1,3 @@
-function inc(x: Integer) Integer
-    return x + 1;
+function proc() return;
 
-inc(0)
+proc()
