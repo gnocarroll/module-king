@@ -40,7 +40,7 @@ pub struct TypeLiteral {
     pub body: ExprID,
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum Type {
     Error,
     Unit,

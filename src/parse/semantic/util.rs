@@ -3,7 +3,11 @@ use std::collections::HashMap;
 use crate::{
     constants::{ERROR_TYPE, UNIT_TYPE},
     parse::{
-        AST, ExprReturns, ExprVariant, FunctionLiteral, Identifier, Member, MemberVariant, Scope, ScopeRefersTo, ScopeVariant, TokenOrString, Type, TypeOrModule, TypeVariant, Visibility, ast_contents::{ExprID, FunctionID, MemberID, ScopeID, TypeID}, errors::{InvalidOperation, MissingOperand, PatternError, SemanticError}, semantic::SemanticContext
+        AST, ExprReturns, ExprVariant, FunctionLiteral, Identifier, Member, MemberVariant, Scope,
+        ScopeRefersTo, ScopeVariant, TokenOrString, Type, TypeOrModule, TypeVariant, Visibility,
+        ast_contents::{ExprID, FunctionID, MemberID, ScopeID, TypeID},
+        errors::{InvalidOperation, MissingOperand, PatternError, SemanticError},
+        semantic::SemanticContext,
     },
     scan::Token,
     tokens::Tokens,
@@ -331,10 +335,7 @@ impl AST {
         }
     }
 
-    pub fn expr_get_function_id(
-        &self,
-        expr: ExprID,
-    ) -> Option<FunctionID> {
+    pub fn expr_get_function_id(&self, expr: ExprID) -> Option<FunctionID> {
         match self.objs.expr(expr).variant {
             ExprVariant::FunctionLiteral(FunctionLiteral {
                 function_id: function_id,
@@ -343,20 +344,15 @@ impl AST {
             ExprVariant::Identifier(Identifier {
                 member_id: member_id,
                 ..
-            }) => {
-                match self.objs.member(member_id).variant {
-                    MemberVariant::Function(function_id) => Some(function_id),
-                    _ => None
-                }
-            }
-            _ => None
+            }) => match self.objs.member(member_id).variant {
+                MemberVariant::Function(function_id) => Some(function_id),
+                _ => None,
+            },
+            _ => None,
         }
     }
 
-    pub fn type_resolve_aliasing(
-        &self,
-        type_id: TypeID,
-    ) -> TypeID {
+    pub fn type_resolve_aliasing(&self, type_id: TypeID) -> TypeID {
         let mut ret = type_id;
 
         loop {
@@ -373,18 +369,64 @@ impl AST {
         ret
     }
 
-    pub fn type_get_variant(
-        &self,
-        type_id: TypeID,
-    ) -> Option<TypeVariant> {
+    pub fn type_get_variant(&self, type_id: TypeID) -> Option<TypeVariant> {
         match self.objs.type_get(type_id) {
-            Type::Scope(scope_id) => {
-                match self.objs.scope(*scope_id).variant {
-                    ScopeVariant::Type(variant) => Some(variant),
-                    _ => panic!("should be a type and thus guaranteed to have TypeVariant"),
+            Type::Scope(scope_id) => match self.objs.scope(*scope_id).variant {
+                ScopeVariant::Type(variant) => Some(variant),
+                _ => panic!("should be a type and thus guaranteed to have TypeVariant"),
+            },
+            _ => None,
+        }
+    }
+
+    pub fn type_eq(&self, t1: TypeID, t2: TypeID) -> bool {
+        let t1 = self.type_resolve_aliasing(t1);
+        let t2 = self.type_resolve_aliasing(t2);
+
+        if t1 == t2 {
+            return true;
+        }
+
+        if self.objs.type_get(t1) == self.objs.type_get(t2) {
+            return true;
+        }
+
+        match (self.objs.type_get(t1), self.objs.type_get(t2)) {
+            (Type::Ptr(t1), Type::Ptr(t2))
+            | (Type::Ref(t1), Type::Ref(t2))
+            | (Type::Map(t1), Type::Map(t2))
+            | (Type::List(t1), Type::List(t2)) => {
+                return self.type_eq(*t1, *t2);
+            }
+            (Type::Function((params1, ret1)), Type::Function((params2, ret2))) => {
+                return self.type_eq(*params1, *params2) && self.type_eq(*ret1, *ret2);
+            }
+            (Type::Module(_), Type::Module(_)) | (Type::Type(_), Type::Type(_)) => return true,
+            (Type::Scope(s1), Type::Scope(s2)) => {
+                // TODO: in the future could check for unnamed record types e.g. if they have same members in same order
+
+                return *s1 == *s2;
+            }
+            _ => (),
+        }
+
+        let mut t1_iter = t1.to_tuple_iterator(self);
+        let mut t2_iter = t2.to_tuple_iterator(self);
+
+        loop {
+            let t1 = t1_iter.next();
+            let t2 = t2_iter.next();
+
+            match (t1, t2) {
+                (None, None) => return true,
+                (Some(_), None) => return false,
+                (None, Some(_)) => return false,
+                (Some(t1), Some(t2)) => {
+                    if !self.type_eq(t1, t2) {
+                        return false;
+                    }
                 }
             }
-            _ => None,
         }
     }
 }
