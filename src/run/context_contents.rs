@@ -264,6 +264,13 @@ fn type_to_value_id(ast: &AST, runtime_scope: &mut RuntimeScope, type_id: TypeID
 }
 
 impl ContextObjects {
+    pub fn runtime_scope_child(&mut self, parent: RuntimeScopeID) -> RuntimeScopeID {
+        self.runtime_scope_push(RuntimeScope {
+            parent,
+            ..Default::default()
+        })
+    }
+
     pub fn runtime_scope_push(&mut self, scope: RuntimeScope) -> RuntimeScopeID {
         self.scopes.push(scope);
 

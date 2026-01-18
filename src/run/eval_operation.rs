@@ -300,6 +300,29 @@ fn eval_operation_eq(
     Ok(expr_to_unit(ast, ctx, expr))
 }
 
+fn eval_operation_apply(
+    ast: &AST,
+    ctx: &mut ExecutionContext,
+    expr: ExprID,
+    operand1: ExprID,
+    operand2: ExprID,
+) -> Result<RuntimeReference, RuntimeError> {
+    let func = eval(ast, ctx, operand1)?;
+
+    let function_id = match ctx.objs.ref_get(func).variant {
+        ValueVariant::Function(function_id) => function_id,
+        _ => return Err(RuntimeError { expr, variant: RuntimeErrorVariant::InvalidOperation })
+    };
+
+    let function_scope = ctx.switch_to_child_scope();
+
+    let new_value_ref = eval(ast, ctx, operand2)?;
+
+    do_assignment(ast, ctx, assign_to_ref, new_value_ref);
+
+    Ok(expr_to_unit(ast, ctx, expr))
+}
+
 fn eval_operation_binary(
     ast: &AST,
     ctx: &mut ExecutionContext,
@@ -325,6 +348,8 @@ fn eval_operation_binary(
         // for colon lhs is identifier(s), just return them
         TokenType::Colon => return eval_operation_colon(ast, ctx, expr, operand1, operand2),
         TokenType::Period => return eval_operation_period(ast, ctx, expr, operand1, operand2),
+
+        TokenType::LParen => return eval_operation_apply(ast, ctx, expr, operand1, operand2),
 
         // currently same code can be used for Eq, ColonEq
         TokenType::Eq => return eval_operation_eq(ast, ctx, expr, operand1, operand2),

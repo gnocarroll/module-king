@@ -1,8 +1,6 @@
 mod analyze_operation;
 mod util;
 
-use std::collections::HashMap;
-
 use crate::{
     constants::{BOOLEAN_TYPE, ERROR_TYPE, FLOAT_TYPE, INTEGER_TYPE, STRING_TYPE, UNIT_TYPE},
     parse::{
@@ -606,13 +604,6 @@ impl AST {
             | ExprVariant::IntegerLiteral(_)
             | ExprVariant::FloatLiteral(_)
             | ExprVariant::StringLiteral(_) => {
-                if self
-                    .test_analyzing_now(ctx.analyzing_now, &[AnalyzingNow::Expr], expr)
-                    .is_err()
-                {
-                    return;
-                }
-
                 // find built-in type id and set type of expr
 
                 let type_name = match self.expr(expr).variant {

@@ -29,6 +29,14 @@ impl<'a> ExecutionContext<'a> {
             curr_scope,
         }
     }
+
+    // create scope that is child of current scope and set it to current
+    // ret value: new scope's ID
+    pub fn switch_to_child_scope(&mut self) -> RuntimeScopeID {
+        self.curr_scope = self.objs.runtime_scope_child(self.curr_scope);
+
+        self.curr_scope
+    }
 }
 
 fn expr_to_unit(ast: &AST, ctx: &mut ExecutionContext, expr: ExprID) -> RuntimeReference {
