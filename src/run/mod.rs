@@ -3,13 +3,17 @@
 mod context_contents;
 mod error;
 mod eval_operation;
+mod util;
 
 use crate::{
-    constants::UNIT_TYPE, parse::{AST, ExprReturns, ExprVariant, Type, ast_contents::ExprID}, run::{
+    constants::UNIT_TYPE,
+    parse::{AST, ExprVariant, Type, ast_contents::ExprID},
+    run::{
         context_contents::{ContextObjects, RuntimeReference, RuntimeScopeID, Value, ValueVariant},
         error::{RuntimeError, RuntimeErrorVariant},
         eval_operation::eval_operation,
-    }, tokens::Tokens
+    },
+    tokens::Tokens,
 };
 
 pub struct ExecutionContext<'a> {
@@ -49,7 +53,11 @@ fn expr_to_unit(ast: &AST, ctx: &mut ExecutionContext, expr: ExprID) -> RuntimeR
     .to_runtime_ref(ctx, ctx.curr_scope)
 }
 
-fn eval(ast: &AST, ctx: &mut ExecutionContext, expr: ExprID) -> Result<RuntimeReference, RuntimeError> {
+fn eval(
+    ast: &AST,
+    ctx: &mut ExecutionContext,
+    expr: ExprID,
+) -> Result<RuntimeReference, RuntimeError> {
     // 1. collect some preliminary info on expr
 
     let type_id = ast.objs.expr(expr).type_id;
@@ -57,9 +65,7 @@ fn eval(ast: &AST, ctx: &mut ExecutionContext, expr: ExprID) -> Result<RuntimeRe
     // if expr is a type itself or a module do not need to do any work
 
     match ast.objs.type_get(type_id) {
-        Type::Type(_) | Type::Module(_) => {
-            return Ok(expr_to_unit(ast, ctx, expr))
-        }
+        Type::Type(_) | Type::Module(_) => return Ok(expr_to_unit(ast, ctx, expr)),
         _ => (),
     }
 
@@ -86,15 +92,15 @@ fn eval(ast: &AST, ctx: &mut ExecutionContext, expr: ExprID) -> Result<RuntimeRe
         ExprVariant::Identifier(ident) => ValueVariant::Identifier(ident.member_id),
 
         // named function literal returns unit but if not named then return expr id
-
-        ExprVariant::FunctionLiteral(func) => if type_id == unit_type_id {
-            ValueVariant::Unit
-        } else {
-            ValueVariant::Function(func.function_id)
-        },
+        ExprVariant::FunctionLiteral(func) => {
+            if type_id == unit_type_id {
+                ValueVariant::Unit
+            } else {
+                ValueVariant::Function(func.function_id)
+            }
+        }
 
         // no handling for given expr variant
-
         _ => {
             return Err(RuntimeError {
                 expr,
@@ -106,7 +112,8 @@ fn eval(ast: &AST, ctx: &mut ExecutionContext, expr: ExprID) -> Result<RuntimeRe
     let ret = Value {
         type_id: Some(type_id),
         variant,
-    }.to_runtime_ref(ctx, ctx.curr_scope);
+    }
+    .to_runtime_ref(ctx, ctx.curr_scope);
 
     Ok(ret)
 }

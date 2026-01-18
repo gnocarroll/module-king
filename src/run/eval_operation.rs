@@ -316,6 +316,8 @@ fn eval_operation_apply(
 
     let function_scope = ctx.switch_to_child_scope();
 
+    let function_struct = ast.objs.function(function_id);
+
     let new_value_ref = eval(ast, ctx, operand2)?;
 
     do_assignment(ast, ctx, assign_to_ref, new_value_ref);

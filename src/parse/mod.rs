@@ -144,7 +144,7 @@ impl Iterator for TupleIterator<'_> {
                 }
                 _ => {
                     self.done = true;
-                    
+
                     return Some(self.type_id);
                 }
             }
@@ -453,6 +453,41 @@ pub enum PatternVariant {
 
     // some other kind of expression is found
     MiscExpr(ExprID),
+}
+
+pub struct PatternIterator<'a> {
+    ast: &'a AST,
+    pattern_stack: Vec<PatternID>,
+}
+
+impl Iterator for PatternIterator<'_> {
+    type Item = (Token, TypeID);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let pattern_id = self.pattern_stack.pop()?;
+
+            let pattern = self.ast.objs.pattern(pattern_id);
+
+            let type_id = pattern.type_id;
+
+            match pattern.variant {
+                PatternVariant::IgnoreOne | PatternVariant::IgnoreMultiple => (),
+                PatternVariant::Ident(token) => return Some((token, type_id)),
+                PatternVariant::Tuple((lhs, None)) | PatternVariant::Slice((lhs, None)) => {
+                    self.pattern_stack.push(lhs)
+                }
+                PatternVariant::Tuple((lhs, Some(rhs)))
+                | PatternVariant::RestOfTuple((lhs, rhs))
+                | PatternVariant::Slice((lhs, Some(rhs)))
+                | PatternVariant::RestOfSlice((lhs, rhs)) => {
+                    self.pattern_stack.push(rhs);
+                    self.pattern_stack.push(lhs);
+                }
+                _ => (),
+            }
+        }
+    }
 }
 
 // NOTE: AST is used for syntax and semantic analysis since I think

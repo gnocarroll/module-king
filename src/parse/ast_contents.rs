@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use crate::{
     constants::{ERROR_TYPE, STRING_TYPE, UNIT_TYPE},
     parse::{
-        AST, Expr, Function, Member, MemberVariant, Pattern, Scope, ScopeVariant, TupleIterator, Type, Visibility
+        AST, Expr, Function, Member, MemberVariant, Pattern, PatternIterator, Scope, ScopeVariant, TupleIterator, Type, Visibility
     },
     tokens::TokenOrString,
 };
@@ -147,6 +147,12 @@ pub struct MemberID {
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub struct PatternID {
     id: u32,
+}
+
+impl PatternID {
+    pub fn to_pattern_iterator<'a>(&self, ast: &'a AST) -> PatternIterator<'a> {
+        PatternIterator { ast, pattern_stack: vec![*self] }
+    }
 }
 
 impl ASTContents {
