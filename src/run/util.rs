@@ -8,7 +8,7 @@ use crate::{
 
 // for each member that can be located from pattern,
 // allocate it in current RuntimeScope
-pub fn alloc_instances_from_pattern(
+pub fn allocate_instances_from_pattern(
     ast: &AST,
     ctx: &mut ExecutionContext,
     pattern: PatternID,

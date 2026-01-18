@@ -6,8 +6,9 @@ use crate::{
     run::{
         ExecutionContext, Value, ValueVariant,
         context_contents::RuntimeReference,
-        error::{RuntimeError, RuntimeErrorVariant},
+        error::{RuntimeException, RuntimeErrorVariant},
         eval, expr_to_unit,
+        util::allocate_instances_from_pattern,
     },
     scan::TokenType,
 };
@@ -16,7 +17,7 @@ pub fn eval_eager(
     _ast: &AST,
     ctx: &mut ExecutionContext,
     runtime_ref: RuntimeReference,
-) -> Result<RuntimeReference, RuntimeError> {
+) -> Result<RuntimeReference, RuntimeException> {
     let mut runtime_ref = runtime_ref;
 
     loop {
@@ -44,13 +45,13 @@ pub fn eval_operation(
     ctx: &mut ExecutionContext,
     expr: ExprID,
     operation: Operation,
-) -> Result<RuntimeReference, RuntimeError> {
+) -> Result<RuntimeReference, RuntimeException> {
     match (operation.operand1, operation.operand2) {
         (Some(operand), None) => eval_operation_unary(ast, ctx, expr, operation.op, operand),
         (Some(operand1), Some(operand2)) => {
             eval_operation_binary(ast, ctx, expr, operation.op, operand1, operand2)
         }
-        _ => Err(RuntimeError {
+        _ => Err(RuntimeException {
             expr,
             variant: RuntimeErrorVariant::InvalidOperation,
         }),
@@ -63,8 +64,8 @@ fn eval_operation_unary(
     expr: ExprID,
     op: TokenType,
     operand: ExprID,
-) -> Result<RuntimeReference, RuntimeError> {
-    let invalid_op = Err(RuntimeError {
+) -> Result<RuntimeReference, RuntimeException> {
+    let invalid_op = Err(RuntimeException {
         expr,
         variant: RuntimeErrorVariant::InvalidOperation,
     });
@@ -178,7 +179,7 @@ fn eval_operation_colon(
     _expr: ExprID,
     operand1: ExprID,
     _operand2: ExprID,
-) -> Result<RuntimeReference, RuntimeError> {
+) -> Result<RuntimeReference, RuntimeException> {
     let ret = eval(ast, ctx, operand1);
 
     if let Ok(lhs_ref) = ret {
@@ -194,7 +195,7 @@ fn eval_operation_period(
     expr: ExprID,
     operand1: ExprID,
     operand2: ExprID,
-) -> Result<RuntimeReference, RuntimeError> {
+) -> Result<RuntimeReference, RuntimeException> {
     let value_ref = eval(ast, ctx, operand1)?;
     let member_ref = eval(ast, ctx, operand2)?;
 
@@ -212,7 +213,7 @@ fn eval_operation_period(
                     scope: ctx.curr_scope,
                     value_id: *value_id,
                 }),
-                None => Err(RuntimeError {
+                None => Err(RuntimeException {
                     expr,
                     variant: RuntimeErrorVariant::InvalidOperation,
                 }),
@@ -222,7 +223,7 @@ fn eval_operation_period(
             let runtime_ref = match ctx.objs.instance_get(*member_id) {
                 Some(r) => r,
                 None => {
-                    return Err(RuntimeError {
+                    return Err(RuntimeException {
                         expr,
                         variant: RuntimeErrorVariant::MemberDNE,
                     });
@@ -237,7 +238,7 @@ fn eval_operation_period(
                 ValueVariant::Record(map) => match map.get(&name) {
                     Some(id) => id,
                     None => {
-                        return Err(RuntimeError {
+                        return Err(RuntimeException {
                             expr,
                             variant: RuntimeErrorVariant::BadIdent,
                         });
@@ -252,7 +253,7 @@ fn eval_operation_period(
             });
         }
         _ => {
-            return Err(RuntimeError {
+            return Err(RuntimeException {
                 expr,
                 variant: RuntimeErrorVariant::InvalidOperation,
             });
@@ -291,7 +292,7 @@ fn eval_operation_eq(
     expr: ExprID,
     operand1: ExprID,
     operand2: ExprID,
-) -> Result<RuntimeReference, RuntimeError> {
+) -> Result<RuntimeReference, RuntimeException> {
     let assign_to_ref = eval(ast, ctx, operand1)?;
     let new_value_ref = eval(ast, ctx, operand2)?;
 
@@ -306,23 +307,58 @@ fn eval_operation_apply(
     expr: ExprID,
     operand1: ExprID,
     operand2: ExprID,
-) -> Result<RuntimeReference, RuntimeError> {
+) -> Result<RuntimeReference, RuntimeException> {
     let func = eval(ast, ctx, operand1)?;
 
     let function_id = match ctx.objs.ref_get(func).variant {
         ValueVariant::Function(function_id) => function_id,
-        _ => return Err(RuntimeError { expr, variant: RuntimeErrorVariant::InvalidOperation })
+        _ => {
+            return Err(RuntimeException {
+                expr,
+                variant: RuntimeErrorVariant::InvalidOperation,
+            });
+        }
     };
 
     let function_scope = ctx.switch_to_child_scope();
 
     let function_struct = ast.objs.function(function_id);
 
+    for pattern_id in &function_struct.params {
+        allocate_instances_from_pattern(ast, ctx, *pattern_id, function_struct.scope);
+    }
+
     let new_value_ref = eval(ast, ctx, operand2)?;
 
-    do_assignment(ast, ctx, assign_to_ref, new_value_ref);
-
     Ok(expr_to_unit(ast, ctx, expr))
+}
+
+fn eval_operation_semi(
+    ast: &AST,
+    ctx: &mut ExecutionContext,
+    _expr: ExprID,
+    operand1: ExprID,
+    operand2: ExprID,
+) -> Result<RuntimeReference, RuntimeException> {
+    let unit_type = ast.get_builtin_type_id(UNIT_TYPE);
+
+    let ret = Ok(Value {
+        type_id: Some(unit_type),
+        variant: ValueVariant::Unit,
+    }
+    .to_runtime_ref(ctx, ctx.curr_scope));
+
+    eval(ast, ctx, operand1)?;
+    
+    if ctx.return_now {
+        return ret;
+    }
+
+    let operand_ref2 = eval(ast, ctx, operand2)?;
+
+    eprintln!("RHS OF SEMI: {}", operand_ref2.to_string(ast, ctx));
+
+    ret
 }
 
 fn eval_operation_binary(
@@ -332,8 +368,8 @@ fn eval_operation_binary(
     op: TokenType,
     operand1: ExprID,
     operand2: ExprID,
-) -> Result<RuntimeReference, RuntimeError> {
-    let invalid_op = Err(RuntimeError {
+) -> Result<RuntimeReference, RuntimeException> {
+    let invalid_op = Err(RuntimeException {
         expr,
         variant: RuntimeErrorVariant::InvalidOperation,
     });
@@ -352,6 +388,8 @@ fn eval_operation_binary(
         TokenType::Period => return eval_operation_period(ast, ctx, expr, operand1, operand2),
 
         TokenType::LParen => return eval_operation_apply(ast, ctx, expr, operand1, operand2),
+
+        TokenType::Semicolon => return eval_operation_semi(ast, ctx, expr, operand1, operand2),
 
         // currently same code can be used for Eq, ColonEq
         TokenType::Eq => return eval_operation_eq(ast, ctx, expr, operand1, operand2),
@@ -377,18 +415,6 @@ fn eval_operation_binary(
     }
 
     let operand_refs = [eval(ast, ctx, operand1)?, eval(ast, ctx, operand2)?];
-
-    if op == TokenType::Semicolon {
-        eprintln!("RHS OF SEMI: {}", operand_refs[1].to_string(ast, ctx));
-
-        let unit_type = ast.get_builtin_type_id(UNIT_TYPE);
-
-        return Ok(Value {
-            type_id: Some(unit_type),
-            variant: ValueVariant::Unit,
-        }
-        .to_runtime_ref(ctx, ctx.curr_scope));
-    }
 
     // eagerly evaluate LHS, RHS before performing operation so e.g.
     // if one side is a var we will get the value

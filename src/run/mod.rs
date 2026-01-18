@@ -10,7 +10,7 @@ use crate::{
     parse::{AST, ExprVariant, Type, ast_contents::ExprID},
     run::{
         context_contents::{ContextObjects, RuntimeReference, RuntimeScopeID, Value, ValueVariant},
-        error::{RuntimeError, RuntimeErrorVariant},
+        error::{RuntimeException, RuntimeErrorVariant},
         eval_operation::eval_operation,
     },
     tokens::Tokens,
@@ -20,6 +20,11 @@ pub struct ExecutionContext<'a> {
     pub tokens: &'a Tokens<'a>,
     pub objs: ContextObjects,
     pub curr_scope: RuntimeScopeID,
+
+    // when function is returning value will be placed at top of here
+    pub ret_locations: Vec<RuntimeReference>,
+
+    pub return_now: bool,
 }
 
 impl<'a> ExecutionContext<'a> {
@@ -31,6 +36,8 @@ impl<'a> ExecutionContext<'a> {
             tokens,
             objs,
             curr_scope,
+            ret_locations: Vec::new(),
+            return_now: false,
         }
     }
 
@@ -57,7 +64,7 @@ fn eval(
     ast: &AST,
     ctx: &mut ExecutionContext,
     expr: ExprID,
-) -> Result<RuntimeReference, RuntimeError> {
+) -> Result<RuntimeReference, RuntimeException> {
     // 1. collect some preliminary info on expr
 
     let type_id = ast.objs.expr(expr).type_id;
@@ -79,7 +86,7 @@ fn eval(
         ExprVariant::IntegerLiteral(i) => ValueVariant::Integer(match (*i).try_into() {
             Ok(i) => i,
             Err(_) => {
-                return Err(RuntimeError {
+                return Err(RuntimeException {
                     expr,
                     variant: RuntimeErrorVariant::IntegerOverflow,
                 });
@@ -102,7 +109,7 @@ fn eval(
 
         // no handling for given expr variant
         _ => {
-            return Err(RuntimeError {
+            return Err(RuntimeException {
                 expr,
                 variant: RuntimeErrorVariant::NotImplemented,
             });

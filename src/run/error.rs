@@ -1,6 +1,6 @@
 use crate::parse::ast_contents::ExprID;
 
-pub struct RuntimeError {
+pub struct RuntimeException {
     pub expr: ExprID,
     pub variant: RuntimeErrorVariant,
 }
