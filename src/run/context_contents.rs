@@ -38,6 +38,9 @@ pub enum ValueVariant {
     String(String),
     Identifier(MemberID),
 
+    // tuples are "flattened" unlike linked-list structure used elsewhere in codebase
+    Tuple(Vec<ValueID>),
+
     Record(HashMap<String, ValueID>),
 
     Ref(RuntimeReference),
@@ -75,6 +78,24 @@ impl RuntimeReference {
                 "type({})",
                 ast.type_to_string(ctx.tokens, *type_id),
             ),
+            ValueVariant::Tuple(values) => {
+                // get string for each value
+
+                let element_strings: Vec<String> = values
+                    .iter()
+                    .map(|value_id| {
+                        RuntimeReference {
+                            scope: self.scope,
+                            value_id: *value_id,
+                        }
+                        .to_string(ast, ctx)
+                    })
+                    .collect();
+
+                // combine
+
+                format!("({})", element_strings.join(", "))
+            }
             ValueVariant::Unit => "Unit".to_string(),
             ValueVariant::Integer(val) => val.to_string(),
             ValueVariant::Float(val) => val.to_string(),
@@ -143,7 +164,9 @@ impl RuntimeReference {
             | ValueVariant::ImplicitRef(_)
             | ValueVariant::Ref(_)
             | ValueVariant::String(_)
-            | ValueVariant::Function(_) => value,
+            | ValueVariant::Function(_)
+            | ValueVariant::Type(_)
+            | ValueVariant::Tuple(_) => value,
             ValueVariant::Identifier(ident) => {
                 return ctx
                     .objs
