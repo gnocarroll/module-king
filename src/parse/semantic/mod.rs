@@ -321,11 +321,10 @@ impl AST {
         let old_analyzing_now = ctx.analyzing_now;
         let mut err: Option<SemanticError> = None;
 
-        if let Some(pattern) = operand1 {
-            ctx.analyzing_now = AnalyzingNow::Pattern;
-            self.analyze_expr(ctx, scope, pattern);
-            ctx.analyzing_now = old_analyzing_now;
-        } else {
+        // do not analyze operand1 since e.g. if it contains names for new instances
+        // they have not been created yet
+
+        if operand1.is_none() {
             err = Some(self.missing_operand(expr, 1));
         }
 
