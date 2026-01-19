@@ -33,7 +33,6 @@ impl<'a> ExecutionContext<'a> {
             tokens,
             objs,
             curr_scope,
-            ret_locations: Vec::new(),
             return_now: false,
         }
     }

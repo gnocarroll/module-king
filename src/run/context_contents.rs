@@ -634,7 +634,18 @@ impl ContextObjects {
             panic!("Bogus RetLocationID 0");
         }
 
-        self.ret_locations[ret_location.id as usize - 1]
+        self.ret_locations[ret_location.id as usize]
+    }
+
+
+    pub fn ret_location_top(&mut self) -> RuntimeReference {
+        if self.ret_locations.len() <= 1 {
+            panic!("No valid ret locations currently exist")
+        }
+
+        let last_ret_locations_idx = self.ret_locations.len() - 1;
+
+        self.ret_locations[last_ret_locations_idx]
     }
 
     pub fn ret_location_delete(&mut self, ret_location: RetLocationID) {

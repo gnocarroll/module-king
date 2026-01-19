@@ -45,13 +45,24 @@ fn eval_operation_apply_function(
     function_id: FunctionID,
     args: RuntimeReference,
 ) -> Result<RuntimeReference, RuntimeException> {
+    // save ID of outside scope, switch to function scope
+
+    let outside_scope = ctx.curr_scope;
     let function_scope = ctx.switch_to_child_scope();
 
+    // set up ret location for function using function scope
+
+    let ret_location = ctx.objs.ret_location_push(function_scope);
+
     let function_struct = ast.objs.function(function_id);
+
+    // allocate space for param variables
 
     for pattern_id in &function_struct.params {
         allocate_instances_from_pattern(ast, ctx, *pattern_id, function_struct.scope);
     }
+
+    // copy values of args into function scope
 
     let args_value_ids: Vec<ValueID> = args.to_tuple_value_iterator(&ctx.objs).collect();
 
@@ -66,6 +77,8 @@ fn eval_operation_apply_function(
             .to_runtime_ref(ctx, function_scope)
         })
         .collect();
+
+    // assign values to args
 
     for ((name, _), new_value_ref) in zip(
         function_struct
@@ -91,13 +104,20 @@ fn eval_operation_apply_function(
         do_assignment(ast, ctx, assign_to_ref, *new_value_ref);
     }
 
+    // eval body and then get return value
+
     eval(ast, ctx, function_struct.body)?;
 
-    // destroy function scope
+    let ret_ref = ctx.objs.ret_location(ret_location);
 
+    let ret_value = ret_ref.dup_in_scope(ast, ctx, outside_scope);
+
+    // destroy ret value location + function scope
+
+    ctx.objs.ret_location_delete(ret_location);
     ctx.pop_curr_scope();
 
-    Ok(expr_to_unit(ast, ctx, expr))
+    Ok(ret_value.to_runtime_ref(ctx, outside_scope))
 }
 
 fn eval_operation_apply_cast(
