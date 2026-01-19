@@ -646,6 +646,7 @@ impl AST {
     fn analyze_expr(&mut self, ctx: &mut SemanticContext, scope: ScopeID, expr: ExprID) {
         match &self.expr(expr).variant {
             ExprVariant::Unit
+            | ExprVariant::BooleanLiteral(_)
             | ExprVariant::IntegerLiteral(_)
             | ExprVariant::FloatLiteral(_)
             | ExprVariant::StringLiteral(_) => {
@@ -653,6 +654,7 @@ impl AST {
 
                 let type_name = match self.expr(expr).variant {
                     ExprVariant::Unit => UNIT_TYPE,
+                    ExprVariant::BooleanLiteral(_) => BOOLEAN_TYPE,
                     ExprVariant::IntegerLiteral(_) => INTEGER_TYPE,
                     ExprVariant::FloatLiteral(_) => FLOAT_TYPE,
                     ExprVariant::StringLiteral(_) => STRING_TYPE,

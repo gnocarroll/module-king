@@ -396,6 +396,18 @@ impl AST {
         let tok = tokens.peek();
 
         match tok.ttype {
+            TokenType::True | TokenType::False => {
+                tokens.next();
+
+                let value = tok.ttype == TokenType::True;
+
+                self.expr_push(Expr {
+                    tok: tok_idx,
+                    end_tok: tok_idx + 1,
+                    variant: ExprVariant::BooleanLiteral(value),
+                    ..Default::default()
+                })
+            }
             TokenType::Underscore => {
                 tokens.next();
                 self.expr_underscore(tok_idx)

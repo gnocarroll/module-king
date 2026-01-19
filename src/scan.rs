@@ -93,6 +93,9 @@ pub enum TokenType {
     Enum,
     Variant,
 
+    True,
+    False,
+
     DollarNumber,
     Identifier,
     Integer,
@@ -424,6 +427,9 @@ impl TokenType {
             Record => Text("record"),
             Enum => Text("enum"),
             Variant => Text("variant"),
+
+            True => Text("true"),
+            False => Text("false"),
 
             DollarNumber => Proc(scan_dollar_number),
             Identifier => Proc(scan_identifier),

@@ -82,19 +82,20 @@ fn eval_while(
     expr: ExprID,
     while_struct: While,
 ) -> Result<RuntimeReference, RuntimeException> {
-    // switch to while scope
-
-    ctx.switch_to_child_scope();
-
     // loop here corresponds to while loop in program
 
     loop {
+        // switch to while scope
+
+        ctx.switch_to_child_scope();
+
         // eval cond + test
 
         let cond_ref = eval(ast, ctx, while_struct.cond)?;
 
         match ctx.objs.ref_get(cond_ref).variant {
             ValueVariant::Boolean(cond_value) => if !cond_value {
+                ctx.pop_curr_scope();
                 break;
             }
             _ => return Err(RuntimeException { expr, variant: RuntimeErrorVariant::UnexpectedType })
@@ -104,12 +105,12 @@ fn eval_while(
 
         eval(ast, ctx, while_struct.body)?;
 
+        ctx.pop_curr_scope();
+
         if ctx.return_now {
             break;
         }
     }
-
-    ctx.pop_curr_scope();
 
     Ok(expr_to_unit(ast, ctx, expr))
 }
@@ -144,6 +145,7 @@ fn eval(
 
     let variant = match &ast.objs.expr(expr).variant {
         ExprVariant::Unit => ValueVariant::Unit,
+        ExprVariant::BooleanLiteral(b) => ValueVariant::Boolean(*b),
         ExprVariant::IntegerLiteral(i) => ValueVariant::Integer(match (*i).try_into() {
             Ok(i) => i,
             Err(_) => {

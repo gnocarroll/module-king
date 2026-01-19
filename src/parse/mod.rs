@@ -244,6 +244,8 @@ pub enum ExprVariant {
     KWType,   // the keyword "type" e.g. type(x)
     KWModule, // the keyword "module"
     DollarNumber(u64),
+
+    BooleanLiteral(bool),
     IntegerLiteral(u64),
     FloatLiteral(f64),
     StringLiteral(Token),
