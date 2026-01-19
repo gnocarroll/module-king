@@ -24,6 +24,16 @@ pub struct RuntimeReference {
     pub value_id: ValueID,
 }
 
+impl RuntimeReference {
+    pub fn to_tuple_value_iterator<'a>(&self, objs: &'a ContextObjects) -> TupleValueIterator<'a> {
+        TupleValueIterator {
+            idx: 0,
+            scope: objs.runtime_scope(self.scope),
+            value_id: self.value_id,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum ValueVariant {
     Unit,
@@ -54,6 +64,39 @@ pub enum ValueVariant {
 pub struct Value {
     pub type_id: Option<TypeID>,
     pub variant: ValueVariant,
+}
+
+pub struct TupleValueIterator<'a> {
+    idx: usize,
+    scope: &'a RuntimeScope,
+    value_id: ValueID,
+}
+
+impl Iterator for TupleValueIterator<'_> {
+    type Item = ValueID;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let value = self.scope.value(self.value_id);
+
+        match &value.variant {
+            ValueVariant::Tuple(value_id_vec) => {
+                if self.idx <= value_id_vec.len() {
+                    self.idx += 1;
+                }
+
+                value_id_vec.get(self.idx - 1).map(|id| *id)
+            }
+            _ => {
+                if self.idx == 0 {
+                    self.idx += 1;
+                    
+                    Some(self.value_id)
+                } else {
+                    None
+                }
+            }
+        }
+    }
 }
 
 impl Default for Value {
