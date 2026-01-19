@@ -39,6 +39,7 @@ pub struct InvalidOperation {
 
 #[derive(Clone)]
 pub struct ExpectedType {
+    pub expr: ExprID,
     pub expected: TypeID,
     pub found: TypeID,
 }

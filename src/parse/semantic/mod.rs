@@ -9,8 +9,7 @@ use crate::{
         TypeVariant, Visibility,
         ast_contents::{ExprID, FunctionID, PatternID, ScopeID, TypeID},
         errors::{
-            ExpectedExprReturns, ExprAndType, InvalidExpr, PatternError, SemanticError,
-            UnexpectedExpr,
+            ExpectedExprReturns, ExpectedType, ExprAndType, InvalidExpr, PatternError, SemanticError, UnexpectedExpr
         },
     },
     scan::TokenType,
@@ -399,10 +398,57 @@ impl AST {
         (pattern, err)
     }
 
+    fn analyze_while(&mut self, ctx: &mut SemanticContext, scope: ScopeID, expr: ExprID) {
+        let while_struct = match &self.objs.expr(expr).variant {
+            ExprVariant::While(while_struct) => while_struct.clone(),
+            _ => panic!("should be func literal"),
+        };
+
+        let while_scope = self.objs.scope_push(Scope {
+            name: None,
+            variant: ScopeVariant::Scope,
+            parent_scope: scope,
+
+            // connect to function obj
+            refers_to: Some(ScopeRefersTo::Expr(expr)),
+
+            ..Default::default()
+        });
+
+        self.analyze_expr(ctx, while_scope, while_struct.cond);
+        self.analyze_expr(ctx, while_scope, while_struct.body);
+
+        let mut finalized = self.objs.expr(while_struct.cond).finalized
+            && self.objs.expr(while_struct.body).finalized;
+
+        if finalized {
+            // check that condition actually returns Boolean
+
+            let boolean_type_id = self.get_builtin_type_id(BOOLEAN_TYPE);
+
+            let cond_type_id = self.objs.expr(while_struct.cond).type_id;
+
+            if !self.type_eq(boolean_type_id, cond_type_id) {
+                finalized = false;
+
+                self.semantic_errors.push(SemanticError::ExpectedType(ExpectedType {
+                    expr: while_struct.cond,
+                    expected: boolean_type_id,
+                    found: cond_type_id,
+                }));
+            }
+        }
+
+        let expr_mut = self.objs.expr_mut(expr);
+
+        expr_mut.type_id = TypeID::unit();
+        expr_mut.finalized = finalized;
+    }
+
     fn analyze_func(&mut self, ctx: &mut SemanticContext, scope: ScopeID, expr: ExprID) {
         let func_literal = match &self.objs.expr(expr).variant {
             ExprVariant::FunctionLiteral(f) => f.clone(),
-            _ => panic!(),
+            _ => panic!("should be func literal"),
         };
 
         let function_id = func_literal.function_id;
@@ -736,7 +782,7 @@ impl AST {
                 variant: ScopeVariant::Module,
                 parent_scope: ScopeID::global(),
                 refers_to: None,
-                
+
                 ..Default::default()
             });
 
