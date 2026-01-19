@@ -23,7 +23,7 @@ fn main() -> ExitCode {
     let _args: Vec<String> = std::env::args().skip(1).collect();
 
     // always use input.txt for now
-    let args = vec!["input.sp"];
+    let args = vec!["assets/input.sp"];
 
     let mut arg_parser = ArgParser::default();
 
