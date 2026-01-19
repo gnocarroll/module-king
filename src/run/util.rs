@@ -1,9 +1,12 @@
 use crate::{
     parse::{
         AST, MemberVariant,
-        ast_contents::{PatternID, ScopeID},
+        ast_contents::{FunctionID, PatternID, ScopeID, TypeID},
     },
-    run::ExecutionContext,
+    run::{
+        ExecutionContext,
+        context_contents::{RuntimeReference, ValueVariant},
+    },
 };
 
 // for each member that can be located from pattern,
@@ -32,5 +35,45 @@ pub fn allocate_instances_from_pattern(
         }
 
         ctx.objs.instance_alloc(ast, ctx.curr_scope, member_id);
+    }
+}
+
+// if runtime ref is a function then retrieve FunctionID,
+// else return None
+pub fn runtime_ref_to_function(
+    ast: &AST,
+    ctx: &mut ExecutionContext,
+    runtime_ref: RuntimeReference,
+) -> Option<FunctionID> {
+    match &ctx.objs.ref_get(runtime_ref).variant {
+        ValueVariant::Function(function_id) => Some(*function_id),
+        ValueVariant::Identifier(member_id) => {
+            match ast.objs.member(*member_id).variant {
+                MemberVariant::Function(function_id) => Some(function_id),
+                _ => None
+            }
+        }
+
+        _ => None,
+    }
+}
+
+// if runtime ref is a type then retrieve TypeID,
+// else return None
+pub fn runtime_ref_to_type(
+    ast: &AST,
+    ctx: &mut ExecutionContext,
+    runtime_ref: RuntimeReference,
+) -> Option<TypeID> {
+    match &ctx.objs.ref_get(runtime_ref).variant {
+        ValueVariant::Type(type_id) => Some(*type_id),
+        ValueVariant::Identifier(member_id) => {
+            match ast.objs.member(*member_id).variant {
+                MemberVariant::Type(type_id) => Some(type_id),
+                _ => None
+            }
+        }
+
+        _ => None,
     }
 }
