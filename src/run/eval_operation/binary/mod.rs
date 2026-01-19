@@ -4,7 +4,7 @@ use std::ops::{Add, Div, Mul, Rem, Sub};
 
 use crate::{
     constants::UNIT_TYPE,
-    parse::{AST, ast_contents::ExprID},
+    parse::{AST, Type, ast_contents::ExprID},
     run::{
         ExecutionContext, Value, ValueVariant,
         context_contents::RuntimeReference,
@@ -250,6 +250,41 @@ fn eval_operation_comma(
     operand1: ExprID,
     operand2: ExprID,
 ) -> Result<RuntimeReference, RuntimeException> {
+    let operand1_ref = eval(ast, ctx, operand1)?;
+    let operand2_ref = eval(ast, ctx, operand2)?;
+
+    let mut value_id_vec = vec![operand1_ref.value_id];
+
+    match &ctx.objs.ref_get(operand2_ref).variant {
+        ValueVariant::Unit => (),
+        ValueVariant::Tuple(value_id_vec2) => {
+            let operand2_type_id = ast.objs.expr(operand2).type_id;
+
+            match ast.objs.type_get(operand2_type_id) {
+                Type::Tuple(_) => {
+                    value_id_vec.push(operand2_ref.value_id);
+                }
+                Type::RestOfTuple(_) => {
+                    // if is RestOfTuple then we extend the Tuple's vec because
+                    // second value id vec is rest of tuple rather than a second element
+                    // in the tuple
+
+                    value_id_vec.extend_from_slice(value_id_vec2);
+                }
+                _ => panic!("type should be guaranteed to be Tuple or RestOfTuple"),
+            }
+        }
+        _ => {
+            value_id_vec.push(operand2_ref.value_id);
+        }
+    }
+
+    let type_id = ast.objs.expr(expr).type_id;
+
+    Ok(Value {
+        type_id: Some(type_id),
+        variant: ValueVariant::Tuple(value_id_vec),
+    }.to_runtime_ref(ctx, ctx.curr_scope))
 }
 
 pub fn eval_operation_binary(
