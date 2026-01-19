@@ -75,6 +75,10 @@ fn eval_operation_unary(
 
     let operand_ref = eval(ast, ctx, operand)?;
 
+    if op == TokenType::LParen {
+        return Ok(operand_ref);
+    }
+
     let operand_ref = eval_eager(ast, ctx, operand_ref)?;
 
     let operand_value = ctx.objs.ref_get(operand_ref);
