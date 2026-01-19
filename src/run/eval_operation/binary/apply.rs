@@ -41,7 +41,7 @@ pub fn eval_operation_apply(
 fn eval_operation_apply_function(
     ast: &AST,
     ctx: &mut ExecutionContext,
-    expr: ExprID,
+    _expr: ExprID,
     function_id: FunctionID,
     args: RuntimeReference,
 ) -> Result<RuntimeReference, RuntimeException> {

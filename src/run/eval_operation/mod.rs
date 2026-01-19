@@ -8,6 +8,7 @@ use crate::{
         error::{RuntimeErrorVariant, RuntimeException},
         eval,
         eval_operation::binary::eval_operation_binary,
+        expr_to_unit,
     },
     scan::TokenType,
 };
@@ -82,6 +83,26 @@ fn eval_operation_unary(
     let operand_ref = eval_eager(ast, ctx, operand_ref)?;
 
     let operand_value = ctx.objs.ref_get(operand_ref);
+
+    if op == TokenType::Return {
+        let operand_value = operand_value.clone();
+
+        // get location where return value should go and then overwrite its current value
+
+        let ret_ref = ctx.objs.ret_location_top();
+
+        ctx.objs
+            .runtime_scope_mut(ret_ref.scope)
+            .value_overwrite(ret_ref.value_id, operand_value);
+
+        // set flag indicating that function execution should terminate
+
+        ctx.return_now = true;
+
+        // ret of return expr is Unit
+
+        return Ok(expr_to_unit(ast, ctx, expr));
+    }
 
     let ret = match (op, &operand_value.variant) {
         // unary +
