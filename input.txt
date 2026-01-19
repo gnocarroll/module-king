@@ -1,12 +1,9 @@
-x := 0;
+function identity(x: Integer) Integer
+begin
+    return x;
+end function;
 
-function inc(x: Integer) Integer
-    return x + 1;
+function add(x: Integer, y: Integer) Integer
+    return identity(x) + identity(y);
 
-while x < 10 do
-    y := 1;
-
-    x = inc(x);
-end while;
-
-x
+add(10, 20)
