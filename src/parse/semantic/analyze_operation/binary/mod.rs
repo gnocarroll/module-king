@@ -321,6 +321,50 @@ impl AST {
         expr_mut.finalized = true;
     }
 
+    // var creation + assignment + type inference
+    // operand1 := operand2;
+    fn analyze_operation_colon_eq(
+        &mut self,
+        ctx: &mut SemanticContext,
+        scope: ScopeID,
+        expr: ExprID,
+        operand1: ExprID,
+        operand2: ExprID,
+    ) {
+        self.analyze_expr(ctx, scope, operand2);
+
+        let maybe_type_id = if self.objs.expr(operand2).finalized {
+            let type_id = self.objs.expr(operand2).type_id;
+
+            match self.objs.type_get(type_id) {
+                Type::Type(_) | Type::Module(_) => {
+                    self.invalid_operation(
+                        expr,
+                        "\":=\" is only for assigning values, not modules or types",
+                    );
+                    None
+                }
+                _ => Some(type_id),
+            }
+        } else {
+            None
+        };
+
+        let (pattern, _) = self.pattern_matching(ctx, scope, operand1, maybe_type_id);
+
+        self.scope_create_members_from_pattern(ctx, scope, pattern);
+
+        // after creation of members analyze lhs (now relevant vars should exist)
+        self.analyze_expr(ctx, scope, operand1);
+
+        let finalized = self.objs.expr(operand1).finalized && self.objs.expr(operand2).finalized;
+
+        let expr_mut = self.objs.expr_mut(expr);
+
+        expr_mut.type_id = TypeID::unit();
+        expr_mut.finalized = finalized;
+    }
+
     // glue values or type together into tuple
     fn analyze_operation_comma(
         &mut self,
@@ -506,35 +550,7 @@ impl AST {
                 return;
             }
             TokenType::ColonEq => {
-                // var creation + assignment + type inference
-                // operand1 := operand2;
-
-                self.analyze_expr(ctx, scope, operand2);
-
-                let maybe_type_id = if self.objs.expr(operand2).finalized {
-                    let type_id = self.objs.expr(operand2).type_id;
-
-                    match self.objs.type_get(type_id) {
-                        Type::Type(_) | Type::Module(_) => {
-                            self.invalid_operation(
-                                expr,
-                                "\":=\" is only for assigning values, not modules or types",
-                            );
-                            None
-                        }
-                        _ => Some(type_id),
-                    }
-                } else {
-                    None
-                };
-
-                let (pattern, _) = self.pattern_matching(ctx, scope, operand1, maybe_type_id);
-
-                self.scope_create_members_from_pattern(ctx, scope, pattern);
-
-                // after creation of members analyze lhs (now relevant vars should exist)
-                self.analyze_expr(ctx, scope, operand1);
-
+                self.analyze_operation_colon_eq(ctx, scope, expr, operand1, operand2);
                 return;
             }
             TokenType::Eq => {
