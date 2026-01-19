@@ -18,7 +18,12 @@ pub struct ValueID {
     id: u32,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+pub struct RetLocationID {
+    id: u32,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct RuntimeReference {
     pub scope: RuntimeScopeID,
     pub value_id: ValueID,
@@ -89,7 +94,7 @@ impl Iterator for TupleValueIterator<'_> {
             _ => {
                 if self.idx == 0 {
                     self.idx += 1;
-                    
+
                     Some(self.value_id)
                 } else {
                     None
@@ -347,6 +352,9 @@ pub struct ContextObjects {
 
     // find which scope given MemberID is in in O(1) so value can be retrieved
     member_map: HashMap<MemberID, RuntimeScopeID>,
+
+    // when function is returning value will be placed at top of here
+    ret_locations: Vec<RuntimeReference>,
 }
 
 impl Default for ContextObjects {
@@ -357,6 +365,7 @@ impl Default for ContextObjects {
         ContextObjects {
             scopes: vec![RuntimeScope::default()],
             member_map: HashMap::new(),
+            ret_locations: vec![RuntimeReference::default()],
         }
     }
 }
@@ -605,5 +614,43 @@ impl ContextObjects {
         scope_obj.members.insert(member_id, value_id);
 
         RuntimeReference { scope, value_id }
+    }
+
+    pub fn ret_location_push(&mut self, scope: RuntimeScopeID) -> RetLocationID {
+        let value_id = self.runtime_scope_mut(scope).value_push(Value::default());
+
+        self.ret_locations.push(RuntimeReference {
+            scope: scope,
+            value_id,
+        });
+
+        RetLocationID {
+            id: self.ret_locations.len() as u32 - 1,
+        }
+    }
+
+    pub fn ret_location(&mut self, ret_location: RetLocationID) -> RuntimeReference {
+        if ret_location.id == 0 {
+            panic!("Bogus RetLocationID 0");
+        }
+
+        self.ret_locations[ret_location.id as usize - 1]
+    }
+
+    pub fn ret_location_delete(&mut self, ret_location: RetLocationID) {
+        if ret_location.id == 0 {
+            panic!("Bogus RetLocationID 0");
+        }
+
+        let last_ret_locations_id = self.ret_locations.len() as u32 - 1;
+
+        if last_ret_locations_id != ret_location.id {
+            panic!(
+                "attempted to delete ret location ID {} but last was {}",
+                ret_location.id, last_ret_locations_id,
+            );
+        }
+
+        self.ret_locations.pop();
     }
 }

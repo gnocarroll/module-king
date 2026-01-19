@@ -21,9 +21,6 @@ pub struct ExecutionContext<'a> {
     pub objs: ContextObjects,
     pub curr_scope: RuntimeScopeID,
 
-    // when function is returning value will be placed at top of here
-    pub ret_locations: Vec<RuntimeReference>,
-
     pub return_now: bool,
 }
 
@@ -94,11 +91,18 @@ fn eval_while(
         let cond_ref = eval(ast, ctx, while_struct.cond)?;
 
         match ctx.objs.ref_get(cond_ref).variant {
-            ValueVariant::Boolean(cond_value) => if !cond_value {
-                ctx.pop_curr_scope();
-                break;
+            ValueVariant::Boolean(cond_value) => {
+                if !cond_value {
+                    ctx.pop_curr_scope();
+                    break;
+                }
             }
-            _ => return Err(RuntimeException { expr, variant: RuntimeErrorVariant::UnexpectedType })
+            _ => {
+                return Err(RuntimeException {
+                    expr,
+                    variant: RuntimeErrorVariant::UnexpectedType,
+                });
+            }
         }
 
         // eval body + see if should return
@@ -127,14 +131,20 @@ fn eval(
     // if expr is a type itself or a module do not need to do any work
 
     match ast.objs.type_get(type_id) {
-        Type::Type(contained_type_id) => return Ok(Value {
-            type_id: Some(type_id),
-            variant: ValueVariant::Type(*contained_type_id),
-        }.to_runtime_ref(ctx, ctx.curr_scope)),
-        Type::Module(scope_id) => return Ok(Value {
-            type_id: Some(type_id),
-            variant: ValueVariant::Module(*scope_id),
-        }.to_runtime_ref(ctx, ctx.curr_scope)),
+        Type::Type(contained_type_id) => {
+            return Ok(Value {
+                type_id: Some(type_id),
+                variant: ValueVariant::Type(*contained_type_id),
+            }
+            .to_runtime_ref(ctx, ctx.curr_scope));
+        }
+        Type::Module(scope_id) => {
+            return Ok(Value {
+                type_id: Some(type_id),
+                variant: ValueVariant::Module(*scope_id),
+            }
+            .to_runtime_ref(ctx, ctx.curr_scope));
+        }
         _ => (),
     }
 
