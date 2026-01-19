@@ -703,6 +703,9 @@ impl AST {
                     expr_mut.finalized = true;
                 }
             }
+            ExprVariant::While(_) => {
+                self.analyze_while(ctx, scope, expr);
+            }
             ExprVariant::FunctionLiteral(_) => {
                 if self
                     .test_analyzing_now(ctx.analyzing_now, &[AnalyzingNow::Expr], expr)
