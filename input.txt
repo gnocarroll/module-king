@@ -1,9 +1,0 @@
-function identity(x: Integer) Integer
-begin
-    return x;
-end function;
-
-function add(x: Integer, y: Integer) Integer
-    return identity(x) + identity(y);
-
-add(10, 20)
