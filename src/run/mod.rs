@@ -72,7 +72,14 @@ fn eval(
     // if expr is a type itself or a module do not need to do any work
 
     match ast.objs.type_get(type_id) {
-        Type::Type(_) | Type::Module(_) => return Ok(expr_to_unit(ast, ctx, expr)),
+        Type::Type(contained_type_id) => return Ok(Value {
+            type_id: Some(type_id),
+            variant: ValueVariant::Type(*contained_type_id),
+        }.to_runtime_ref(ctx, ctx.curr_scope)),
+        Type::Module(scope_id) => return Ok(Value {
+            type_id: Some(type_id),
+            variant: ValueVariant::Module(*scope_id),
+        }.to_runtime_ref(ctx, ctx.curr_scope)),
         _ => (),
     }
 

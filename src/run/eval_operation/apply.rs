@@ -1,5 +1,8 @@
 use crate::{
-    parse::{AST, ast_contents::ExprID},
+    parse::{
+        AST,
+        ast_contents::{ExprID, FunctionID},
+    },
     run::{
         ExecutionContext,
         context_contents::{RuntimeReference, ValueVariant},
@@ -18,16 +21,24 @@ pub fn eval_operation_apply(
 ) -> Result<RuntimeReference, RuntimeException> {
     let func = eval(ast, ctx, operand1)?;
 
-    let function_id = match ctx.objs.ref_get(func).variant {
-        ValueVariant::Function(function_id) => function_id,
-        _ => {
-            return Err(RuntimeException {
-                expr,
-                variant: RuntimeErrorVariant::InvalidOperation,
-            });
+    match ctx.objs.ref_get(func).variant {
+        ValueVariant::Function(function_id) => {
+            eval_operation_apply_function(ast, ctx, expr, function_id, operand2)
         }
-    };
+        _ => Err(RuntimeException {
+            expr,
+            variant: RuntimeErrorVariant::InvalidOperation,
+        }),
+    }
+}
 
+fn eval_operation_apply_function(
+    ast: &AST,
+    ctx: &mut ExecutionContext,
+    expr: ExprID,
+    function_id: FunctionID,
+    args: ExprID,
+) -> Result<RuntimeReference, RuntimeException> {
     let function_scope = ctx.switch_to_child_scope();
 
     let function_struct = ast.objs.function(function_id);

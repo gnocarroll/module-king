@@ -27,6 +27,11 @@ pub struct RuntimeReference {
 #[derive(Clone, Debug)]
 pub enum ValueVariant {
     Unit,
+
+    // TypeID is contained type
+    // e.g. for expr "Integer" it would be ID of Integer type
+    Type(TypeID),
+
     Boolean(bool),
     Integer(i64),
     Float(f64),
@@ -66,6 +71,10 @@ impl RuntimeReference {
         let value = ctx.objs.ref_get(*self);
 
         match &value.variant {
+            ValueVariant::Type(type_id) => format!(
+                "type({})",
+                ast.type_to_string(ctx.tokens, *type_id),
+            ),
             ValueVariant::Unit => "Unit".to_string(),
             ValueVariant::Integer(val) => val.to_string(),
             ValueVariant::Float(val) => val.to_string(),
