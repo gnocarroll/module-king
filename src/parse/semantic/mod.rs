@@ -671,6 +671,11 @@ impl AST {
             ExprVariant::Identifier(ident) => {
                 let name = ctx.tokens.tok_as_str(&ident.name);
 
+                if let AnalyzingNow::TypeBody(_) = ctx.analyzing_now {
+                    // TODO: attempt to add discriminant-only member to enum or variant
+                    return;
+                }
+
                 if let Some(member_id) = self.scope_search(scope, name) {
                     let member = self.objs.member(member_id);
 

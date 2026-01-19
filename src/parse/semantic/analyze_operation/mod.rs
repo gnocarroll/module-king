@@ -129,15 +129,11 @@ impl AST {
                 self.analyze_expr(ctx, scope, child_expr);
             }
             TokenType::Semicolon | TokenType::Comma => {
-                match (operation.op, ctx.analyzing_now) {
-                    (TokenType::Semicolon, AnalyzingNow::TypeBody(IsEnum::Enum))
-                    | (TokenType::Comma, AnalyzingNow::TypeBody(IsEnum::Other)) => {
-                        self.invalid_operation(
-                            expr,
-                            "members of enum should be comma-separated, otherwise use semicolons",
-                        );
-                    }
-                    _ => (),
+                if operation.op == TokenType::Comma {
+                    self.invalid_operation(
+                        expr,
+                        "members of type literal should be semicolon-separated",
+                    );
                 }
 
                 for operand in [operation.operand1, operation.operand2] {
