@@ -7,8 +7,8 @@ type Integer is integer;
 type Float is float;
 
 type Boolean is enum
-    true = 1,
-    false = 0,
+    true = 1;
+    false = 0;
 end enum;
 
 import (true, false) from Boolean;
