@@ -48,6 +48,15 @@ impl<'a> ExecutionContext<'a> {
 
         self.curr_scope
     }
+
+    // destroy contents of current scope and return back to parent scope
+    pub fn pop_curr_scope(&mut self) -> RuntimeScopeID {
+        let old_scope = self.curr_scope;
+
+        self.curr_scope = self.objs.runtime_scope(self.curr_scope).parent;
+
+        self.curr_scope
+    }
 }
 
 fn expr_to_unit(ast: &AST, ctx: &mut ExecutionContext, expr: ExprID) -> RuntimeReference {
@@ -66,7 +75,21 @@ fn eval_while(
     expr: ExprID,
     while_struct: While,
 ) -> Result<RuntimeReference, RuntimeException> {
+    let ret = expr_to_unit(ast, ctx, expr);
 
+    // switch to while scope
+
+    ctx.switch_to_child_scope();
+
+    // loop here corresponds to while loop in program
+
+    loop {
+        let cond_ref = eval(ast, ctx, expr)?;
+
+        match ctx.ref_get
+    }
+
+    Ok(ret)
 }
 
 fn eval(

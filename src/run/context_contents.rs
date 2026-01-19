@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use crate::{
     parse::{
-        AST, ExprVariant, MemberVariant, ScopeVariant, Type, TypeOrModule, TypeVariant, Visibility,
-        ast_contents::{ExprID, FunctionID, MemberID, ScopeID, TypeID},
+        AST, MemberVariant, ScopeVariant, Type, TypeVariant, Visibility,
+        ast_contents::{FunctionID, MemberID, ScopeID, TypeID},
     },
     run::ExecutionContext,
 };
@@ -56,6 +56,15 @@ pub struct Value {
     pub variant: ValueVariant,
 }
 
+impl Default for Value {
+    fn default() -> Self {
+        Value {
+            type_id: Some(TypeID::unit()),
+            variant: ValueVariant::Unit,
+        }
+    }
+}
+
 impl Value {
     pub fn to_runtime_ref(
         self,
@@ -74,10 +83,9 @@ impl RuntimeReference {
         let value = ctx.objs.ref_get(*self);
 
         match &value.variant {
-            ValueVariant::Type(type_id) => format!(
-                "type({})",
-                ast.type_to_string(ctx.tokens, *type_id),
-            ),
+            ValueVariant::Type(type_id) => {
+                format!("type({})", ast.type_to_string(ctx.tokens, *type_id),)
+            }
             ValueVariant::Tuple(values) => {
                 // get string for each value
 
@@ -224,13 +232,24 @@ impl RuntimeReference {
     }
 }
 
-#[derive(Default)]
 pub struct RuntimeScope {
     pub members: HashMap<MemberID, ValueID>,
 
     pub values: Vec<Value>,
 
     pub parent: RuntimeScopeID,
+}
+
+impl Default for RuntimeScope {
+    fn default() -> Self {
+        // make it so that ValueID can be bogus => panic if access attempted
+
+        RuntimeScope {
+            members: HashMap::new(),
+            values: vec![Value::default()],
+            parent: RuntimeScopeID::default(),
+        }
+    }
 }
 
 impl RuntimeScope {
@@ -243,15 +262,27 @@ impl RuntimeScope {
     }
 
     pub fn value(&self, value: ValueID) -> &Value {
+        if value.id == 0 {
+            panic!("attempted to access bogus ValueID 0");
+        }
+
         &self.values[value.id as usize]
     }
 
     pub fn value_mut(&mut self, value: ValueID) -> &mut Value {
+        if value.id == 0 {
+            panic!("attempted to access bogus ValueID 0");
+        }
+
         &mut self.values[value.id as usize]
     }
 
     // wipe provided ValueID by replacing value with Unit
     pub fn value_set_unit(&mut self, value: ValueID) {
+        if value.id == 0 {
+            panic!("attempted to access bogus ValueID 0");
+        }
+
         self.values[value.id as usize] = Value {
             type_id: Some(TypeID::unit()),
             variant: ValueVariant::Unit,
@@ -260,11 +291,14 @@ impl RuntimeScope {
 
     // ret new value
     pub fn value_overwrite(&mut self, value_id: ValueID, new_value: Value) {
+        if value_id.id == 0 {
+            panic!("attempted to access bogus ValueID 0");
+        }
+
         self.values[value_id.id as usize] = new_value;
     }
 }
 
-#[derive(Default)]
 pub struct ContextObjects {
     scopes: Vec<RuntimeScope>,
 
@@ -272,7 +306,25 @@ pub struct ContextObjects {
     member_map: HashMap<MemberID, RuntimeScopeID>,
 }
 
-fn types_to_tuple_value_id(ast: &AST, runtime_scope: &mut RuntimeScope, type_id: TypeID, t1: TypeID, maybe_t2: Option<TypeID>) -> ValueID {
+impl Default for ContextObjects {
+    fn default() -> Self {
+        // put in one RuntimeScope so that ID 0 can be a bogus ID
+        // makes sense since RuntimeScopeID::default() returns 0 and you don't want that used
+
+        ContextObjects {
+            scopes: vec![RuntimeScope::default()],
+            member_map: HashMap::new(),
+        }
+    }
+}
+
+fn types_to_tuple_value_id(
+    ast: &AST,
+    runtime_scope: &mut RuntimeScope,
+    type_id: TypeID,
+    t1: TypeID,
+    maybe_t2: Option<TypeID>,
+) -> ValueID {
     let mut value_id_vec = vec![type_to_value_id(ast, runtime_scope, t1)];
 
     if let Some(t2) = maybe_t2 {
@@ -287,8 +339,8 @@ fn types_to_tuple_value_id(ast: &AST, runtime_scope: &mut RuntimeScope, type_id:
 
                     extended_vec = true;
                 }
-                _ => panic!("ValueVariant should be guaranteed to be tuple")
-            }
+                _ => panic!("ValueVariant should be guaranteed to be tuple"),
+            },
             _ => {
                 value_id_vec.push(value_id2);
             }
@@ -367,6 +419,10 @@ fn type_to_value_id(ast: &AST, runtime_scope: &mut RuntimeScope, type_id: TypeID
 
 impl ContextObjects {
     pub fn runtime_scope_child(&mut self, parent: RuntimeScopeID) -> RuntimeScopeID {
+        if parent.id == 0 {
+            panic!("provided bogus RuntimeScopeID 0");
+        }
+
         self.runtime_scope_push(RuntimeScope {
             parent,
             ..Default::default()
@@ -381,19 +437,53 @@ impl ContextObjects {
         }
     }
 
+    // must be top scope
+    // ID is provided to ensure that something has not gone wrong
+    // if ID does not line up or there is no top scope kill program (panic)
+    pub fn runtime_scope_delete(&mut self, scope: RuntimeScopeID) {
+        if scope.id == 0 {
+            panic!("provided bogus RuntimeScopeID 0");
+        }
+
+        let last_scope_id = self.scopes.len() as u32 - 1;
+
+        if last_scope_id != scope.id {
+            panic!(
+                "attempted to delete scope ID {} but last was {}",
+                scope.id, last_scope_id,
+            );
+        }
+
+        self.scopes.pop();
+    }
+
     pub fn runtime_scope_new(&mut self) -> RuntimeScopeID {
         self.runtime_scope_push(RuntimeScope::default())
     }
 
     pub fn runtime_scope(&self, scope: RuntimeScopeID) -> &RuntimeScope {
+        if scope.id == 0 {
+            panic!("provided bogus RuntimeScopeID 0");
+        }
+
         &self.scopes[scope.id as usize]
     }
 
     pub fn runtime_scope_mut(&mut self, scope: RuntimeScopeID) -> &mut RuntimeScope {
+        if scope.id == 0 {
+            panic!("provided bogus RuntimeScopeID 0");
+        }
+
         &mut self.scopes[scope.id as usize]
     }
 
     pub fn scope_instance_get(&self, scope: RuntimeScopeID, member_id: MemberID) -> ValueID {
+        if scope.id == 0 {
+            panic!("provided bogus RuntimeScopeID 0");
+        } else if member_id == MemberID::default() {
+            panic!("provided bogus MemberID 0");
+        }
+
         self.runtime_scope(scope).members[&member_id]
     }
 
@@ -409,6 +499,10 @@ impl ContextObjects {
 
     // return scope and value for full locat
     pub fn instance_get(&self, member_id: MemberID) -> Option<RuntimeReference> {
+        if member_id == MemberID::default() {
+            panic!("provided bogus MemberID 0");
+        }
+
         let scope = *self.member_map.get(&member_id)?;
 
         Some(RuntimeReference {
@@ -419,6 +513,10 @@ impl ContextObjects {
 
     // give new value to member
     pub fn instance_set(&mut self, member_id: MemberID, new_value: Value) {
+        if member_id == MemberID::default() {
+            panic!("provided bogus MemberID 0");
+        }
+
         let scope_id = *(self
             .member_map
             .get(&member_id)
@@ -437,6 +535,12 @@ impl ContextObjects {
         scope: RuntimeScopeID,
         member_id: MemberID,
     ) -> RuntimeReference {
+        if scope.id == 0 {
+            panic!("provided bogus RuntimeScopeID 0");
+        } else if member_id == MemberID::default() {
+            panic!("provided bogus MemberID 0");
+        }
+
         let member = ast.objs.member(member_id);
 
         let type_id = match member.variant {
