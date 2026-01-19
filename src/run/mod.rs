@@ -53,7 +53,13 @@ impl<'a> ExecutionContext<'a> {
     pub fn pop_curr_scope(&mut self) -> RuntimeScopeID {
         let old_scope = self.curr_scope;
 
-        self.curr_scope = self.objs.runtime_scope(self.curr_scope).parent;
+        // back to parent
+
+        self.curr_scope = self.objs.runtime_scope(old_scope).parent;
+
+        // attempt to destroy old scope
+
+        self.objs.runtime_scope_delete(old_scope);
 
         self.curr_scope
     }
@@ -69,14 +75,13 @@ fn expr_to_unit(ast: &AST, ctx: &mut ExecutionContext, expr: ExprID) -> RuntimeR
     .to_runtime_ref(ctx, ctx.curr_scope)
 }
 
+// eval while loop
 fn eval_while(
     ast: &AST,
     ctx: &mut ExecutionContext,
     expr: ExprID,
     while_struct: While,
 ) -> Result<RuntimeReference, RuntimeException> {
-    let ret = expr_to_unit(ast, ctx, expr);
-
     // switch to while scope
 
     ctx.switch_to_child_scope();
@@ -84,12 +89,29 @@ fn eval_while(
     // loop here corresponds to while loop in program
 
     loop {
-        let cond_ref = eval(ast, ctx, expr)?;
+        // eval cond + test
 
-        match ctx.ref_get
+        let cond_ref = eval(ast, ctx, while_struct.cond)?;
+
+        match ctx.objs.ref_get(cond_ref).variant {
+            ValueVariant::Boolean(cond_value) => if !cond_value {
+                break;
+            }
+            _ => return Err(RuntimeException { expr, variant: RuntimeErrorVariant::UnexpectedType })
+        }
+
+        // eval body + see if should return
+
+        eval(ast, ctx, while_struct.body)?;
+
+        if ctx.return_now {
+            break;
+        }
     }
 
-    Ok(ret)
+    ctx.pop_curr_scope();
+
+    Ok(expr_to_unit(ast, ctx, expr))
 }
 
 fn eval(

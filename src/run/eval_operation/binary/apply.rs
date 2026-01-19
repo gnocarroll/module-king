@@ -49,6 +49,10 @@ fn eval_operation_apply_function(
         allocate_instances_from_pattern(ast, ctx, *pattern_id, function_struct.scope);
     }
 
+    // destroy function scope
+
+    ctx.pop_curr_scope();
+
     Ok(expr_to_unit(ast, ctx, expr))
 }
 

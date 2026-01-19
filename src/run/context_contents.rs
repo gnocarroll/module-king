@@ -242,7 +242,7 @@ pub struct RuntimeScope {
 
 impl Default for RuntimeScope {
     fn default() -> Self {
-        // make it so that ValueID can be bogus => panic if access attempted
+        // make it so that ValueID 0 can be bogus => panic if access attempted
 
         RuntimeScope {
             members: HashMap::new(),

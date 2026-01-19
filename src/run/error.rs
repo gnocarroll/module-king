@@ -12,4 +12,5 @@ pub enum RuntimeErrorVariant {
     RootExprMissing,
     MemberDNE,
     BadIdent,
+    UnexpectedType,
 }
