@@ -1,3 +1,5 @@
+use std::iter::zip;
+
 use crate::{
     parse::{
         AST, TypeVariant,
@@ -5,9 +7,11 @@ use crate::{
     },
     run::{
         ExecutionContext,
-        context_contents::{RuntimeReference, Value, ValueVariant},
+        context_contents::{RuntimeReference, Value, ValueID, ValueVariant},
         error::{RuntimeErrorVariant, RuntimeException},
-        eval, expr_to_unit,
+        eval,
+        eval_operation::binary::do_assignment,
+        expr_to_unit,
         util::{allocate_instances_from_pattern, runtime_ref_to_function, runtime_ref_to_type},
     },
 };
@@ -48,6 +52,46 @@ fn eval_operation_apply_function(
     for pattern_id in &function_struct.params {
         allocate_instances_from_pattern(ast, ctx, *pattern_id, function_struct.scope);
     }
+
+    let args_value_ids: Vec<ValueID> = args.to_tuple_value_iterator(&ctx.objs).collect();
+
+    let args_refs: Vec<RuntimeReference> = args_value_ids
+        .into_iter()
+        .map(|value_id| {
+            RuntimeReference {
+                value_id,
+                scope: args.scope,
+            }
+            .dup_in_scope(ast, ctx, function_scope)
+            .to_runtime_ref(ctx, function_scope)
+        })
+        .collect();
+
+    for ((name, _), new_value_ref) in zip(
+        function_struct
+            .params
+            .iter()
+            .flat_map(|pattern_id| pattern_id.to_pattern_iterator(ast)),
+        args_refs.iter(),
+    ) {
+        let name = ctx.tokens.tok_as_str(&name).to_string();
+
+        let member_id = ast
+            .objs
+            .scope(function_struct.scope)
+            .members
+            .get(&name)
+            .expect("member should exist");
+
+        let assign_to_ref = ctx
+            .objs
+            .instance_get(member_id)
+            .expect("should be allocated");
+
+        do_assignment(ast, ctx, assign_to_ref, *new_value_ref);
+    }
+
+    eval(ast, ctx, function_struct.body)?;
 
     // destroy function scope
 
