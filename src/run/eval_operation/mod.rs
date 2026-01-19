@@ -66,13 +66,13 @@ fn eval_operation_begin(
     expr: ExprID,
     operand: ExprID,
 ) -> Result<RuntimeReference, RuntimeException> {
-    let block_scope = ctx.switch_to_child_scope();
+    ctx.switch_to_child_scope();
 
     // now contained expr is evaluated inside new scope
 
     eval(ast, ctx, operand)?;
 
-    ctx.objs.runtime_scope_delete(block_scope);
+    ctx.pop_curr_scope();
 
     return Ok(expr_to_unit(ast, ctx, expr))
 }
