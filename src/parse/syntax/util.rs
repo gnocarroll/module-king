@@ -98,6 +98,13 @@ impl AST {
                     }
                 )
             }
+            ExprVariant::While(while_struct) => {
+                format!(
+                    "(while {} do {})",
+                    self.expr_to_string(tokens, while_struct.cond),
+                    self.expr_to_string(tokens, while_struct.body),
+                )
+            }
             ExprVariant::FunctionLiteral(function_literal) => {
                 let func = self.objs.function(function_literal.function_id);
 

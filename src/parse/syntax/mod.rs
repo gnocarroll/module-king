@@ -5,7 +5,11 @@ use operator::OperatorVariant::*;
 
 use crate::{
     parse::{
-        AST, Expr, ExprVariant, Function, FunctionLiteral, Identifier, IdentifierVariant, Operation, Tokens, TypeLiteral, TypeVariant, ast_contents::{ExprID, MemberID}, errors::{InvalidExpr, NameMismatch, ParseError, SemanticError}, operator
+        AST, Expr, ExprVariant, Function, FunctionLiteral, Identifier, IdentifierVariant,
+        Operation, Tokens, TypeLiteral, TypeVariant, While,
+        ast_contents::{ExprID, MemberID},
+        errors::{InvalidExpr, NameMismatch, ParseError, SemanticError},
+        operator,
     },
     scan::{Token, TokenType},
     tokens::ExpectedToken,
@@ -58,6 +62,40 @@ impl AST {
 
             Err(ret)
         }
+    }
+
+    fn parse_while(&mut self, tokens: &mut Tokens) -> ExprID {
+        let start_tok_idx = tokens.idx();
+
+        tokens.next();
+
+        let cond = self.parse_expr(tokens);
+
+        let _ = self.expect(tokens, TokenType::Do);
+
+        let body = self.parse_expr(tokens);
+
+        if self
+            .expect_sequence(tokens, &[TokenType::End, TokenType::While])
+            .is_err()
+        {
+            let found = tokens.sync(&[TokenType::End, TokenType::Semicolon]);
+
+            if found.ttype == TokenType::End {
+                tokens.next();
+
+                if tokens.peek().ttype == TokenType::While {
+                    tokens.next();
+                }
+            }
+        }
+
+        self.objs.expr_push(Expr {
+            tok: start_tok_idx,
+            end_tok: tokens.idx(),
+            variant: ExprVariant::While(While { cond, body }),
+            ..Default::default()
+        })
     }
 
     fn parse_if(&mut self, tokens: &mut Tokens) -> ExprID {
@@ -400,6 +438,7 @@ impl AST {
                 })
             }
             TokenType::If => self.parse_if(tokens),
+            TokenType::While => self.parse_while(tokens),
             TokenType::Function => self.parse_function(tokens),
             TokenType::KWInteger | TokenType::KWFloat => self.parse_number_type_literal(tokens),
             TokenType::Record | TokenType::Variant => self.parse_record_literal(tokens),

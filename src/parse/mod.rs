@@ -232,6 +232,12 @@ pub struct If {
 }
 
 #[derive(Clone)]
+pub struct While {
+    pub cond: ExprID,
+    pub body: ExprID,
+}
+
+#[derive(Clone)]
 pub enum ExprVariant {
     Unit,
     Underscore,
@@ -253,6 +259,8 @@ pub enum ExprVariant {
     // really just all if and else case
     If(If),
     Elif(If),
+
+    While(While),
 
     FunctionLiteral(FunctionLiteral),
 
