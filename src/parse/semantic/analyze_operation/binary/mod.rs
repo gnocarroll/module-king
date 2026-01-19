@@ -139,7 +139,7 @@ impl AST {
 
         let mut finalized = false;
 
-        if lhs_type != err_type && rhs_type != err_type && lhs_type != rhs_type {
+        if lhs_type != err_type && rhs_type != err_type && !self.type_eq(lhs_type, rhs_type) {
             self.invalid_operation(
                 expr,
                 "lhs and rhs type are not the same for this assignment",

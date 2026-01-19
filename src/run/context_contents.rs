@@ -165,14 +165,34 @@ impl RuntimeReference {
             | ValueVariant::Ref(_)
             | ValueVariant::String(_)
             | ValueVariant::Function(_)
-            | ValueVariant::Type(_)
-            | ValueVariant::Tuple(_) => value,
+            | ValueVariant::Type(_) => value,
             ValueVariant::Identifier(ident) => {
                 return ctx
                     .objs
                     .instance_get(*ident)
                     .expect("should have been alloced")
                     .dup_in_scope(ast, ctx, target_scope);
+            }
+            ValueVariant::Tuple(value_id_vec) => {
+                let new_vec: Vec<ValueID> = value_id_vec
+                    .iter()
+                    .map(|value_id| {
+                        let new_value = RuntimeReference {
+                            scope: self.scope,
+                            value_id: *value_id,
+                        }
+                        .dup_in_scope(ast, ctx, target_scope);
+
+                        ctx.objs
+                            .runtime_scope_mut(target_scope)
+                            .value_push(new_value)
+                    })
+                    .collect();
+
+                Value {
+                    type_id: value.type_id,
+                    variant: ValueVariant::Tuple(new_vec),
+                }
             }
             ValueVariant::Record(map) => {
                 let new_map: HashMap<String, ValueID> = map
@@ -230,6 +250,14 @@ impl RuntimeScope {
         &mut self.values[value.id as usize]
     }
 
+    // wipe provided ValueID by replacing value with Unit
+    pub fn value_set_unit(&mut self, value: ValueID) {
+        self.values[value.id as usize] = Value {
+            type_id: Some(TypeID::unit()),
+            variant: ValueVariant::Unit,
+        }
+    }
+
     // ret new value
     pub fn value_overwrite(&mut self, value_id: ValueID, new_value: Value) {
         self.values[value_id.id as usize] = new_value;
@@ -242,6 +270,42 @@ pub struct ContextObjects {
 
     // find which scope given MemberID is in in O(1) so value can be retrieved
     member_map: HashMap<MemberID, RuntimeScopeID>,
+}
+
+fn types_to_tuple_value_id(ast: &AST, runtime_scope: &mut RuntimeScope, type_id: TypeID, t1: TypeID, maybe_t2: Option<TypeID>) -> ValueID {
+    let mut value_id_vec = vec![type_to_value_id(ast, runtime_scope, t1)];
+
+    if let Some(t2) = maybe_t2 {
+        let mut extended_vec = false;
+        let value_id2 = type_to_value_id(ast, runtime_scope, t2);
+
+        match ast.objs.type_get(t2) {
+            Type::Unit => (),
+            Type::RestOfTuple(_) => match &runtime_scope.value(value_id2).variant {
+                ValueVariant::Tuple(value_id_vec2) => {
+                    value_id_vec.extend_from_slice(value_id_vec2);
+
+                    extended_vec = true;
+                }
+                _ => panic!("ValueVariant should be guaranteed to be tuple")
+            }
+            _ => {
+                value_id_vec.push(value_id2);
+            }
+        }
+
+        // if we extended vec can wipe other ValueID that had second ValueID vec
+        // since it is not needed
+
+        if extended_vec {
+            runtime_scope.value_set_unit(value_id2);
+        }
+    }
+
+    runtime_scope.value_push(Value {
+        type_id: Some(type_id),
+        variant: ValueVariant::Tuple(value_id_vec),
+    })
 }
 
 fn type_to_value_id(ast: &AST, runtime_scope: &mut RuntimeScope, type_id: TypeID) -> ValueID {
@@ -286,6 +350,12 @@ fn type_to_value_id(ast: &AST, runtime_scope: &mut RuntimeScope, type_id: TypeID
                 panic!("scope retrieved using type id is not a type?");
             }
         },
+        Type::Tuple((t1, maybe_t2)) => {
+            return types_to_tuple_value_id(ast, runtime_scope, type_id, *t1, *maybe_t2);
+        }
+        Type::RestOfTuple((t1, t2)) => {
+            return types_to_tuple_value_id(ast, runtime_scope, type_id, *t1, Some(*t2));
+        }
         _ => todo!("have not implemented in interpreter other sorts of types yet"),
     };
 
