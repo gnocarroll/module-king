@@ -7,10 +7,10 @@ mod util;
 
 use crate::{
     constants::UNIT_TYPE,
-    parse::{AST, ExprVariant, Type, ast_contents::ExprID},
+    parse::{AST, ExprVariant, Type, While, ast_contents::ExprID},
     run::{
         context_contents::{ContextObjects, RuntimeReference, RuntimeScopeID, Value, ValueVariant},
-        error::{RuntimeException, RuntimeErrorVariant},
+        error::{RuntimeErrorVariant, RuntimeException},
         eval_operation::eval_operation,
     },
     tokens::Tokens,
@@ -58,6 +58,15 @@ fn expr_to_unit(ast: &AST, ctx: &mut ExecutionContext, expr: ExprID) -> RuntimeR
         variant: ValueVariant::Unit,
     }
     .to_runtime_ref(ctx, ctx.curr_scope)
+}
+
+fn eval_while(
+    ast: &AST,
+    ctx: &mut ExecutionContext,
+    expr: ExprID,
+    while_struct: While,
+) -> Result<RuntimeReference, RuntimeException> {
+
 }
 
 fn eval(
@@ -112,6 +121,10 @@ fn eval(
             } else {
                 ValueVariant::Function(func.function_id)
             }
+        }
+
+        ExprVariant::While(while_struct) => {
+            return eval_while(ast, ctx, expr, while_struct.clone());
         }
 
         // no handling for given expr variant
