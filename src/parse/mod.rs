@@ -571,6 +571,12 @@ pub fn parse_file(file_name: &str, tokens: &mut Tokens) -> AST {
     // reenable later to test
     ast.do_semantic_analysis(&tokens, file_name);
 
+    eprintln!("RAN SEMANTIC ANALYSIS FUNC");
+
+    if let Some(expr) = ast.root_expr {
+        println!("{}", ast.expr_to_string(&tokens, expr));
+    }
+
     if ast.has_errors() {
         eprintln!("One or more semantic errors occurred, program will not be compiled.");
 

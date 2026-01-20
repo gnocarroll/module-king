@@ -422,6 +422,24 @@ impl AST {
             return true;
         }
 
+        // if both are type or both are module, return true
+
+        if [t1, t2]
+            .into_iter()
+            .all(|type_id| matches!(self.objs.type_get(type_id), Type::AnyType | Type::Type(_),))
+        {
+            return true;
+        }
+
+        if [t1, t2].into_iter().all(|type_id| {
+            matches!(
+                self.objs.type_get(type_id),
+                Type::AnyModule | Type::Module(_)
+            )
+        }) {
+            return true;
+        }
+
         match (self.objs.type_get(t1), self.objs.type_get(t2)) {
             (Type::Ptr(t1), Type::Ptr(t2))
             | (Type::Ref(t1), Type::Ref(t2))
@@ -432,7 +450,6 @@ impl AST {
             (Type::Function((params1, ret1)), Type::Function((params2, ret2))) => {
                 return self.type_eq(*params1, *params2) && self.type_eq(*ret1, *ret2);
             }
-            (Type::Module(_), Type::Module(_)) | (Type::Type(_), Type::Type(_)) => return true,
             (Type::Scope(s1), Type::Scope(s2)) => {
                 // TODO: in the future could check for unnamed record types e.g. if they have same members in same order
 

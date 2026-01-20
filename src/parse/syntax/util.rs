@@ -14,12 +14,13 @@ impl AST {
             Type::String => "String".to_string(),
             Type::Error => "error".to_string(),
             Type::Unit => "Unit".to_string(),
-            Type::AnyType => "type".to_string(),
+            Type::AnyType => "AnyType".to_string(),
             Type::Type(t) => format!(
                 "type({})",
                 self.type_to_string(tokens, t),
             ),
-            Type::AnyModule | Type::Module(_) => "module".to_string(),
+            Type::AnyModule => "AnyModule".to_string(),
+            Type::Module(_) => "module".to_string(),
             Type::Alias(t) => self.type_to_string(tokens, t),
             Type::Ptr(t) => format!("*{}", self.type_to_string(tokens, t)),
             Type::Ref(t) => format!("&{}", self.type_to_string(tokens, t)),
@@ -89,6 +90,8 @@ impl AST {
             ExprVariant::FloatLiteral(f) => f.to_string(),
             ExprVariant::StringLiteral(t) => tokens.tok_as_str(&t).to_string(),
             ExprVariant::Identifier(ident) => tokens.tok_as_str(&ident.name).to_string(),
+            ExprVariant::KWType => "KWType".to_string(),
+            ExprVariant::KWModule => "KWModule".to_string(),
             ExprVariant::Operation(operation) => {
                 let operand_to_string = |operand: Option<ExprID>| match operand {
                     Some(id) => format!(" {}", self.expr_to_string(tokens, id),),
