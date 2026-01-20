@@ -402,8 +402,11 @@ impl AST {
             return;
         }
 
-        // search through operand2 for identifiers so we can add them to current module
+        // search through operand2 for identifiers so we can add them to current scope
+        // acceptable to parenthesize imported identifiers and list multiple with comma,
+        // other operations not allowed
 
+        let mut finalized = true;
         let mut expr_stack = vec![operand2];
 
         loop {
@@ -411,12 +414,50 @@ impl AST {
                 Some(expr_id) => expr_id,
                 None => break,
             };
+
+            match self.objs.expr(expr_id).variant {
+                ExprVariant::Operation(Operation {
+                    op: TokenType::LParen,
+                    operand1: Some(operand1),
+                    operand2: None,
+                }) => {
+                    expr_stack.push(operand1);
+                }
+                ExprVariant::Operation(Operation {
+                    op: TokenType::Comma,
+                    operand1: Some(operand1),
+                    operand2: Some(operand2),
+                }) => {
+                    match self.objs.expr(operand2).variant {
+                        ExprVariant::Unit => (),
+                        _ => {
+                            expr_stack.push(operand2);
+                        }
+                    }
+
+                    expr_stack.push(operand1);
+                }
+                ExprVariant::Identifier(ident) => {
+                    // add mapping from member name -> MemberID to scope
+
+                    let name = ctx.tokens.tok_as_str(&ident.name).to_string();
+
+                    self.objs
+                        .scope_mut(scope)
+                        .members
+                        .insert(name, ident.member_id);
+                }
+                _ => {
+                    self.invalid_operation(expr, "provide names separated by commas as things to import");
+                    finalized = false;
+                }
+            }
         }
 
         let expr_mut = self.objs.expr_mut(expr);
 
         expr_mut.type_id = TypeID::unit();
-        expr_mut.finalized = true;
+        expr_mut.finalized = finalized;
     }
 
     // glue values or type together into tuple
