@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use crate::parse::ast_contents::MemberID;
+use crate::parse::{ast_contents::MemberID, errors::DuplicateName};
 
 #[derive(Clone, Default)]
 pub struct ScopeMembers {
@@ -29,12 +29,19 @@ impl ScopeMembers {
         self.order.len()
     }
 
-    pub fn insert(&mut self, s: String, member: MemberID) {
-        if self.map.contains_key(&s) {
-            panic!("duplicate key ScopeMembers");
+    // try to insert to scope, return error if name exists
+    pub fn insert(&mut self, s: String, member: MemberID) -> Result<(), DuplicateName> {
+        if let Some(old_member) = self.map.get(&s) {
+            return Err(DuplicateName {
+                name: s,
+                old_member: *old_member,
+                new_member: member,
+            });
         }
 
         self.order.push(s.clone());
         self.map.insert(s, member);
+
+        Ok(())
     }
 }
