@@ -21,6 +21,53 @@ impl AST {
         operand: ExprID,
     ) {
         self.analyze_expr(ctx, scope, operand);
+
+        if !self.expr(operand).finalized {
+            return;
+        }
+
+        let operand_type_id = self.objs.expr(operand).type_id;
+
+        match self.objs.type_get(operand_type_id) {
+            Type::ImportTarget(_) => {
+                self.invalid_operation(expr, "no nested from");
+                return;
+            }
+            _ => (),
+        }
+
+        let expr_scope_id = match self.expr_get_scope_id(operand) {
+            Some(scope_id) => scope_id,
+            None => {
+                self.invalid_operation(
+                    expr,
+                    "target of \"from\" does not have a corresponding scope to import from",
+                );
+                return;
+            }
+        };
+
+        let scope_struct = self.objs.scope(expr_scope_id);
+
+        match scope_struct.variant {
+            ScopeVariant::Scope => {
+                self.invalid_operation(expr, "cannot import from this scope");
+                return;
+            }
+            ScopeVariant::Type(TypeVariant::Enum | TypeVariant::Variant) => (), // Ok
+            ScopeVariant::Type(_) => {
+                self.invalid_operation(expr, "you may only import from an enum or variant type");
+                return;
+            }
+            ScopeVariant::Module => (), // Ok
+        }
+
+        let type_id = self.objs.type_push(Type::ImportTarget(expr_scope_id));
+
+        let expr_mut = self.objs.expr_mut(expr);
+
+        expr_mut.type_id = type_id;
+        expr_mut.finalized = true;
     }
 
     fn analyze_operation_unary_import(
@@ -30,7 +77,6 @@ impl AST {
         expr: ExprID,
         operand: ExprID,
     ) {
-
     }
 
     pub fn analyze_operation_unary(
