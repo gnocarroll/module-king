@@ -4,7 +4,7 @@ mod unary;
 use crate::{
     parse::{
         AST, ExprVariant, Operation,
-        ast_contents::{ExprID, ScopeID},
+        ast_contents::{ExprID, ScopeID, TypeID},
         errors::{InvalidOperation, SemanticError},
         semantic::{AnalyzingNow, SemanticContext},
     },
@@ -61,14 +61,20 @@ impl AST {
                     operation.operand2,
                 );
 
-                let finalized = err.is_none();
+                let mut finalized = err.is_none();
 
                 // add param
                 let curr_func = ctx.curr_func.expect("should be current func recorded");
 
                 let func_scope = self.objs.function(curr_func).scope;
 
-                self.scope_create_members_from_pattern(ctx, func_scope, pattern);
+                if self
+                    .scope_create_members_from_pattern(ctx, func_scope, pattern)
+                    .is_err()
+                    && finalized
+                {
+                    finalized = false;
+                }
 
                 self.objs.function_mut(curr_func).params.push(pattern);
 
@@ -160,7 +166,7 @@ impl AST {
                 }
             }
             TokenType::Colon => {
-                let (pattern, _) = self.analyze_instance_creation(
+                let (pattern, err) = self.analyze_instance_creation(
                     ctx,
                     scope,
                     expr,
@@ -168,7 +174,16 @@ impl AST {
                     operation.operand2,
                 );
 
-                self.scope_create_members_from_pattern(ctx, scope, pattern);
+                let finalized = self
+                    .scope_create_members_from_pattern(ctx, scope, pattern)
+                    .is_ok()
+                    && err.is_none();
+
+                let expr_mut = self.objs.expr_mut(expr);
+
+                expr_mut.type_id = TypeID::unit();
+                expr_mut.is_var = true;
+                expr_mut.finalized = finalized;
             }
             _ => {}
         }

@@ -1,10 +1,7 @@
-use crate::{
-    constants::ERROR_TYPE,
-    parse::{
-        AST, ExprVariant, MemberVariant, ScopeVariant, Type, TypeVariant, Visibility,
-        ast_contents::{ExprID, FunctionID, ScopeID, TypeID},
-        semantic::SemanticContext,
-    },
+use crate::parse::{
+    AST, ExprVariant, MemberVariant, ScopeVariant, Type, TypeVariant, Visibility,
+    ast_contents::{ExprID, FunctionID, ScopeID, TypeID},
+    semantic::SemanticContext,
 };
 
 // if doing apply operator (e.g. "f()") what are you doing
@@ -141,7 +138,7 @@ impl AST {
                 // type itself is what is being returned
 
                 type_id = self.objs.type_push(Type::Type(generic_type));
-                
+
                 finalized = true;
             }
             (true, _) => {
@@ -158,8 +155,8 @@ impl AST {
     // ret value indicates success
     pub fn analyze_cast(
         &mut self,
-        ctx: &mut SemanticContext,
-        scope: ScopeID,
+        _ctx: &mut SemanticContext,
+        _scope: ScopeID,
         expr: ExprID,
         cast_to: TypeID,
         args: ExprID, // args
@@ -256,8 +253,8 @@ impl AST {
     // ret value indicates success
     pub fn analyze_function_call(
         &mut self,
-        ctx: &mut SemanticContext,
-        scope: ScopeID,
+        _ctx: &mut SemanticContext,
+        _scope: ScopeID,
         expr: ExprID,
         function: FunctionID,
         args: ExprID, // args

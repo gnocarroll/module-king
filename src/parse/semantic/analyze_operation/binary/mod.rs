@@ -200,21 +200,22 @@ impl AST {
         // if type creation can be completed then do it here with helper function
         // else record error
 
-        let mut finalized = false;
+        let finalized;
 
         if let (true, Type::Type(type_id), Some(name)) =
             (rhs.finalized, self.objs.type_get(rhs.type_id), name)
         {
-            self.scope_add_member_type_from_name_and_id(
-                ctx,
-                scope,
-                TokenOrString::Token(name),
-                *type_id,
-            );
-
-            finalized = true;
+            finalized = self
+                .scope_add_member_type_from_name_and_id(
+                    ctx,
+                    scope,
+                    TokenOrString::Token(name),
+                    *type_id,
+                )
+                .is_ok();
         } else {
             self.invalid_operation(expr, "creation of new type could not be completed");
+            finalized = false;
         }
 
         let unit_type_id = self.get_builtin_type_id(UNIT_TYPE);
@@ -352,12 +353,14 @@ impl AST {
 
         let (pattern, _) = self.pattern_matching(ctx, scope, operand1, maybe_type_id);
 
-        self.scope_create_members_from_pattern(ctx, scope, pattern);
+        let maybe_err = self.scope_create_members_from_pattern(ctx, scope, pattern);
 
         // after creation of members analyze lhs (now relevant vars should exist)
         self.analyze_expr(ctx, scope, operand1);
 
-        let finalized = self.objs.expr(operand1).finalized && self.objs.expr(operand2).finalized;
+        let finalized = maybe_err.is_ok()
+            && self.objs.expr(operand1).finalized
+            && self.objs.expr(operand2).finalized;
 
         let expr_mut = self.objs.expr_mut(expr);
 
@@ -628,14 +631,17 @@ impl AST {
                     Some(operand2),
                 );
 
-                self.scope_create_members_from_pattern(ctx, scope, pattern);
+                let no_err = self
+                    .scope_create_members_from_pattern(ctx, scope, pattern)
+                    .is_ok()
+                    && err.is_none();
 
                 // after creation of members analyze lhs (now relevant vars should exist)
                 self.analyze_expr(ctx, scope, operand1);
 
-                let finalized = self.objs.expr(operand1).finalized
-                    && self.objs.expr(operand2).finalized
-                    && err.is_none();
+                let finalized = no_err
+                    && self.objs.expr(operand1).finalized
+                    && self.objs.expr(operand2).finalized;
 
                 let unit_type_id = self.get_builtin_type_id(UNIT_TYPE);
 
