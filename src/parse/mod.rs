@@ -57,6 +57,9 @@ pub enum Type {
     // is a module
     Module(ScopeID),
 
+    // result of unary from e.g. "from Boolean"
+    ImportTarget(ScopeID),
+
     // link to scope containing type information e.g. members
     // this covers types which are integers, floats, records, etc.
     Scope(ScopeID),

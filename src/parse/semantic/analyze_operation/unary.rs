@@ -20,7 +20,7 @@ impl AST {
         expr: ExprID,
         operand: ExprID,
     ) {
-
+        self.analyze_expr(ctx, scope, operand);
     }
 
     fn analyze_operation_unary_import(

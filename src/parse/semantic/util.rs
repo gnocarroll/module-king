@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{any::Any, collections::HashMap};
 
 use crate::{
     constants::{ERROR_TYPE, UNIT_TYPE},
@@ -348,6 +348,54 @@ impl AST {
                 MemberVariant::Function(function_id) => Some(function_id),
                 _ => None,
             },
+            _ => None,
+        }
+    }
+
+    pub fn type_get_scope_id(&self, type_id: TypeID) -> Option<ScopeID> {
+        let type_id = self.type_resolve_aliasing(type_id);
+
+        match self.objs.type_get(type_id) {
+            Type::Alias(_) => panic!("should have removed aliasing"),
+            Type::Scope(scope_id) => Some(*scope_id),
+            _ => None,
+        }
+    }
+
+    pub fn expr_get_scope_id(&self, expr: ExprID) -> Option<ScopeID> {
+        let expr_struct = self.objs.expr(expr);
+
+        let maybe_ret = match &expr_struct.variant {
+            ExprVariant::Identifier(Identifier {
+                member_id: member_id,
+                ..
+            }) => {
+                let member = self.objs.member(*member_id);
+
+                match member.variant {
+                    MemberVariant::Module(scope_id) => Some(scope_id),
+                    MemberVariant::Type(type_id) => self.type_get_scope_id(type_id),
+                    MemberVariant::Function(function_id) => {
+                        Some(self.objs.function(function_id).scope)
+                    }
+                    MemberVariant::Instance(_) => None,
+                }
+            }
+            ExprVariant::FunctionLiteral(function_literal) => {
+                Some(self.objs.function(function_literal.function_id).scope)
+            }
+            _ => None,
+        };
+
+        if maybe_ret.is_some() {
+            return maybe_ret;
+        }
+
+        let type_id = self.type_resolve_aliasing(expr_struct.type_id);
+
+        match self.objs.type_get(type_id) {
+            Type::Module(scope_id) | Type::ImportTarget(scope_id) => Some(*scope_id),
+            Type::Type(type_id) => self.type_get_scope_id(*type_id),
             _ => None,
         }
     }
