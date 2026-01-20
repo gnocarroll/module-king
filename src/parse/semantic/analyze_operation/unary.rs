@@ -72,11 +72,12 @@ impl AST {
 
     fn analyze_operation_unary_import(
         &mut self,
-        ctx: &mut SemanticContext,
-        scope: ScopeID,
+        _ctx: &mut SemanticContext,
+        _scope: ScopeID,
         expr: ExprID,
-        operand: ExprID,
+        _operand: ExprID,
     ) {
+        self.invalid_operation(expr, "unary import e.g. \"import some_module\" not implemented yet");
     }
 
     pub fn analyze_operation_unary(

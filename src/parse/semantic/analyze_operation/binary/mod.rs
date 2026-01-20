@@ -365,6 +365,60 @@ impl AST {
         expr_mut.finalized = finalized;
     }
 
+    // binary import e.g. "from some_module import ..."
+    fn analyze_operation_binary_import(
+        &mut self,
+        ctx: &mut SemanticContext,
+        scope: ScopeID,
+        expr: ExprID,
+        operand1: ExprID,
+        operand2: ExprID,
+    ) {
+        self.analyze_expr(ctx, scope, operand1);
+
+        let operand1_struct = self.objs.expr(operand1);
+
+        if !operand1_struct.finalized {
+            return;
+        }
+
+        let import_from_scope_id = match self.objs.type_get(operand1_struct.type_id) {
+            Type::ImportTarget(scope_id) => *scope_id,
+            _ => {
+                self.invalid_operation(
+                    expr,
+                    "target of import should be valid import target \
+                    created with \"from\" e.g. \"from some_module\"",
+                );
+                return;
+            }
+        };
+
+        // use scope that is being imported from
+
+        self.analyze_expr(ctx, import_from_scope_id, operand2);
+
+        if !self.objs.expr(operand2).finalized {
+            return;
+        }
+
+        // search through operand2 for identifiers so we can add them to current module
+
+        let mut expr_stack = vec![operand2];
+
+        loop {
+            let expr_id = match expr_stack.pop() {
+                Some(expr_id) => expr_id,
+                None => break,
+            };
+        }
+
+        let expr_mut = self.objs.expr_mut(expr);
+
+        expr_mut.type_id = TypeID::unit();
+        expr_mut.finalized = true;
+    }
+
     // glue values or type together into tuple
     fn analyze_operation_comma(
         &mut self,
@@ -547,6 +601,10 @@ impl AST {
 
                 expr_mut.finalized = finalized;
 
+                return;
+            }
+            TokenType::Import => {
+                self.analyze_operation_binary_import(ctx, scope, expr, operand1, operand2);
                 return;
             }
             TokenType::ColonEq => {
