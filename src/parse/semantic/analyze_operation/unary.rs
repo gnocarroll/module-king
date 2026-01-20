@@ -13,6 +13,26 @@ use crate::{
 use operator::OperatorVariant::*;
 
 impl AST {
+    fn analyze_operation_from(
+        &mut self,
+        ctx: &mut SemanticContext,
+        scope: ScopeID,
+        expr: ExprID,
+        operand: ExprID,
+    ) {
+
+    }
+
+    fn analyze_operation_unary_import(
+        &mut self,
+        ctx: &mut SemanticContext,
+        scope: ScopeID,
+        expr: ExprID,
+        operand: ExprID,
+    ) {
+
+    }
+
     pub fn analyze_operation_unary(
         &mut self,
         ctx: &mut SemanticContext,
@@ -21,6 +41,18 @@ impl AST {
         op: TokenType,
         operand: ExprID,
     ) {
+        match op {
+            TokenType::From => {
+                self.analyze_operation_from(ctx, scope, expr, operand);
+                return;
+            }
+            TokenType::Import => {
+                self.analyze_operation_unary_import(ctx, scope, expr, operand);
+                return;
+            }
+            _ => (),
+        }
+
         self.analyze_expr(ctx, scope, operand);
 
         if !self.expr(operand).finalized {
@@ -83,15 +115,9 @@ impl AST {
             TokenType::Plus | TokenType::Minus | TokenType::PlusPlus | TokenType::MinusMinus => {
                 let err_msg = "this unary operation is only supported for integers and floats";
 
-                let type_variant = match self.objs.type_get(operand_type_id) {
-                    Type::Scope(scope) => match self.objs.scope(*scope).variant {
-                        ScopeVariant::Type(variant) => Some(variant),
-                        _ => None,
-                    },
-                    _ => None,
-                };
+                // TODO: for ++ and -- check if operand is var
 
-                let type_variant = match type_variant {
+                let type_variant = match self.type_get_variant(operand_type_id) {
                     Some(v) => v,
                     None => {
                         self.invalid_operation(expr, err_msg);
