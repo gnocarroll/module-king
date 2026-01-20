@@ -1,7 +1,7 @@
 use crate::{
     constants::ERROR_TYPE,
     parse::{
-        AST, MemberVariant, ScopeVariant, Type, TypeVariant, Visibility, ast_contents::{ExprID, FunctionID, ScopeID, TypeID}, semantic::SemanticContext
+        AST, ExprVariant, MemberVariant, ScopeVariant, Type, TypeVariant, Visibility, ast_contents::{ExprID, FunctionID, ScopeID, TypeID}, semantic::SemanticContext
     },
 };
 
@@ -24,6 +24,22 @@ impl AST {
         operand1: ExprID,
         operand2: ExprID,
     ) {
+        // test if user is attempting to create built-in List or Map type
+
+        if let ExprVariant::Identifier(ident) = self.objs.expr(operand1).variant {
+            let ident_str = ctx.tokens.tok_as_str(&ident.name);
+
+            // if matches List/Map go to handler for that and return early from here
+
+            if ident_str == "List" {
+
+                return;
+            } else if ident_str == "Map" {
+
+                return;
+            }
+        }
+
         self.analyze_expr(ctx, scope, operand1);
 
         let old_analyzing_now = ctx.analyzing_now;
