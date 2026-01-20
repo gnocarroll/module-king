@@ -76,6 +76,31 @@ static OP_INFO_TABLE: &[&[OperatorInfo]] = &[
         assoc: Assoc::Right,
         is_rhs_optional: false,
     }],
+    // operators for importing from modules (or enums or variants)
+    // infix import and prefix from allows for lines like
+    // (from Boolean) import true, false;
+    &[OperatorInfo {
+        ttype: TokenType::Import,
+        variant: Infix,
+        assoc: Assoc::Left,
+        is_rhs_optional: false,
+    }],
+    &[
+        OperatorInfo {
+            ttype: TokenType::From,
+            variant: Prefix,
+            assoc: Assoc::Right,
+            is_rhs_optional: false,
+        },
+        // prefix import would allow you to just import module e.g.
+        // import io;
+        OperatorInfo {
+            ttype: TokenType::Import,
+            variant: Prefix,
+            assoc: Assoc::Right,
+            is_rhs_optional: false,
+        },
+    ],
     &[
         OperatorInfo {
             ttype: TokenType::Return,

@@ -11,4 +11,4 @@ type Boolean is enum
     false = 0;
 end enum;
 
-import (true, false) from Boolean;
+from Boolean import true, false;
