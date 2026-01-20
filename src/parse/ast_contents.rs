@@ -6,7 +6,8 @@ use std::collections::HashMap;
 use crate::{
     constants::{ERROR_TYPE, STRING_TYPE, UNIT_TYPE},
     parse::{
-        AST, Expr, Function, Member, MemberVariant, Pattern, PatternIterator, Scope, ScopeVariant, TupleIterator, Type, Visibility
+        AST, Expr, Function, Member, MemberVariant, Pattern, PatternIterator, Scope, ScopeVariant,
+        TupleIterator, Type, Visibility,
     },
     tokens::TokenOrString,
 };
@@ -77,7 +78,8 @@ impl Default for ASTContents {
 
             ret.scope_mut(ScopeID::global())
                 .members
-                .insert(name.to_string(), member_id);
+                .insert(name.to_string(), member_id)
+                .expect("names of built-ins should not be duplicate");
         }
 
         ret
@@ -151,7 +153,10 @@ pub struct PatternID {
 
 impl PatternID {
     pub fn to_pattern_iterator<'a>(&self, ast: &'a AST) -> PatternIterator<'a> {
-        PatternIterator { ast, pattern_stack: vec![*self] }
+        PatternIterator {
+            ast,
+            pattern_stack: vec![*self],
+        }
     }
 }
 

@@ -440,15 +440,19 @@ impl AST {
                 ExprVariant::Identifier(ident) => {
                     // add mapping from member name -> MemberID to scope
 
-                    let name = ctx.tokens.tok_as_str(&ident.name).to_string();
-
-                    self.objs
-                        .scope_mut(scope)
-                        .members
-                        .insert(name, ident.member_id);
+                    if self
+                        .scope_try_insert(ctx.tokens, scope, ident.member_id)
+                        .is_err()
+                    {
+                        // duplicate ident => problem
+                        finalized = false;
+                    }
                 }
                 _ => {
-                    self.invalid_operation(expr, "provide names separated by commas as things to import");
+                    self.invalid_operation(
+                        expr,
+                        "provide names separated by commas as things to import",
+                    );
                     finalized = false;
                 }
             }

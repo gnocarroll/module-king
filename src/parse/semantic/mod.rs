@@ -9,7 +9,8 @@ use crate::{
         TypeVariant, Visibility,
         ast_contents::{ExprID, FunctionID, PatternID, ScopeID, TypeID},
         errors::{
-            ExpectedExprReturns, ExpectedType, ExprAndType, InvalidExpr, PatternError, SemanticError, UnexpectedExpr
+            DuplicateName, ExpectedExprReturns, ExpectedType, ExprAndType, InvalidExpr,
+            PatternError, SemanticError, UnexpectedExpr,
         },
     },
     scan::TokenType,
@@ -25,10 +26,8 @@ pub enum IsEnum {
 pub enum AnalyzingNow {
     Type,
     TypeBody(IsEnum),
-    FuncArgs,
     FuncParams,
-    Pattern, // e.g. (x, y) so certain ops not permitted
-    Expr,    // if specification is unnecessary
+    Expr, // if specification is unnecessary
 }
 
 pub struct SemanticContext<'a> {
@@ -45,7 +44,8 @@ impl AST {
         ctx: &mut SemanticContext,
         scope: ScopeID,
         pattern: PatternID,
-    ) {
+    ) -> Result<(), DuplicateName> {
+        let mut err: Option<DuplicateName> = None;
         let mut pattern_stack = vec![pattern];
 
         while let Some(pattern) = pattern_stack.pop() {
@@ -58,7 +58,14 @@ impl AST {
             match pattern_ref.variant {
                 PatternVariant::Ident(token) => {
                     // instance is added from identifier piece of pattern
-                    self.scope_add_instance(ctx, scope, TokenOrString::Token(token), Some(type_id));
+                    if let Err(e) = self.scope_add_instance(
+                        ctx,
+                        scope,
+                        TokenOrString::Token(token),
+                        Some(type_id),
+                    ) {
+                        err = Some(e);
+                    }
                 }
                 PatternVariant::Tuple((lhs, rhs)) | PatternVariant::Slice((lhs, rhs)) => {
                     if let Some(rhs) = rhs {
@@ -75,16 +82,25 @@ impl AST {
                 _ => (),
             }
         }
+
+        match err {
+            Some(e) => Err(e),
+            None => Ok(()),
+        }
     }
 
     // process provided pattern for func params
     // - append correct param information to func
     // - add correct instances to function scope
-    fn pattern_process_for_func_params(&mut self, ctx: &mut SemanticContext, pattern: PatternID) {
+    fn _pattern_process_for_func_params(
+        &mut self,
+        ctx: &mut SemanticContext,
+        pattern: PatternID,
+    ) -> Result<(), DuplicateName> {
         let func = if let Some(curr_func) = ctx.curr_func {
             curr_func
         } else {
-            return;
+            return Ok(());
         };
 
         // add pattern to vec for func
@@ -95,7 +111,7 @@ impl AST {
 
         let scope = func_mut.scope;
 
-        self.scope_create_members_from_pattern(ctx, scope, pattern);
+        self.scope_create_members_from_pattern(ctx, scope, pattern)
     }
 
     // function to attempt pattern matching between identifier(s) in pattern and type
@@ -431,11 +447,12 @@ impl AST {
             if !self.type_eq(boolean_type_id, cond_type_id) {
                 finalized = false;
 
-                self.semantic_errors.push(SemanticError::ExpectedType(ExpectedType {
-                    expr: while_struct.cond,
-                    expected: boolean_type_id,
-                    found: cond_type_id,
-                }));
+                self.semantic_errors
+                    .push(SemanticError::ExpectedType(ExpectedType {
+                        expr: while_struct.cond,
+                        expected: boolean_type_id,
+                        found: cond_type_id,
+                    }));
             }
         }
 
@@ -581,7 +598,13 @@ impl AST {
         // add function as member of parent scope
 
         if let (true, Some(name)) = (finalized, func_name) {
-            self.scope_add_function(ctx.tokens, scope, name, function_id);
+            if self
+                .scope_add_function(ctx.tokens, scope, name, function_id)
+                .is_err()
+            {
+                // duplicate name => problem
+                self.objs.expr_mut(expr).finalized = false;
+            }
         }
     }
 
@@ -763,6 +786,9 @@ impl AST {
                     ScopeID::global(),
                     TokenOrString::String(name.to_string()),
                     variant,
+                )
+                .expect(
+                    "should be no name conflict for initial insertion of Integer, Float, Boolean",
                 );
             }
 
@@ -773,13 +799,15 @@ impl AST {
             match self.objs.type_get(boolean_type).clone() {
                 Type::Scope(scope) => {
                     for name in ["false", "true"] {
-                        let member = self.objs.member_push(Member {
+                        let member_id = self.objs.member_push(Member {
                             name: TokenOrString::String(name.to_string()),
                             visibility: Visibility::Global,
                             variant: MemberVariant::Instance(boolean_type),
                         });
 
-                        self.scope_add_member(&mut ctx, scope, member);
+                        self.scope_try_insert(&ctx.tokens, scope, member_id).expect(
+                            "initial insertion to Boolean of true, false should not cause conflict",
+                        );
                     }
                 }
                 _ => panic!("boolean type malformed"),

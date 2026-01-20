@@ -6,7 +6,7 @@ use crate::{
         AST, ExprVariant, Operation,
         ast_contents::{ExprID, ScopeID},
         errors::{InvalidOperation, SemanticError},
-        semantic::{AnalyzingNow, IsEnum, SemanticContext},
+        semantic::{AnalyzingNow, SemanticContext},
     },
     scan::TokenType,
 };

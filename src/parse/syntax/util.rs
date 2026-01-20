@@ -1,7 +1,6 @@
 use crate::{
     parse::{
-        AST, ExprVariant, ScopeVariant, Type,
-        ast_contents::{ExprID, TypeID},
+        AST, ExprVariant, ScopeRefersTo, ScopeVariant, Type, ast_contents::{ExprID, ScopeID, TypeID}
     },
     tokens::Tokens,
 };
@@ -62,7 +61,23 @@ impl AST {
 
                 format!("({} {})", variant_string, name)
             }
+            Type::ImportTarget(scope_id) => format!(
+                "(from {})",
+                self.scope_to_string(tokens, scope_id),
+            )
         }
+    }
+
+    pub fn scope_to_string(&self, tokens: &Tokens, scope: ScopeID) -> String {
+        let name = match &self.objs.scope(scope).name {
+            Some(token_or_string) => tokens.tok_or_string_to_string(token_or_string),
+            None => "(anonymous)".to_string(),
+        };
+
+        format!(
+            "(scope {})",
+            name,
+        )
     }
 
     pub fn expr_to_string(&self, tokens: &Tokens, expr: ExprID) -> String {

@@ -65,7 +65,7 @@ pub struct UnexpectedExpr {
     pub expr: ExprID,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct DuplicateName {
     pub name: String,
 

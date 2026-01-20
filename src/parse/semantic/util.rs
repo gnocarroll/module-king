@@ -1,12 +1,10 @@
-use std::{any::Any, collections::HashMap};
-
 use crate::{
     constants::{ERROR_TYPE, UNIT_TYPE},
     parse::{
         AST, ExprReturns, ExprVariant, FunctionLiteral, Identifier, Member, MemberVariant, Scope,
         ScopeRefersTo, ScopeVariant, TokenOrString, Type, TypeOrModule, TypeVariant, Visibility,
         ast_contents::{ExprID, FunctionID, MemberID, ScopeID, TypeID},
-        errors::{InvalidOperation, MissingOperand, PatternError, SemanticError},
+        errors::{DuplicateName, InvalidOperation, MissingOperand, PatternError, SemanticError},
         semantic::SemanticContext,
     },
     scan::Token,
@@ -71,7 +69,7 @@ impl AST {
         scope: ScopeID,
         name: TokenOrString,
         type_id: Option<TypeID>,
-    ) -> MemberID {
+    ) -> Result<MemberID, DuplicateName> {
         let type_id = match type_id {
             Some(id) => id,
             None => self.get_builtin_type_id(ERROR_TYPE),
@@ -83,9 +81,7 @@ impl AST {
             variant: MemberVariant::Instance(type_id),
         });
 
-        self.scope_add_member(ctx, scope, member_id);
-
-        member_id
+        self.scope_try_insert(ctx.tokens, scope, member_id)
     }
 
     pub fn set_expr_returns_unit(&mut self, _ctx: &mut SemanticContext, expr: ExprID) {
@@ -168,25 +164,6 @@ impl AST {
         type_id
     }
 
-    pub fn scope_add_member(
-        &mut self,
-        ctx: &mut SemanticContext,
-        scope: ScopeID,
-        member: MemberID,
-    ) {
-        let t_or_s = self.objs.member(member).name.clone();
-
-        let member_name = match t_or_s {
-            TokenOrString::Token(t) => ctx.tokens.tok_as_str(&t).to_string(),
-            TokenOrString::String(s) => s,
-        };
-
-        self.objs
-            .scope_mut(scope)
-            .members
-            .insert(member_name.to_string(), member);
-    }
-
     pub fn type_create(
         &mut self,
         scope: ScopeID,
@@ -211,7 +188,7 @@ impl AST {
         ctx: &mut SemanticContext,
         scope: ScopeID,
         type_id: TypeID,
-    ) -> MemberID {
+    ) -> Result<MemberID, DuplicateName> {
         let name = match self.objs.type_get(type_id) {
             Type::Scope(scope) => self.objs.scope(*scope).name.clone(),
             _ => None,
@@ -223,9 +200,7 @@ impl AST {
             variant: MemberVariant::Type(type_id),
         });
 
-        self.scope_add_member(ctx, scope, member_id);
-
-        member_id
+        self.scope_try_insert(ctx.tokens, scope, member_id)
     }
 
     // return is the id of the Scope which represents the type
@@ -235,7 +210,7 @@ impl AST {
         scope: ScopeID,
         name: TokenOrString,
         type_id: TypeID,
-    ) -> TypeID {
+    ) -> Result<MemberID, DuplicateName> {
         let type_id = if let Type::Scope(scope) = self.objs.type_get(type_id) {
             let scope_mut = self.objs.scope_mut(*scope);
 
@@ -258,9 +233,7 @@ impl AST {
             variant: MemberVariant::Type(type_id),
         });
 
-        self.scope_add_member(ctx, scope, member_id);
-
-        type_id
+        self.scope_try_insert(ctx.tokens, scope, member_id)
     }
 
     // return is the id of the Scope which represents the type
@@ -270,7 +243,7 @@ impl AST {
         scope: ScopeID,
         name: TokenOrString,
         variant: TypeVariant,
-    ) -> TypeID {
+    ) -> Result<TypeID, DuplicateName> {
         let type_id = self.type_create(scope, name.clone(), variant);
 
         let member_id = self.objs.member_push(Member {
@@ -279,9 +252,9 @@ impl AST {
             variant: MemberVariant::Type(type_id),
         });
 
-        self.scope_add_member(ctx, scope, member_id);
+        self.scope_try_insert(ctx.tokens, scope, member_id)?;
 
-        type_id
+        Ok(type_id)
     }
 
     pub fn member_type_or_module(&mut self, member: MemberID) -> TypeOrModule {
@@ -295,13 +268,33 @@ impl AST {
         }
     }
 
+    pub fn scope_try_insert(
+        &mut self,
+        tokens: &Tokens,
+        scope: ScopeID,
+        member_id: MemberID,
+    ) -> Result<MemberID, DuplicateName> {
+        let name = &self.objs.member(member_id).name;
+
+        let name = tokens.tok_or_string_to_string(name);
+
+        if let Err(e) = self.objs.scope_mut(scope).members.insert(name, member_id) {
+            self.semantic_errors
+                .push(SemanticError::DuplicateName(e.clone()));
+
+            return Err(e);
+        }
+
+        Ok(member_id)
+    }
+
     pub fn scope_add_function(
         &mut self,
         ctx: &Tokens,
         scope: ScopeID,
         name: Token,
         function: FunctionID,
-    ) -> MemberID {
+    ) -> Result<MemberID, DuplicateName> {
         // create member struct and get ID
 
         let member_id = self.objs.member_push(Member {
@@ -312,12 +305,9 @@ impl AST {
 
         // insert to provided scope
 
-        self.objs
-            .scope_mut(scope)
-            .members
-            .insert(ctx.tok_as_str(&name).to_string(), member_id);
+        self.scope_try_insert(ctx, scope, member_id)?;
 
-        member_id
+        Ok(member_id)
     }
 
     pub fn expr_returns(&self, expr: ExprID) -> ExprReturns {
@@ -337,17 +327,13 @@ impl AST {
 
     pub fn expr_get_function_id(&self, expr: ExprID) -> Option<FunctionID> {
         match self.objs.expr(expr).variant {
-            ExprVariant::FunctionLiteral(FunctionLiteral {
-                function_id: function_id,
-                ..
-            }) => Some(function_id),
-            ExprVariant::Identifier(Identifier {
-                member_id: member_id,
-                ..
-            }) => match self.objs.member(member_id).variant {
-                MemberVariant::Function(function_id) => Some(function_id),
-                _ => None,
-            },
+            ExprVariant::FunctionLiteral(FunctionLiteral { function_id, .. }) => Some(function_id),
+            ExprVariant::Identifier(Identifier { member_id, .. }) => {
+                match self.objs.member(member_id).variant {
+                    MemberVariant::Function(function_id) => Some(function_id),
+                    _ => None,
+                }
+            }
             _ => None,
         }
     }
@@ -366,10 +352,7 @@ impl AST {
         let expr_struct = self.objs.expr(expr);
 
         let maybe_ret = match &expr_struct.variant {
-            ExprVariant::Identifier(Identifier {
-                member_id: member_id,
-                ..
-            }) => {
+            ExprVariant::Identifier(Identifier { member_id, .. }) => {
                 let member = self.objs.member(*member_id);
 
                 match member.variant {

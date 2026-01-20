@@ -30,7 +30,7 @@ impl ScopeMembers {
     }
 
     // try to insert to scope, return error if name exists
-    pub fn insert(&mut self, s: String, member: MemberID) -> Result<(), DuplicateName> {
+    pub fn insert(&mut self, s: String, member: MemberID) -> Result<MemberID, DuplicateName> {
         if let Some(old_member) = self.map.get(&s) {
             return Err(DuplicateName {
                 name: s,
@@ -42,6 +42,6 @@ impl ScopeMembers {
         self.order.push(s.clone());
         self.map.insert(s, member);
 
-        Ok(())
+        Ok(member)
     }
 }
