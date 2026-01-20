@@ -44,7 +44,7 @@ impl AST {
         Ok(ret)
     }
 
-    fn test_name_match(
+    fn _test_name_match(
         &mut self,
         tokens: &mut Tokens,
         expected: Token,

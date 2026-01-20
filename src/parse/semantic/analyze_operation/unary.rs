@@ -1,8 +1,8 @@
 use crate::{
     constants::{BOOLEAN_TYPE, ERROR_TYPE, UNIT_TYPE},
     parse::{
-        AST, ScopeVariant, Type, TypeVariant,
-        ast_contents::{ExprID, ScopeID},
+        AST, ExprVariant, ScopeVariant, Type, TypeVariant,
+        ast_contents::{ExprID, ScopeID, TypeID},
         errors::{InvalidOperation, SemanticError},
         operator,
         semantic::SemanticContext,
@@ -77,7 +77,10 @@ impl AST {
         expr: ExprID,
         _operand: ExprID,
     ) {
-        self.invalid_operation(expr, "unary import e.g. \"import some_module\" not implemented yet");
+        self.invalid_operation(
+            expr,
+            "unary import e.g. \"import some_module\" not implemented yet",
+        );
     }
 
     pub fn analyze_operation_unary(
@@ -112,6 +115,28 @@ impl AST {
         {
             self.invalid_operation(expr, "not a supported unary operator");
             return;
+        }
+
+        match (op, &self.expr(operand).variant) {
+            (TokenType::Type, ExprVariant::Unit) => {
+                let expr_mut = self.expr_mut(expr);
+
+                expr_mut.variant = ExprVariant::KWType;
+                expr_mut.type_id = TypeID::any_type();
+                expr_mut.finalized = true;
+
+                return;
+            }
+            (TokenType::Module, ExprVariant::Unit) => {
+                let expr_mut = self.expr_mut(expr);
+
+                expr_mut.variant = ExprVariant::KWModule;
+                expr_mut.type_id = TypeID::any_module();
+                expr_mut.finalized = true;
+
+                return;
+            }
+            _ => (),
         }
 
         let operand_struct = self.expr(operand);

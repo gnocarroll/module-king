@@ -1,8 +1,6 @@
 // ID structs in this module enable use of strongly-typed IDs
 // replacing previous use of u32 for various AST objects
 
-use std::collections::HashMap;
-
 use crate::{
     constants::{ERROR_TYPE, STRING_TYPE, UNIT_TYPE},
     parse::{
@@ -59,6 +57,11 @@ impl Default for ASTContents {
 
         let error_type_id = ret.type_push(Type::Error);
         let unit_type_id = ret.type_push(Type::Unit);
+
+        // any type, any module will have 3, 4 respectively
+
+        ret.type_push(Type::AnyType);
+        ret.type_push(Type::AnyModule);
 
         // for now String will also just be built-in but later should go in
         // std library
@@ -136,8 +139,16 @@ impl TypeID {
         return TypeID { id: 2 };
     }
 
-    pub fn string() -> Self {
+    pub fn any_type() -> Self {
         return TypeID { id: 3 };
+    }
+
+    pub fn any_module() -> Self {
+        return TypeID { id: 4 };
+    }
+
+    pub fn string() -> Self {
+        return TypeID { id: 5 };
     }
 }
 

@@ -32,24 +32,6 @@ impl AST {
         })
     }
 
-    pub fn expr_kwtype(&mut self, tok_idx: u32) -> ExprID {
-        self.expr_push(Expr {
-            tok: tok_idx,
-            end_tok: tok_idx + 1,
-            variant: ExprVariant::KWType,
-            ..Default::default()
-        })
-    }
-
-    pub fn expr_kwmodule(&mut self, tok_idx: u32) -> ExprID {
-        self.expr_push(Expr {
-            tok: tok_idx,
-            end_tok: tok_idx + 1,
-            variant: ExprVariant::KWModule,
-            ..Default::default()
-        })
-    }
-
     pub fn expr_dollar_number(&mut self, tokens: &Tokens, tok_idx: u32, tok: &Token) -> ExprID {
         let mut chars = tokens.tok_as_str(tok).chars();
 

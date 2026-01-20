@@ -183,7 +183,7 @@ impl AST {
 
     // provide scope, type id to add type to scope as a member
     // ret: member id
-    pub fn scope_add_member_type_from_id(
+    pub fn _scope_add_member_type_from_id(
         &mut self,
         ctx: &mut SemanticContext,
         scope: ScopeID,
@@ -257,7 +257,7 @@ impl AST {
         Ok(type_id)
     }
 
-    pub fn member_type_or_module(&mut self, member: MemberID) -> TypeOrModule {
+    pub fn _member_type_or_module(&mut self, member: MemberID) -> TypeOrModule {
         match self.objs.member(member).variant {
             MemberVariant::Function(function_id) => {
                 TypeOrModule::Type(self.objs.function(function_id).func_type)
