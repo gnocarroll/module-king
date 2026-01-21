@@ -165,6 +165,10 @@ fn eval(
             }
         }),
         ExprVariant::FloatLiteral(f) => ValueVariant::Float(*f),
+
+        // CharacterLiteral will be int value (it is Integer type)
+        ExprVariant::CharacterLiteral(c) => ValueVariant::Integer(*c as i64),
+        ExprVariant::StringLiteral(s) => ValueVariant::String(s.clone()),
         ExprVariant::Operation(operation) => {
             return eval_operation(ast, ctx, expr, *operation);
         }

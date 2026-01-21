@@ -441,7 +441,10 @@ impl AST {
                                 .parse::<f64>()
                                 .expect("float scanning or getting token text is broken"),
                         ),
-                        TokenType::String => ExprVariant::StringLiteral(tok),
+                        TokenType::String => ExprVariant::StringLiteral(
+                            util::tok_parse_string(tokens, tok)
+                                .expect("failed to get String from Token"),
+                        ),
                         TokenType::Character => ExprVariant::CharacterLiteral(
                             util::tok_parse_char(tokens, tok)
                                 .expect("failed to get char from Token"),

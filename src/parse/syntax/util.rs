@@ -50,6 +50,25 @@ pub fn tok_parse_char(tokens: &Tokens, tok: Token) -> Option<char> {
     Some(c)
 }
 
+// similar to above but for String Token -> String
+pub fn tok_parse_string(tokens: &Tokens, tok: Token) -> Option<String> {
+    if tok.ttype != TokenType::String {
+        return None;
+    }
+
+    let tok_str = tokens.tok_as_str(&tok);
+
+    let mut chars = tok_str.chars();
+
+    if chars.next()? != '"' {
+        return None;
+    }
+
+    
+
+    None
+}
+
 impl AST {
     pub fn type_to_string(&self, tokens: &Tokens, type_id: TypeID) -> String {
         let type_ref = self.objs.type_get(type_id);
