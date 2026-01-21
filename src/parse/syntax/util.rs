@@ -127,8 +127,15 @@ impl AST {
             ExprVariant::Unit => "Unit".to_string(),
             ExprVariant::IntegerLiteral(i) => i.to_string(),
             ExprVariant::FloatLiteral(f) => f.to_string(),
+            ExprVariant::CharacterLiteral(c) => c.to_string(),
             ExprVariant::StringLiteral(t) => tokens.tok_as_str(&t).to_string(),
             ExprVariant::Identifier(ident) => tokens.tok_as_str(&ident.name).to_string(),
+            ExprVariant::BooleanLiteral(b) => b.to_string(),
+            ExprVariant::Underscore => "_".to_string(),
+            ExprVariant::DollarNumber(i) => format!(
+                "${}",
+                u.to_string(),
+            ),
             ExprVariant::KWType => "KWType".to_string(),
             ExprVariant::KWModule => "KWModule".to_string(),
             ExprVariant::Operation(operation) => {
@@ -183,7 +190,6 @@ impl AST {
                     self.expr_to_string(tokens, type_literal.body),
                 )
             }
-            _ => "ERR".to_string(),
         }
     }
 }
