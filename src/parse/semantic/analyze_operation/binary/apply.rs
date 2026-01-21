@@ -95,148 +95,6 @@ impl AST {
         }
     }
 
-    fn analyze_builtin_function(
-        &mut self,
-        ctx: &mut SemanticContext,
-        scope: ScopeID,
-        expr: ExprID,
-        builtin: Builtin,
-        arg: ExprID,
-    ) {
-        self.analyze_expr(ctx, scope, arg);
-
-        let mut type_id = TypeID::error();
-
-        let arg_struct = self.objs.expr(arg);
-
-        let mut finalized = arg_struct.finalized;
-
-        if !finalized {
-            return;
-        }
-
-        // perform semantic analysis unique to specific builtin
-
-        match builtin {
-            Builtin::Map | Builtin::List => {
-                let inner_type_id = match self.objs.type_get(arg_struct.type_id) {
-                    Type::Type(type_id) => *type_id,
-                    _ => {
-                        self.invalid_operation(expr, "arg to Map or List should be a type");
-                        return;
-                    }
-                };
-
-                let generic_type_id = self.objs.type_push(match builtin {
-                    Builtin::Map => Type::Map(inner_type_id),
-                    Builtin::List => Type::List(inner_type_id),
-                    _ => panic!("should be List or Map here"),
-                });
-
-                // ret is type itself
-
-                type_id = self.objs.type_push(Type::Type(generic_type_id));
-            }
-
-            Builtin::GenericPush | Builtin::GenericGet | Builtin::GenericExists => {
-                let arg_count_err_msg = "should be two args to push, get, exists";
-
-                let mut tuple_iter = arg_struct.type_id.to_tuple_iterator(self);
-
-                let arg1_type_id = match tuple_iter.next() {
-                    Some(type_id) => type_id,
-                    None => {
-                        self.invalid_operation(expr, arg_count_err_msg);
-                        return;
-                    }
-                };
-
-                let arg2_type_id = match tuple_iter.next() {
-                    Some(type_id) => type_id,
-                    None => {
-                        self.invalid_operation(expr, arg_count_err_msg);
-                        return;
-                    }
-                };
-
-                let arg1_type = self.objs.type_get(arg1_type_id).clone();
-                let inner_type_id;
-
-                match &arg1_type {
-                    Type::List(type_id) | Type::Map(type_id) => {
-                        inner_type_id = *type_id;
-                    } // Ok
-                    _ => {
-                        self.invalid_operation(
-                            expr,
-                            "arg1 to push/get/exists should be List or Map",
-                        );
-                        return;
-                    }
-                }
-
-                let arg2_type = self.objs.type_get(arg2_type_id).clone();
-
-                match (builtin, arg1_type, arg2_type) {
-                    // List
-                    (Builtin::GenericPush, Type::List(_), _) => {
-                        if !self.type_eq(inner_type_id, arg2_type_id) {
-                            self.invalid_operation(expr, "arg2 should match inner type of List");
-                            return;
-                        }
-                    }
-                    (Builtin::GenericGet | Builtin::GenericExists, Type::List(_), _) => {
-                        // provide integer type to index List
-
-                        if !matches!(
-                            self.type_get_variant(arg2_type_id),
-                            Some(TypeVariant::Integer)
-                        ) {
-                            self.invalid_operation(expr, "use integer type to index list");
-                            return;
-                        }
-                    }
-
-                    // Map
-                    (
-                        Builtin::GenericPush,
-                        Type::Map(_),
-                        Type::Tuple((tuple_t1, Some(tuple_t2))),
-                    ) => {}
-                    (Builtin::GenericGet, Type::Map(_), _) => {}
-                    (Builtin::GenericExists, Type::Map(_), _) => {}
-
-                    // Push arg is not tuple with two elements => wrong
-                    (Builtin::GenericPush, Type::Map(_), _) => {
-                        self.invalid_operation(expr, "provide tuple to push to map");
-                        return;
-                    }
-
-                    _ => {
-                        self.invalid_operation(expr, "wrong arg types to Generic function");
-                        return;
-                    }
-                }
-            }
-
-            Builtin::Malloc => {}
-            Builtin::Mfree => {}
-
-            Builtin::GetWD => {}
-            Builtin::SetWD => {}
-
-            Builtin::DirList => {}
-            Builtin::FileRead => {}
-
-            Builtin::BuiltinCount => {}
-        }
-
-        let expr_mut = self.objs.expr_mut(expr);
-
-        expr_mut.type_id = type_id;
-        expr_mut.finalized = finalized;
-    }
-
     // ret value indicates success
     pub fn analyze_cast(
         &mut self,
@@ -363,6 +221,177 @@ impl AST {
         let expr_mut = self.expr_mut(expr);
 
         expr_mut.type_id = expr_type_id;
+        expr_mut.finalized = true;
+    }
+
+    fn analyze_builtin_function(
+        &mut self,
+        ctx: &mut SemanticContext,
+        scope: ScopeID,
+        expr: ExprID,
+        builtin: Builtin,
+        arg: ExprID,
+    ) {
+        self.analyze_expr(ctx, scope, arg);
+
+        let arg_struct = self.objs.expr(arg);
+
+        if !arg_struct.finalized {
+            return;
+        }
+
+        // perform semantic analysis unique to specific builtin
+
+        match builtin {
+            Builtin::Map | Builtin::List => {
+                let inner_type_id = match self.objs.type_get(arg_struct.type_id) {
+                    Type::Type(type_id) => *type_id,
+                    _ => {
+                        self.invalid_operation(expr, "arg to Map or List should be a type");
+                        return;
+                    }
+                };
+
+                let generic_type_id = self.objs.type_push(match builtin {
+                    Builtin::Map => Type::Map(inner_type_id),
+                    Builtin::List => Type::List(inner_type_id),
+                    _ => panic!("should be List or Map here"),
+                });
+
+                // ret is type itself
+
+                let ret_type_id = self.objs.type_push(Type::Type(generic_type_id));
+
+                let expr_mut = self.objs.expr_mut(expr);
+
+                expr_mut.type_id = ret_type_id;
+                expr_mut.finalized = true;
+            }
+
+            Builtin::GenericPush | Builtin::GenericGet | Builtin::GenericExists => {
+                self.analyze_generic_push_get_exists(ctx, scope, expr, builtin, arg);
+            }
+
+            Builtin::Malloc => {}
+            Builtin::Mfree => {}
+
+            Builtin::GetWD => {}
+            Builtin::SetWD => {}
+
+            Builtin::DirList => {}
+            Builtin::FileRead => {}
+
+            Builtin::BuiltinCount => {}
+        }
+    }
+
+    fn analyze_generic_push_get_exists(
+        &mut self,
+        ctx: &mut SemanticContext,
+        scope: ScopeID,
+        expr: ExprID,
+        builtin: Builtin,
+        arg: ExprID,
+    ) {
+        let arg_count_err_msg = "should be two args to push, get, exists";
+
+        let mut ret_type_id = TypeID::error();
+
+        let arg_struct = self.objs.expr(arg);
+
+        let mut tuple_iter = arg_struct.type_id.to_tuple_iterator(self);
+
+        let arg1_type_id = match tuple_iter.next() {
+            Some(type_id) => type_id,
+            None => {
+                self.invalid_operation(expr, arg_count_err_msg);
+                return;
+            }
+        };
+
+        let arg2_type_id = match tuple_iter.next() {
+            Some(type_id) => type_id,
+            None => {
+                self.invalid_operation(expr, arg_count_err_msg);
+                return;
+            }
+        };
+
+        let arg1_type = self.objs.type_get(arg1_type_id).clone();
+        let inner_type_id;
+
+        match &arg1_type {
+            Type::List(type_id) | Type::Map(type_id) => {
+                inner_type_id = *type_id;
+            } // Ok
+            _ => {
+                self.invalid_operation(
+                    expr,
+                    "arg1 to push/get/exists should be List or Map",
+                );
+                return;
+            }
+        }
+
+        let arg2_type = self.objs.type_get(arg2_type_id).clone();
+
+        match (builtin, arg1_type, arg2_type) {
+            // List
+            (Builtin::GenericPush, Type::List(_), _) => {
+                if !self.type_eq(inner_type_id, arg2_type_id) {
+                    self.invalid_operation(expr, "arg2 should match inner type of List");
+                    return;
+                }
+            }
+            (Builtin::GenericGet | Builtin::GenericExists, Type::List(_), _) => {
+                // provide integer type to index List
+
+                if !matches!(
+                    self.type_get_variant(arg2_type_id),
+                    Some(TypeVariant::Integer)
+                ) {
+                    self.invalid_operation(expr, "use integer type to index list");
+                    return;
+                }
+            }
+
+            // Map
+            (
+                Builtin::GenericPush,
+                Type::Map(_),
+                Type::Tuple((tuple_t1, Some(tuple_t2))),
+            ) => {
+                if !self.type_eq(tuple_t1, TypeID::string()) {
+                    self.invalid_operation(expr, "first in tuple pushed to Map should be String");
+                    return;
+                }
+                if !self.type_eq(tuple_t2, inner_type_id) {
+                    self.invalid_operation(expr, "second in tuple pushed to Map should be inner type of Map");
+                    return;
+                }
+            }
+            (Builtin::GenericGet | Builtin::GenericExists, Type::Map(_), _) => {
+                if !self.type_eq(arg2_type_id, TypeID::string()) {
+                    self.invalid_operation(expr, "use String to access Map");
+                    return;
+                }
+            }
+
+            // Push arg is not tuple with two elements => wrong
+            (Builtin::GenericPush, Type::Map(_), _) => {
+                self.invalid_operation(expr, "provide tuple to push to map");
+                return;
+            }
+
+            _ => {
+                self.invalid_operation(expr, "wrong arg types to Generic function");
+                return;
+            }
+        }
+
+        let expr_mut = self.objs.expr_mut(expr);
+
+        expr_mut.type_id = ret_type_id;
         expr_mut.finalized = true;
     }
 }
