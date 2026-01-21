@@ -40,6 +40,10 @@ impl AST {
                 self.type_to_string(tokens, params),
                 self.type_to_string(tokens, ret),
             ),
+            Type::Builtin(builtin) => format!(
+                "(builtin {})",
+                builtin.get_builtin_name(),
+            ),
             Type::Slice((idx, t)) => format!(
                 "[{}]{}",
                 self.expr_to_string(tokens, idx),

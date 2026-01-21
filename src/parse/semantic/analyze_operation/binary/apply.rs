@@ -1,5 +1,3 @@
-use std::backtrace;
-
 use crate::{
     constants::BOOLEAN_TYPE,
     parse::{
