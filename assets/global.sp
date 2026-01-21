@@ -4,11 +4,14 @@
 // 2. import names from enum
 
 type Integer is integer;
+
+type Character is new Integer;
+
 type Float is float;
 
 type Boolean is enum
-    true = 1;
-    false = 0;
+    false;
+    true;
 end enum;
 
 from Boolean import true, false;

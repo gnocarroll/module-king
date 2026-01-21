@@ -1,7 +1,7 @@
 use crate::{
     constants::BOOLEAN_TYPE,
     parse::{
-        AST, MemberVariant, ScopeVariant, Type, TypeVariant, Visibility,
+        AST, ExprVariant, MemberVariant, ScopeVariant, Type, TypeVariant, Visibility,
         ast_contents::{ExprID, FunctionID, ScopeID, TypeID},
         semantic::{SemanticContext, builtin::Builtin},
     },
@@ -247,6 +247,10 @@ impl AST {
         let arg_type_id = self.type_unwrap_if_single_tuple(arg_struct.type_id);
         let arg_type_id = self.type_resolve_aliasing(arg_type_id);
 
+        // arg is unit i.e. 0 args provided
+
+        let arg_is_unit = matches!(arg_struct.variant, ExprVariant::Unit);
+
         // perform semantic analysis unique to specific builtin
 
         match builtin {
@@ -307,13 +311,59 @@ impl AST {
                 expr_mut.finalized = true;
             }
 
-            Builtin::GetWD => {}
-            Builtin::SetWD => {}
+            Builtin::GetWD => {
+                if !arg_is_unit {
+                    self.invalid_operation(expr, "get wd takes no args");
+                    return;
+                }
 
-            Builtin::DirList => {}
-            Builtin::FileRead => {}
+                let expr_mut = self.objs.expr_mut(expr);
 
-            Builtin::BuiltinCount => {}
+                expr_mut.type_id = TypeID::string();
+                expr_mut.finalized = true;
+            }
+            Builtin::SetWD => {
+                if !self.type_eq(arg_type_id, TypeID::string()) {
+                    self.invalid_operation(expr, "provide 1 arg which is a String to set wd");
+                    return;
+                }
+
+                let expr_mut = self.objs.expr_mut(expr);
+
+                expr_mut.type_id = TypeID::unit();
+                expr_mut.finalized = true;
+            }
+
+            Builtin::DirList => {
+                if !self.type_eq(arg_type_id, TypeID::string()) {
+                    self.invalid_operation(expr, "provide target dir to dir list");
+                    return;
+                }
+
+                // ret type is List(String)
+
+                let type_id = self.type_from_inner(TypeID::string(), Type::List);
+
+                let expr_mut = self.objs.expr_mut(expr);
+
+                expr_mut.type_id = type_id;
+                expr_mut.finalized = true;
+            }
+            Builtin::FileRead => {
+                if !self.type_eq(arg_type_id, TypeID::string()) {
+                    self.invalid_operation(expr, "provide filename to read it in");
+                    return;
+                }
+
+                let expr_mut = self.objs.expr_mut(expr);
+
+                expr_mut.type_id = TypeID::string();
+                expr_mut.finalized = true;
+            }
+
+            Builtin::BuiltinCount => {
+                panic!("BuiltinCount enum value should never be passed to this function");
+            }
         }
     }
 
