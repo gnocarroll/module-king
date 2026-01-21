@@ -5,7 +5,6 @@ enum ScanMethod {
     Proc(fn(&str) -> usize),
 }
 
-
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[repr(u8)]
 pub enum TokenType {
@@ -100,6 +99,7 @@ pub enum TokenType {
     Identifier,
     Integer,
     Float,
+    Character,
     String,
 
     Eof,
@@ -111,21 +111,19 @@ pub enum TokenType {
 
 // some code for stringifying, displaying TokenType
 
-static TTYPE_STRINGS: LazyLock<Vec<String>> = LazyLock::new(|| (0..=(TokenTypeCount as u8)).map(
-    |ttype_int|
-    format!(
-        "{:?}",
-        unsafe {
-            std::mem::transmute::<u8,TokenType>(ttype_int)
-        },
-    )
-).collect());
+static TTYPE_STRINGS: LazyLock<Vec<String>> = LazyLock::new(|| {
+    (0..=(TokenTypeCount as u8))
+        .map(|ttype_int| {
+            format!("{:?}", unsafe {
+                std::mem::transmute::<u8, TokenType>(ttype_int)
+            },)
+        })
+        .collect()
+});
 
 impl AsRef<str> for TokenType {
     fn as_ref(&self) -> &str {
-        TTYPE_STRINGS[unsafe{
-            std::mem::transmute::<TokenType,u8>(*self)
-        } as usize].as_str()
+        TTYPE_STRINGS[unsafe { std::mem::transmute::<TokenType, u8>(*self) } as usize].as_str()
     }
 }
 
@@ -151,8 +149,7 @@ fn scan_identifier(s: &str) -> usize {
         if first_c != '_' && !first_c.is_alphabetic() {
             return 0;
         }
-    }
-    else {
+    } else {
         return 0;
     }
 
@@ -161,8 +158,7 @@ fn scan_identifier(s: &str) -> usize {
     for c in chars {
         if c == '_' || c.is_alphanumeric() {
             ret += 1;
-        }
-        else {
+        } else {
             break;
         }
     }
@@ -176,8 +172,7 @@ fn scan_integer(s: &str) -> usize {
     for c in s.chars() {
         if c.is_numeric() {
             ret += 1;
-        }
-        else {
+        } else {
             break;
         }
     }
@@ -186,7 +181,7 @@ fn scan_integer(s: &str) -> usize {
 }
 
 fn scan_float(s: &str) -> usize {
-    let mut ret  = scan_integer(s);
+    let mut ret = scan_integer(s);
 
     if ret == 0 {
         return 0;
@@ -225,8 +220,7 @@ fn scan_float(s: &str) -> usize {
                         if c == '-' {
                             is_number_after_e = false;
                         }
-                    }
-                    else {
+                    } else {
                         return 0;
                     }
                 }
@@ -272,13 +266,77 @@ fn scan_string(s: &str) -> usize {
 
         if c == '\\' {
             is_escaped = true;
-        }
-        else if c == '"' {
+        } else if c == '"' {
             break;
         }
     }
 
     ret
+}
+
+// separate internal function to use ? operator on next()
+fn scan_character_internal(s: &str) -> Option<usize> {
+    // quote, char, quote => 3
+    // quote, backslash, other, quote => 4 (or 1 extra)
+
+    static CHAR_LEN: usize = 3;
+    static BSLASH_CHAR_LEN: usize = CHAR_LEN + 1;
+
+    // which chars you can escape e.g. n for \n (newline)
+    // not gonna do as many as C I think these are enough
+
+    static ESC_SEQUENCE_CHARS: &str = "nrt\\\'";
+
+    let mut chars = s.chars();
+
+    // start quote
+
+    if chars.next()? != '\'' {
+        return None;
+    }
+
+    let is_escaped;
+
+    match chars.next()? {
+        '\\' => {
+            is_escaped = true;
+
+            // next char must be one of the valid escape sequence chars
+
+            let c = chars.next()?;
+
+            if !ESC_SEQUENCE_CHARS.contains(c) {
+                return None;
+            }
+        }
+        c @ _ => {
+            if c.is_ascii() {
+                // is ASCII => Ok, record not escaped char and proceed
+                is_escaped = false;
+            } else {
+                return None;
+            }
+        }
+    }
+
+    // end quote
+
+    if chars.next()? != '\'' {
+        return None;
+    }
+
+    if is_escaped {
+        Some(BSLASH_CHAR_LEN)
+    } else {
+        Some(CHAR_LEN)
+    }
+}
+
+fn scan_character(s: &str) -> usize {
+    match scan_character_internal(s) {
+        Some(len) => len,
+        None => 0,
+    }
 }
 
 fn scan_dollar_number(s: &str) -> usize {
@@ -307,7 +365,7 @@ fn scan_ws_and_comments(s: &str) -> usize {
 
         // 'a' is acceptable default since loop will quit if next is None
         let c = chars.next().unwrap_or('a');
-        
+
         if c == '/' {
             // check if comment has been found, if not break
 
@@ -318,19 +376,17 @@ fn scan_ws_and_comments(s: &str) -> usize {
 
                 while let Some(c) = chars.next() {
                     len += 1;
-                    
+
                     if c == '\n' {
                         break;
                     }
                 }
-            }
-            else {
+            } else {
                 break;
             }
-        }
-        else if c.is_whitespace() {
+        } else if c.is_whitespace() {
             found_ws_or_comment = true;
-            
+
             len += 1;
         }
 
@@ -354,18 +410,18 @@ impl TokenType {
             RCurly => Text("}"),
             Comma => Text(","),
             Or => Text("or"),
-            And => Text ("and"),
-            Pipe => Text ("|"),
-            Carrot => Text ("^"),
-            Ampersand => Text ("&"),
-            EqEq => Text ("=="),
-            BangEq => Text ("!="),
-            Lt => Text ("<"),
-            Gt => Text (">"),
-            Le => Text ("<="),
-            Ge => Text (">="),
-            LtLt => Text ("<<"),
-            GtGt => Text (">>"),
+            And => Text("and"),
+            Pipe => Text("|"),
+            Carrot => Text("^"),
+            Ampersand => Text("&"),
+            EqEq => Text("=="),
+            BangEq => Text("!="),
+            Lt => Text("<"),
+            Gt => Text(">"),
+            Le => Text("<="),
+            Ge => Text(">="),
+            LtLt => Text("<<"),
+            GtGt => Text(">>"),
             Plus => Text("+"),
             Minus => Text("-"),
             Star => Text("*"),
@@ -394,7 +450,7 @@ impl TokenType {
             DArrow => Text("=>"),
             PipeGt => Text("|>"),
             Underscore => Text("_"),
-            
+
             Type => Text("type"),
             New => Text("new"),
             Is => Text("is"),
@@ -435,6 +491,7 @@ impl TokenType {
             Identifier => Proc(scan_identifier),
             Integer => Proc(scan_integer),
             Float => Proc(scan_float),
+            Character => Proc(scan_character),
             String => Proc(scan_string),
 
             Eof => Text(""),
@@ -460,7 +517,8 @@ pub struct Token {
 impl Token {
     // s is string where Token was sourced from
     pub fn as_str<'a>(&self, s: &'a str) -> &'a str {
-        &s[self.offset as usize..(self.offset + self.end_column as u32 - self.column as u32) as usize]
+        &s[self.offset as usize
+            ..(self.offset + self.end_column as u32 - self.column as u32) as usize]
     }
 }
 
@@ -476,9 +534,7 @@ impl Default for Token {
     }
 }
 
-pub fn tokenize(
-    s: &str
-) -> Result<Vec<Token>,String> {
+pub fn tokenize(s: &str) -> Result<Vec<Token>, String> {
     // offset in file (s)
     let mut offset = 0;
 
@@ -523,19 +579,16 @@ pub fn tokenize(
         // to check them all in order
 
         for ttype_int in 0..(TokenTypeCount as u8) {
-            let ttype : TokenType = unsafe {
-                std::mem::transmute(ttype_int)
-            };
+            let ttype: TokenType = unsafe { std::mem::transmute(ttype_int) };
 
             let curr_match = match ttype.get_scan_method() {
                 Text(s) => {
                     if chars.as_str().starts_with(s) {
                         s.chars().count()
-                    }
-                    else {
+                    } else {
                         0
                     }
-                },
+                }
                 Proc(f) => f(chars.as_str()),
             };
 
@@ -545,7 +598,8 @@ pub fn tokenize(
             }
         }
 
-        if max_match == 0 { // => no match was found
+        if max_match == 0 {
+            // => no match was found
             let s = chars.as_str();
             let len = std::cmp::min(chars.count(), 25);
 
@@ -553,9 +607,7 @@ pub fn tokenize(
 
             return Err(format!(
                 "Ln {}, Col {}: no matching token found here \"{}\"",
-                line,
-                column,
-                s,
+                line, column, s,
             ));
         }
 
