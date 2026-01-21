@@ -5,14 +5,15 @@ mod util;
 use crate::{
     constants::{BOOLEAN_TYPE, ERROR_TYPE, FLOAT_TYPE, INTEGER_TYPE, STRING_TYPE, UNIT_TYPE},
     parse::{
-        AST, ExprReturns, ExprVariant, IdentifierVariant, Member, MemberVariant, Operation,
-        Pattern, PatternVariant, Scope, ScopeRefersTo, ScopeVariant, TokenOrString, Tokens, Type,
-        TypeVariant, Visibility,
+        AST, ExprReturns, ExprVariant, Identifier, IdentifierVariant, Member, MemberVariant,
+        Operation, Pattern, PatternVariant, Scope, ScopeRefersTo, ScopeVariant, TokenOrString,
+        Tokens, Type, TypeVariant, Visibility,
         ast_contents::{ExprID, FunctionID, PatternID, ScopeID, TypeID},
         errors::{
             DuplicateName, ExpectedExprReturns, ExpectedType, ExprAndType, InvalidExpr,
             PatternError, SemanticError, UnexpectedExpr,
         },
+        semantic::builtin::Builtin,
     },
     scan::TokenType,
 };
@@ -666,6 +667,63 @@ impl AST {
         }
     }
 
+    fn analyze_ident(
+        &mut self,
+        ctx: &mut SemanticContext,
+        scope: ScopeID,
+        expr: ExprID,
+        ident: Identifier,
+    ) {
+        let name = ctx.tokens.tok_as_str(&ident.name);
+
+        // test if name of ident is a built-in function
+
+        for builtin in Builtin::get_builtin_iter() {
+            let builtin_name = builtin.get_builtin_name();
+
+            if name != builtin_name {
+                continue;
+            }
+        }
+
+        if let AnalyzingNow::TypeBody(_) = ctx.analyzing_now {
+            // TODO: attempt to add discriminant-only member to enum or variant
+            return;
+        }
+
+        if let Some(member_id) = self.scope_search(scope, name) {
+            let member = self.objs.member(member_id);
+
+            let (type_id, ident_variant) = match member.variant {
+                MemberVariant::Module(scope_id) => (
+                    self.objs.type_push(Type::Module(scope_id)),
+                    IdentifierVariant::Module,
+                ),
+                MemberVariant::Type(type_id) => (
+                    self.objs.type_push(Type::Type(type_id)),
+                    IdentifierVariant::Type,
+                ),
+                MemberVariant::Instance(type_id) => (type_id, IdentifierVariant::Instance),
+                MemberVariant::Function(function_id) => (
+                    self.objs.function(function_id).func_type,
+                    IdentifierVariant::Function,
+                ),
+            };
+
+            let expr_mut = self.expr_mut(expr);
+
+            expr_mut.type_id = type_id;
+
+            if let ExprVariant::Identifier(ident) = &mut expr_mut.variant {
+                ident.member_id = member_id;
+                ident.variant = ident_variant;
+            }
+
+            expr_mut.is_var = true;
+            expr_mut.finalized = true;
+        }
+    }
+
     // semantic analysis on particular expression
     fn analyze_expr(&mut self, ctx: &mut SemanticContext, scope: ScopeID, expr: ExprID) {
         match &self.expr(expr).variant {
@@ -693,44 +751,7 @@ impl AST {
                 expr.finalized = true;
             }
             ExprVariant::Identifier(ident) => {
-                let name = ctx.tokens.tok_as_str(&ident.name);
-
-                if let AnalyzingNow::TypeBody(_) = ctx.analyzing_now {
-                    // TODO: attempt to add discriminant-only member to enum or variant
-                    return;
-                }
-
-                if let Some(member_id) = self.scope_search(scope, name) {
-                    let member = self.objs.member(member_id);
-
-                    let (type_id, ident_variant) = match member.variant {
-                        MemberVariant::Module(scope_id) => (
-                            self.objs.type_push(Type::Module(scope_id)),
-                            IdentifierVariant::Module,
-                        ),
-                        MemberVariant::Type(type_id) => (
-                            self.objs.type_push(Type::Type(type_id)),
-                            IdentifierVariant::Type,
-                        ),
-                        MemberVariant::Instance(type_id) => (type_id, IdentifierVariant::Instance),
-                        MemberVariant::Function(function_id) => (
-                            self.objs.function(function_id).func_type,
-                            IdentifierVariant::Function,
-                        ),
-                    };
-
-                    let expr_mut = self.expr_mut(expr);
-
-                    expr_mut.type_id = type_id;
-
-                    if let ExprVariant::Identifier(ident) = &mut expr_mut.variant {
-                        ident.member_id = member_id;
-                        ident.variant = ident_variant;
-                    }
-
-                    expr_mut.is_var = true;
-                    expr_mut.finalized = true;
-                }
+                self.analyze_ident(ctx, scope, expr, ident.clone());
             }
             ExprVariant::While(_) => {
                 self.analyze_while(ctx, scope, expr);

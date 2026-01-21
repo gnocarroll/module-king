@@ -12,12 +12,6 @@ enum ApplyCase {
     Function(FunctionID),
 }
 
-#[derive(Clone, Copy, PartialEq)]
-enum BuiltinGeneric {
-    List,
-    Map,
-}
-
 impl AST {
     // apply a function e.g. f()
     // TokenType is actually LParen
@@ -29,29 +23,6 @@ impl AST {
         operand1: ExprID,
         operand2: ExprID,
     ) {
-        // test if user is attempting to create built-in List or Map type
-
-        if let ExprVariant::Identifier(ident) = self.objs.expr(operand1).variant {
-            let ident_str = ctx.tokens.tok_as_str(&ident.name);
-
-            // if matches List/Map go to handler for that and return early from here
-
-            if ident_str == "List" || ident_str == "Map" {
-                self.analyze_builtin_generic(
-                    ctx,
-                    scope,
-                    expr,
-                    operand2,
-                    if ident_str == "List" {
-                        BuiltinGeneric::List
-                    } else {
-                        BuiltinGeneric::Map
-                    },
-                );
-                return;
-            }
-        }
-
         self.analyze_expr(ctx, scope, operand1);
 
         let old_analyzing_now = ctx.analyzing_now;
@@ -118,7 +89,6 @@ impl AST {
         scope: ScopeID,
         expr: ExprID,
         arg: ExprID,
-        which_one: BuiltinGeneric,
     ) {
         self.analyze_expr(ctx, scope, arg);
 
