@@ -142,28 +142,34 @@ impl AST {
                     );
                 }
 
-                for operand in [operation.operand1, operation.operand2] {
+                let (operand1, operand2) = (
+                    operation.operand1.expect("LHS should be present"),
+                    operation.operand2.expect("RHS should be present"),
+                );
+
+                for operand in [operand1, operand2] {
                     // if second operand is Unit then ignore it (otherwise would cause error)
 
-                    if operand == operation.operand2
-                        && match self
-                            .objs
-                            .expr(operation.operand2.expect("RHS should be present"))
-                            .variant
-                        {
-                            ExprVariant::Unit => true,
-                            _ => false,
-                        }
+                    if operand == operand2
+                        && matches!(self.objs.expr(operand2).variant, ExprVariant::Unit)
                     {
+                        let operand2_mut = self.expr_mut(operand2);
+
+                        operand2_mut.type_id = TypeID::unit();
+                        operand2_mut.finalized = true;
+
                         break;
                     }
 
-                    self.analyze_expr(
-                        ctx,
-                        scope,
-                        operand.expect("both operands should always be present here"),
-                    );
+                    self.analyze_expr(ctx, scope, operand);
                 }
+
+                let finalized = self.expr(operand1).finalized && self.expr(operand2).finalized;
+
+                let expr_mut = self.objs.expr_mut(expr);
+
+                expr_mut.type_id = TypeID::unit();
+                expr_mut.finalized = finalized;
             }
             TokenType::Colon => {
                 let (pattern, err) = self.analyze_instance_creation(

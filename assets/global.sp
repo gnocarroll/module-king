@@ -5,8 +5,6 @@
 
 type Integer is integer;
 
-type Character is new Integer;
-
 type Float is float;
 
 type Boolean is enum

@@ -741,16 +741,19 @@ impl AST {
             | ExprVariant::BooleanLiteral(_)
             | ExprVariant::IntegerLiteral(_)
             | ExprVariant::FloatLiteral(_)
+            | ExprVariant::CharacterLiteral(_)
             | ExprVariant::StringLiteral(_) => {
                 // find built-in type id and set type of expr
 
                 let type_name = match self.expr(expr).variant {
                     ExprVariant::Unit => UNIT_TYPE,
                     ExprVariant::BooleanLiteral(_) => BOOLEAN_TYPE,
-                    ExprVariant::IntegerLiteral(_) => INTEGER_TYPE,
+
+                    // character literals will just be Integers like C
+                    ExprVariant::IntegerLiteral(_) | ExprVariant::CharacterLiteral(_) => INTEGER_TYPE,
                     ExprVariant::FloatLiteral(_) => FLOAT_TYPE,
                     ExprVariant::StringLiteral(_) => STRING_TYPE,
-                    _ => panic!("only unit, integer, float here"),
+                    _ => panic!("bad expr variant, not Unit or a literal"),
                 };
 
                 let type_id = self.get_builtin_type_id(type_name);
