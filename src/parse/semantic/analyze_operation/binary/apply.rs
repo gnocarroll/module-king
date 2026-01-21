@@ -241,11 +241,11 @@ impl AST {
             return;
         }
 
-        let arg_type_id = self.type_resolve_aliasing(arg_struct.type_id);
+        // if arg is a single element tuple pull out inner type
+        // also remove any aliasing from type after that
 
-        // if it is single-element tuple then get inner type out
-
-        // TODO: get inner type out if single-element tuple
+        let arg_type_id = self.type_unwrap_if_single_tuple(arg_struct.type_id);
+        let arg_type_id = self.type_resolve_aliasing(arg_type_id);
 
         // perform semantic analysis unique to specific builtin
 
@@ -296,13 +296,15 @@ impl AST {
                 expr_mut.finalized = true;
             }
             Builtin::Mfree => {
-                let inner_type_id = match self.objs.type_get(arg_type_id) {
-                    Type::Ref(type_id) => *type_id,
-                    _ => {
-                        self.invalid_operation(expr, "provide ref argument for memory allocation");
-                        return;
-                    }
+                if !matches!(self.objs.type_get(arg_type_id), Type::Ref(_)) {
+                    self.invalid_operation(expr, "provide ref argument for memory freeing");
+                    return;
                 };
+
+                let expr_mut = self.objs.expr_mut(expr);
+
+                expr_mut.type_id = TypeID::unit();
+                expr_mut.finalized = true;
             }
 
             Builtin::GetWD => {}

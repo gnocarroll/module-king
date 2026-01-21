@@ -481,4 +481,12 @@ impl AST {
     pub fn type_from_inner(&mut self, inner_type_id: TypeID, to_type: impl Fn(TypeID) -> Type) -> TypeID {
         self.objs.type_push(to_type(inner_type_id))
     }
+
+    // if type is a single element tuple pull out inner type otherwise return arg
+    pub fn type_unwrap_if_single_tuple(&self, type_id: TypeID) -> TypeID {
+        match self.objs.type_get(type_id) {
+            Type::Tuple((t, None)) => *t,
+            _ => type_id
+        }
+    }
 }
