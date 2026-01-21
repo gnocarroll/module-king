@@ -62,7 +62,7 @@ impl Builtin {
 
             GetWD => "get_wd",
             SetWD => "set_wd",
-            
+
             DirList => "dir_list",
             FileRead => "file_read",
 

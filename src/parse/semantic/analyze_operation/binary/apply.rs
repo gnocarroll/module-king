@@ -1,7 +1,9 @@
+use std::backtrace;
+
 use crate::parse::{
-    AST, ExprVariant, MemberVariant, ScopeVariant, Type, TypeVariant, Visibility,
+    AST, MemberVariant, ScopeVariant, Type, TypeVariant, Visibility,
     ast_contents::{ExprID, FunctionID, ScopeID, TypeID},
-    semantic::SemanticContext,
+    semantic::{SemanticContext, builtin::Builtin},
 };
 
 // if doing apply operator (e.g. "f()") what are you doing
@@ -10,6 +12,7 @@ use crate::parse::{
 enum ApplyCase {
     Cast(TypeID),
     Function(FunctionID),
+    Builtin(Builtin),
 }
 
 impl AST {
@@ -61,6 +64,12 @@ impl AST {
 
                 apply_case = ApplyCase::Function(function_id);
             }
+
+            // builtin function
+            (true, Type::Builtin(builtin)) => {
+                apply_case = ApplyCase::Builtin(*builtin);
+            }
+
             _ => {
                 self.invalid_operation(expr, "should be type cast or function call");
                 finalized = false;
@@ -79,41 +88,66 @@ impl AST {
                 ApplyCase::Function(function) => {
                     self.analyze_function_call(ctx, scope, expr, function, operand2);
                 }
+                ApplyCase::Builtin(builtin) => {
+                    self.analyze_builtin_function(ctx, scope, expr, builtin, operand2);
+                }
             }
         }
     }
 
-    fn analyze_builtin_generic(
+    fn analyze_builtin_function(
         &mut self,
         ctx: &mut SemanticContext,
         scope: ScopeID,
         expr: ExprID,
+        builtin: Builtin,
         arg: ExprID,
     ) {
         self.analyze_expr(ctx, scope, arg);
 
         let mut type_id = TypeID::error();
-        let mut finalized = false;
 
         let arg_struct = self.objs.expr(arg);
 
-        match (arg_struct.finalized, self.objs.type_get(arg_struct.type_id)) {
-            (false, _) => (),
-            (true, Type::Type(contained_type_id)) => {
-                let generic_type = self.objs.type_push(match which_one {
-                    BuiltinGeneric::List => Type::List(*contained_type_id),
-                    BuiltinGeneric::Map => Type::Map(*contained_type_id),
+        let mut finalized = arg_struct.finalized;
+
+        if !finalized {
+            return;
+        }
+
+        // perform semantic analysis unique to specific builtin
+
+        match builtin {
+            Builtin::Map | Builtin::List => {
+                let inner_type_id = match self.objs.type_get(arg_struct.type_id) {
+                    Type::Type(type_id) => *type_id,
+                    _ => {
+                        self.invalid_operation(expr, "arg to Map or List should be a type");
+                        return;
+                    }
+                };
+
+                type_id = self.objs.type_push(match builtin {
+                    Builtin::Map => Type::Map(inner_type_id),
+                    Builtin::List => Type::List(inner_type_id),
+                    _ => panic!("should be List or Map here"),
                 });
-
-                // type itself is what is being returned
-
-                type_id = self.objs.type_push(Type::Type(generic_type));
-
-                finalized = true;
             }
-            (true, _) => {
-                self.invalid_operation(expr, "provide type as argument to List/Map");
-            }
+
+            Builtin::GenericPush => {}
+            Builtin::GenericGet => {}
+            Builtin::GenericExists => {}
+
+            Builtin::Malloc => {}
+            Builtin::Mfree => {}
+
+            Builtin::GetWD => {}
+            Builtin::SetWD => {}
+
+            Builtin::DirList => {}
+            Builtin::FileRead => {}
+
+            Builtin::BuiltinCount => {}
         }
 
         let expr_mut = self.objs.expr_mut(expr);
