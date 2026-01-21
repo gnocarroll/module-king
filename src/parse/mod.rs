@@ -10,6 +10,7 @@ use crate::{
         ast_contents::{ASTContents, ExprID, FunctionID, MemberID, PatternID, ScopeID, TypeID},
         errors::{ParseError, SemanticError},
         scope_members::ScopeMembers,
+        semantic::builtin::Builtin,
     },
     scan::{Token, TokenType},
     tokens::{ExpectedToken, TokenOrString, Tokens},
@@ -84,6 +85,9 @@ pub enum Type {
 
     // args, ret type (args can be tuple)
     Function((TypeID, TypeID)),
+
+    // dedicated special type to record which builtin function
+    Builtin(Builtin),
 
     // in this initial Rust interpreter will not have full generics
     // however will support lists of a given Type

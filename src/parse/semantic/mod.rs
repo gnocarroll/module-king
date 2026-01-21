@@ -1,5 +1,5 @@
 mod analyze_operation;
-mod builtin;
+pub mod builtin;
 mod util;
 
 use crate::{
@@ -684,6 +684,16 @@ impl AST {
             if name != builtin_name {
                 continue;
             }
+
+            // name eq => match
+            // create builtin type and set fields of expr
+
+            let type_id = self.objs.type_push(Type::Builtin(builtin));
+
+            let expr_mut = self.expr_mut(expr);
+
+            expr_mut.type_id = type_id;
+            expr_mut.finalized = true;
         }
 
         if let AnalyzingNow::TypeBody(_) = ctx.analyzing_now {
