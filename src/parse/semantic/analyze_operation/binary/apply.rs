@@ -1,9 +1,12 @@
 use std::backtrace;
 
-use crate::parse::{
-    AST, MemberVariant, ScopeVariant, Type, TypeVariant, Visibility,
-    ast_contents::{ExprID, FunctionID, ScopeID, TypeID},
-    semantic::{SemanticContext, builtin::Builtin},
+use crate::{
+    constants::BOOLEAN_TYPE,
+    parse::{
+        AST, MemberVariant, ScopeVariant, Type, TypeVariant, Visibility,
+        ast_contents::{ExprID, FunctionID, ScopeID, TypeID},
+        semantic::{SemanticContext, builtin::Builtin},
+    },
 };
 
 // if doing apply operator (e.g. "f()") what are you doing
@@ -287,15 +290,13 @@ impl AST {
 
     fn analyze_generic_push_get_exists(
         &mut self,
-        ctx: &mut SemanticContext,
-        scope: ScopeID,
+        _ctx: &mut SemanticContext,
+        _scope: ScopeID,
         expr: ExprID,
         builtin: Builtin,
         arg: ExprID,
     ) {
         let arg_count_err_msg = "should be two args to push, get, exists";
-
-        let mut ret_type_id = TypeID::error();
 
         let arg_struct = self.objs.expr(arg);
 
@@ -317,6 +318,16 @@ impl AST {
             }
         };
 
+        // make sure there are only two args
+
+        match tuple_iter.next() {
+            Some(_) => {
+                self.invalid_operation(expr, arg_count_err_msg);
+                return;
+            }
+            None => (), // Ok
+        }
+
         let arg1_type = self.objs.type_get(arg1_type_id).clone();
         let inner_type_id;
 
@@ -325,10 +336,7 @@ impl AST {
                 inner_type_id = *type_id;
             } // Ok
             _ => {
-                self.invalid_operation(
-                    expr,
-                    "arg1 to push/get/exists should be List or Map",
-                );
+                self.invalid_operation(expr, "arg1 to push/get/exists should be List or Map");
                 return;
             }
         }
@@ -356,17 +364,16 @@ impl AST {
             }
 
             // Map
-            (
-                Builtin::GenericPush,
-                Type::Map(_),
-                Type::Tuple((tuple_t1, Some(tuple_t2))),
-            ) => {
+            (Builtin::GenericPush, Type::Map(_), Type::Tuple((tuple_t1, Some(tuple_t2)))) => {
                 if !self.type_eq(tuple_t1, TypeID::string()) {
                     self.invalid_operation(expr, "first in tuple pushed to Map should be String");
                     return;
                 }
                 if !self.type_eq(tuple_t2, inner_type_id) {
-                    self.invalid_operation(expr, "second in tuple pushed to Map should be inner type of Map");
+                    self.invalid_operation(
+                        expr,
+                        "second in tuple pushed to Map should be inner type of Map",
+                    );
                     return;
                 }
             }
@@ -379,7 +386,10 @@ impl AST {
 
             // Push arg is not tuple with two elements => wrong
             (Builtin::GenericPush, Type::Map(_), _) => {
-                self.invalid_operation(expr, "provide tuple to push to map");
+                self.invalid_operation(
+                    expr,
+                    "provide tuple with two elements (String, InnerType) to push to map",
+                );
                 return;
             }
 
@@ -388,6 +398,13 @@ impl AST {
                 return;
             }
         }
+
+        let ret_type_id = match builtin {
+            Builtin::GenericPush => TypeID::unit(),
+            Builtin::GenericGet => self.type_from_inner(inner_type_id, Type::Ref),
+            Builtin::GenericExists => self.get_builtin_type_id(BOOLEAN_TYPE),
+            _ => panic!("should always be Push, Get, or Exists"),
+        };
 
         let expr_mut = self.objs.expr_mut(expr);
 
