@@ -3,12 +3,24 @@
 #[derive(Clone, Copy, PartialEq)]
 #[repr(u8)]
 pub enum Builtin {
+    // create generic type
     Map,
     List,
+
+    // push to or get from generic type or check if idx/key exists
     GenericPush,
     GenericGet,
+    GenericExists,
+
+    // heap allocation/free
+    Malloc,
+    Mfree,
+
+    // working directory
     GetWD,
     SetWD,
+
+    // list files in directory and read from file to String
     DirList,
     FileRead,
 
@@ -40,10 +52,17 @@ impl Builtin {
         match self {
             Map => "Map",
             List => "List",
+
             GenericPush => "Generic_push",
             GenericGet => "Generic_get",
+            GenericExists => "Generic_exists",
+
+            Malloc => "m_alloc",
+            Mfree => "m_free",
+
             GetWD => "get_wd",
             SetWD => "set_wd",
+            
             DirList => "dir_list",
             FileRead => "file_read",
 
