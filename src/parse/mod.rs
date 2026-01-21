@@ -255,6 +255,7 @@ pub enum ExprVariant {
     BooleanLiteral(bool),
     IntegerLiteral(u64),
     FloatLiteral(f64),
+    CharacterLiteral(char),
     StringLiteral(Token),
 
     Identifier(Identifier),

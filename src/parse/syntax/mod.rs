@@ -418,7 +418,11 @@ impl AST {
                 self.expr_dollar_number(tokens, tok_idx, &tok)
             }
             // single token (e.g. integer) literals or ident
-            TokenType::Integer | TokenType::Float | TokenType::String | TokenType::Identifier => {
+            TokenType::Integer
+            | TokenType::Float
+            | TokenType::String
+            | TokenType::Character
+            | TokenType::Identifier => {
                 tokens.next();
 
                 self.expr_push(Expr {
@@ -438,6 +442,10 @@ impl AST {
                                 .expect("float scanning or getting token text is broken"),
                         ),
                         TokenType::String => ExprVariant::StringLiteral(tok),
+                        TokenType::Character => ExprVariant::CharacterLiteral(
+                            util::tok_parse_char(tokens, tok)
+                                .expect("failed to get char from Token"),
+                        ),
                         TokenType::Identifier => ExprVariant::Identifier(Identifier {
                             name: tok,
 
@@ -454,7 +462,9 @@ impl AST {
             TokenType::While => self.parse_while(tokens),
             TokenType::Function => self.parse_function(tokens),
             TokenType::KWInteger | TokenType::KWFloat => self.parse_number_type_literal(tokens),
-            TokenType::Record | TokenType::Variant | TokenType::Enum => self.parse_record_literal(tokens),
+            TokenType::Record | TokenType::Variant | TokenType::Enum => {
+                self.parse_record_literal(tokens)
+            }
             // if no atom or other (e.g. prefix) expr is found return Unit
             _ => self.expr_unit(tok_idx),
         }

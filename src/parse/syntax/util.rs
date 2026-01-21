@@ -1,9 +1,54 @@
 use crate::{
     parse::{
-        AST, ExprVariant, ScopeRefersTo, ScopeVariant, Type, ast_contents::{ExprID, ScopeID, TypeID}
+        AST, ExprVariant, ScopeVariant, Type,
+        ast_contents::{ExprID, ScopeID, TypeID},
     },
+    scan::{Token, TokenType},
     tokens::Tokens,
 };
+
+// util function that will attempt to parse char from Token
+// so needs to be Character token and not malformed
+// malformed would imply bug in char scanner function
+pub fn tok_parse_char(tokens: &Tokens, tok: Token) -> Option<char> {
+    if tok.ttype != TokenType::Character {
+        return None;
+    }
+
+    let tok_str = tokens.tok_as_str(&tok);
+
+    let mut chars = tok_str.chars();
+
+    if chars.next()? != '\'' {
+        return None;
+    }
+
+    let c;
+
+    match chars.next()? {
+        // esc sequence
+        '\\' => {
+            c = match chars.next()? {
+                'n' => '\n',
+                't' => '\t',
+                '\\' => '\\',
+                '\'' => '\'',
+                _ => return None,
+            };
+        }
+
+        // regular char
+        other @ _ => {
+            c = other;
+        }
+    }
+
+    if chars.next()? != '\'' {
+        return None;
+    }
+
+    Some(c)
+}
 
 impl AST {
     pub fn type_to_string(&self, tokens: &Tokens, type_id: TypeID) -> String {
@@ -15,10 +60,7 @@ impl AST {
             Type::Error => "error".to_string(),
             Type::Unit => "Unit".to_string(),
             Type::AnyType => "AnyType".to_string(),
-            Type::Type(t) => format!(
-                "type({})",
-                self.type_to_string(tokens, t),
-            ),
+            Type::Type(t) => format!("type({})", self.type_to_string(tokens, t),),
             Type::AnyModule => "AnyModule".to_string(),
             Type::Module(_) => "module".to_string(),
             Type::Alias(t) => self.type_to_string(tokens, t),
@@ -40,10 +82,7 @@ impl AST {
                 self.type_to_string(tokens, params),
                 self.type_to_string(tokens, ret),
             ),
-            Type::Builtin(builtin) => format!(
-                "(builtin {})",
-                builtin.get_builtin_name(),
-            ),
+            Type::Builtin(builtin) => format!("(builtin {})", builtin.get_builtin_name(),),
             Type::Slice((idx, t)) => format!(
                 "[{}]{}",
                 self.expr_to_string(tokens, idx),
@@ -66,10 +105,9 @@ impl AST {
 
                 format!("({} {})", variant_string, name)
             }
-            Type::ImportTarget(scope_id) => format!(
-                "(from {})",
-                self.scope_to_string(tokens, scope_id),
-            )
+            Type::ImportTarget(scope_id) => {
+                format!("(from {})", self.scope_to_string(tokens, scope_id),)
+            }
         }
     }
 
@@ -79,10 +117,7 @@ impl AST {
             None => "(anonymous)".to_string(),
         };
 
-        format!(
-            "(scope {})",
-            name,
-        )
+        format!("(scope {})", name,)
     }
 
     pub fn expr_to_string(&self, tokens: &Tokens, expr: ExprID) -> String {
