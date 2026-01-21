@@ -241,11 +241,17 @@ impl AST {
             return;
         }
 
+        let arg_type_id = self.type_resolve_aliasing(arg_struct.type_id);
+
+        // if it is single-element tuple then get inner type out
+
+        // TODO: get inner type out if single-element tuple
+
         // perform semantic analysis unique to specific builtin
 
         match builtin {
             Builtin::Map | Builtin::List => {
-                let inner_type_id = match self.objs.type_get(arg_struct.type_id) {
+                let inner_type_id = match self.objs.type_get(arg_type_id) {
                     Type::Type(type_id) => *type_id,
                     _ => {
                         self.invalid_operation(expr, "arg to Map or List should be a type");
@@ -273,8 +279,31 @@ impl AST {
                 self.analyze_generic_push_get_exists(ctx, scope, expr, builtin, arg);
             }
 
-            Builtin::Malloc => {}
-            Builtin::Mfree => {}
+            Builtin::Malloc => {
+                let inner_type_id = match self.objs.type_get(arg_type_id) {
+                    Type::Type(type_id) => *type_id,
+                    _ => {
+                        self.invalid_operation(expr, "provide type argument for memory allocation");
+                        return;
+                    }
+                };
+
+                let type_id = self.type_from_inner(inner_type_id, Type::Ref);
+
+                let expr_mut = self.objs.expr_mut(expr);
+
+                expr_mut.type_id = type_id;
+                expr_mut.finalized = true;
+            }
+            Builtin::Mfree => {
+                let inner_type_id = match self.objs.type_get(arg_type_id) {
+                    Type::Ref(type_id) => *type_id,
+                    _ => {
+                        self.invalid_operation(expr, "provide ref argument for memory allocation");
+                        return;
+                    }
+                };
+            }
 
             Builtin::GetWD => {}
             Builtin::SetWD => {}
