@@ -64,9 +64,43 @@ pub fn tok_parse_string(tokens: &Tokens, tok: Token) -> Option<String> {
         return None;
     }
 
-    
+    let mut ret_string = String::new();
 
-    None
+    let mut found_end_quote = false;
+    let mut is_escaped = false;
+
+    while let Some(c) = chars.next() {
+        if is_escaped {
+            is_escaped = false;
+
+            let push_c = match c {
+                'n' => '\n',
+                't' => '\t',
+                'r' => '\r',
+                _ => c,
+            };
+
+            ret_string.push(push_c);
+        } else {
+            if c == '"' {
+                found_end_quote = true;
+                break;
+            } else if c == '\\' {
+                is_escaped = true;
+            } else {
+                ret_string.push(c);
+            }
+        }
+    }
+
+    // should have found terminating quote
+    // => should be no further chars
+
+    if !found_end_quote || chars.next().is_some() {
+        return None;
+    }
+
+    Some(ret_string)
 }
 
 impl AST {
