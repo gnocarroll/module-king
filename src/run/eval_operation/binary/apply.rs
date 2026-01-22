@@ -3,7 +3,7 @@ use std::iter::zip;
 use crate::{
     parse::{
         AST, TypeVariant,
-        ast_contents::{ExprID, FunctionID, TypeID},
+        ast_contents::{ExprID, FunctionID, TypeID}, builtin::Builtin,
     },
     run::{
         ExecutionContext,
@@ -12,7 +12,7 @@ use crate::{
         eval,
         eval_operation::binary::do_assignment,
         expr_to_unit,
-        util::{allocate_instances_from_pattern, runtime_ref_to_function, runtime_ref_to_type},
+        util::{allocate_instances_from_pattern, runtime_ref_to_builtin, runtime_ref_to_function, runtime_ref_to_type},
     },
 };
 
@@ -30,6 +30,8 @@ pub fn eval_operation_apply(
         return eval_operation_apply_function(ast, ctx, expr, function_id, args_ref);
     } else if let Some(type_id) = runtime_ref_to_type(ast, ctx, runtime_ref) {
         return eval_operation_apply_cast(ast, ctx, expr, type_id, args_ref);
+    } else if let Some(builtin) = runtime_ref_to_builtin(ast, ctx, runtime_ref) {
+        return eval_operation_apply_builtin(ast, ctx, expr, builtin, args_ref);
     }
 
     return Err(RuntimeException {
@@ -186,4 +188,14 @@ fn eval_operation_apply_cast(
     }
 
     Ok(expr_to_unit(ast, ctx, expr))
+}
+
+fn eval_operation_apply_builtin(
+    ast: &AST,
+    ctx: &mut ExecutionContext,
+    expr: ExprID,
+    builtin: Builtin,
+    args: RuntimeReference,
+) -> Result<RuntimeReference, RuntimeException> {
+
 }

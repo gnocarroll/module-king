@@ -1,7 +1,7 @@
 use crate::{
     parse::{
         AST, MemberVariant,
-        ast_contents::{FunctionID, PatternID, ScopeID, TypeID},
+        ast_contents::{FunctionID, PatternID, ScopeID, TypeID}, builtin::Builtin,
     },
     run::{
         ExecutionContext,
@@ -74,6 +74,17 @@ pub fn runtime_ref_to_type(
             }
         }
 
+        _ => None,
+    }
+}
+
+pub fn runtime_ref_to_builtin(
+    _ast: &AST,
+    ctx: &mut ExecutionContext,
+    runtime_ref: RuntimeReference,
+) -> Option<Builtin> {
+    match &ctx.objs.ref_get(runtime_ref).variant {
+        ValueVariant::Builtin(builtin) => Some(*builtin),
         _ => None,
     }
 }

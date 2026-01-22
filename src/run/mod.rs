@@ -146,6 +146,13 @@ fn eval(
             }
             .to_runtime_ref(ctx, ctx.curr_scope));
         }
+        Type::Builtin(builtin) => {
+            return Ok(Value {
+                type_id: Some(type_id),
+                variant: ValueVariant::Builtin(*builtin),
+            }
+            .to_runtime_ref(ctx, ctx.curr_scope));
+        }
         _ => (),
     }
 
@@ -175,7 +182,7 @@ fn eval(
             return eval_operation(ast, ctx, expr, *operation);
         }
         ExprVariant::Identifier(ident) => ValueVariant::Identifier(ident.member_id),
-        
+
         // named function literal returns unit but if not named then return expr id
         ExprVariant::FunctionLiteral(func) => {
             if type_id == unit_type_id {
