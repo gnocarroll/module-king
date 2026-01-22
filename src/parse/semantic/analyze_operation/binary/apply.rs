@@ -1,5 +1,5 @@
 use crate::{
-    constants::BOOLEAN_TYPE,
+    constants::{BOOLEAN_TYPE, INTEGER_TYPE},
     parse::{
         AST, ExprVariant, MemberVariant, ScopeVariant, Type, TypeVariant, Visibility,
         ast_contents::{ExprID, FunctionID, ScopeID, TypeID},
@@ -378,23 +378,82 @@ impl AST {
         builtin: Builtin,
         arg: ExprID,
     ) {
-        let arg_count_err_msg = "should be two args to push, get, exists";
+        let arg_count_err_msg = "should be two args to push, get, exists or one arg to len";
 
-        let arg_struct = self.objs.expr(arg);
+        // used later since this is inner type of String
+        let integer_type_id = self.get_builtin_type_id(INTEGER_TYPE);
 
-        let mut tuple_iter = arg_struct.type_id.to_tuple_iterator(self);
+        let arg_type_id = self.type_unwrap_if_single_tuple(self.objs.expr(arg).type_id);
+
+        let mut tuple_iter = arg_type_id.to_tuple_iterator(self);
+
+        // attempt to get arg1 type and then analyze to make sure it is Ref to some container type
+        // then will be able to find what container type and what is type of container's values
 
         let arg1_type_id = match tuple_iter.next() {
-            Some(type_id) => type_id,
+            Some(type_id) => self.type_resolve_aliasing(type_id),
             None => {
                 self.invalid_operation(expr, arg_count_err_msg);
                 return;
             }
         };
 
+        // should be Ref to container so get out type it is Ref to if possible
+
+        let arg1_type = self.objs.type_get(arg1_type_id).clone();
+        let ref_to_type_id;
+
+        if let Type::Ref(type_id) = arg1_type {
+            ref_to_type_id = self.type_resolve_aliasing(type_id);
+        } else {
+            self.invalid_operation(
+                expr,
+                "ensure arg1 is Ref to a container (so e.g. not container itself but Ref)",
+            );
+            return;
+        }
+
+        // now will get out type which there is a Ref to
+        // and for these functions it should be one of the builtin containers hence var name here
+
+        let arg1_container_type = self.objs.type_get(ref_to_type_id).clone();
+
+        // inner type id is type of values in container e.g. Integer for String
+        let inner_type_id;
+
+        match &arg1_container_type {
+            Type::List(type_id) | Type::Map(type_id) => {
+                inner_type_id = self.type_resolve_aliasing(*type_id);
+            } // Ok
+            Type::String => {
+                // chars in String will just be Integers in this interpreter
+                inner_type_id = integer_type_id;
+            } // Ok
+            _ => {
+                self.invalid_operation(
+                    expr,
+                    "arg1 to push/get/exists/len should be List, Map, String",
+                );
+                return;
+            }
+        }
+
         let arg2_type_id = match tuple_iter.next() {
-            Some(type_id) => type_id,
+            Some(type_id) => self.type_resolve_aliasing(type_id),
             None => {
+                // if len is being called that is good, it takes one arg
+                if builtin == Builtin::GenericLen {
+                    // 1 arg that has already been check for correctness
+                    // => can set return type (Integer) and finalize expr
+
+                    let expr_mut = self.objs.expr_mut(expr);
+
+                    expr_mut.type_id = integer_type_id;
+                    expr_mut.finalized = true;
+
+                    return;
+                }
+
                 self.invalid_operation(expr, arg_count_err_msg);
                 return;
             }
@@ -410,37 +469,27 @@ impl AST {
             None => (), // Ok
         }
 
-        let arg1_type = self.objs.type_get(arg1_type_id).clone();
-        let inner_type_id;
-
-        match &arg1_type {
-            Type::List(type_id) | Type::Map(type_id) => {
-                inner_type_id = *type_id;
-            } // Ok
-            _ => {
-                self.invalid_operation(expr, "arg1 to push/get/exists should be List or Map");
-                return;
-            }
-        }
-
         let arg2_type = self.objs.type_get(arg2_type_id).clone();
 
-        match (builtin, arg1_type, arg2_type) {
-            // List
-            (Builtin::GenericPush, Type::List(_), _) => {
+        match (builtin, arg1_container_type, arg2_type) {
+            // String/List
+            (Builtin::GenericPush, Type::String | Type::List(_), _) => {
                 if !self.type_eq(inner_type_id, arg2_type_id) {
-                    self.invalid_operation(expr, "arg2 should match inner type of List");
+                    self.invalid_operation(
+                        expr,
+                        "arg2 should match inner type of List/String (in case of String always Integer)",
+                    );
                     return;
                 }
             }
-            (Builtin::GenericGet | Builtin::GenericExists, Type::List(_), _) => {
+            (Builtin::GenericGet | Builtin::GenericExists, Type::String | Type::List(_), _) => {
                 // provide integer type to index List
 
                 if !matches!(
                     self.type_get_variant(arg2_type_id),
                     Some(TypeVariant::Integer)
                 ) {
-                    self.invalid_operation(expr, "use integer type to index list");
+                    self.invalid_operation(expr, "use integer type to index String or List");
                     return;
                 }
             }

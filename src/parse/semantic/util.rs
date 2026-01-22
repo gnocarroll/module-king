@@ -483,9 +483,12 @@ impl AST {
     }
 
     // if type is a single element tuple pull out inner type otherwise return arg
+    // also removes aliasing on input/output type(s)
     pub fn type_unwrap_if_single_tuple(&self, type_id: TypeID) -> TypeID {
+        let type_id = self.type_resolve_aliasing(type_id);
+
         match self.objs.type_get(type_id) {
-            Type::Tuple((t, None)) => *t,
+            Type::Tuple((t, None)) => self.type_resolve_aliasing(*t),
             _ => type_id
         }
     }
