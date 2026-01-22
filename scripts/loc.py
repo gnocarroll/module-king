@@ -30,7 +30,7 @@ parser.add_argument(
 
 ext: str = parser.parse_args().ext
 
-def listdir_r(path: str = ".") -> Generator[str, None, None]:
+def listdir_recursive(path: str = ".") -> Generator[str, None, None]:
     """
     Similar to os.listdir except returns full paths (not just filenames)
     and is recursive so will recurse to child dirs
@@ -49,12 +49,12 @@ def listdir_r(path: str = ".") -> Generator[str, None, None]:
         if not is_dir:
             yield child_path_str
         else:
-            for result in listdir_r(child_path_str):
+            for result in listdir_recursive(child_path_str):
                 yield result
 
 loc = 0
 
-for filepath in listdir_r(SRC_DIR):
+for filepath in listdir_recursive(SRC_DIR):
     # only add loc from files with right ext
 
     if not filepath.endswith(ext):
