@@ -1,9 +1,12 @@
+mod run_builtin;
+
 use std::iter::zip;
 
 use crate::{
     parse::{
         AST, TypeVariant,
-        ast_contents::{ExprID, FunctionID, TypeID}, builtin::Builtin,
+        ast_contents::{ExprID, FunctionID, TypeID},
+        builtin::Builtin,
     },
     run::{
         ExecutionContext,
@@ -12,7 +15,10 @@ use crate::{
         eval,
         eval_operation::binary::do_assignment,
         expr_to_unit,
-        util::{allocate_instances_from_pattern, runtime_ref_to_builtin, runtime_ref_to_function, runtime_ref_to_type},
+        util::{
+            allocate_instances_from_pattern, runtime_ref_to_builtin, runtime_ref_to_function,
+            runtime_ref_to_type,
+        },
     },
 };
 
@@ -197,5 +203,36 @@ fn eval_operation_apply_builtin(
     builtin: Builtin,
     args: RuntimeReference,
 ) -> Result<RuntimeReference, RuntimeException> {
+    let type_id = ast.objs.expr(expr).type_id;
 
+    let type_id = ast.type_resolve_aliasing(type_id);
+
+    let variant = match builtin {
+        // These two return types so no real corresponding Rust function
+        Builtin::Map | Builtin::List => ValueVariant::Type(type_id),
+
+        Builtin::GenericPush => "Generic_push",
+        Builtin::GenericGet => "Generic_get",
+        Builtin::GenericExists => "Generic_exists",
+        Builtin::GenericLen => "Generic_len",
+
+        Builtin::Malloc => "m_alloc",
+        Builtin::Mfree => "m_free",
+
+        Builtin::GetWD => run_builtin::get_wd(expr)?,
+        Builtin::SetWD => run_builtin::set_wd(ast, ctx, expr, args)?,
+
+        Builtin::DirList => "dir_list",
+        Builtin::FileRead => "file_read",
+
+        Builtin::BuiltinCount => {
+            panic!("should not have builtin with value BuiltinCount in interpreter")
+        }
+    };
+
+    Ok(Value {
+        type_id: Some(type_id),
+        variant,
+    }
+    .to_runtime_ref(ctx, ctx.curr_scope))
 }

@@ -332,9 +332,12 @@ impl AST {
                     return;
                 }
 
+                // ret indicates if set wd was successful (true => success)
+                let boolean_type_id = self.get_builtin_type_id(BOOLEAN_TYPE);
+
                 let expr_mut = self.objs.expr_mut(expr);
 
-                expr_mut.type_id = TypeID::unit();
+                expr_mut.type_id = boolean_type_id;
                 expr_mut.finalized = true;
             }
 

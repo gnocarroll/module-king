@@ -7,7 +7,6 @@ count total LOC in src directory
 """
 
 import argparse
-import os
 from pathlib import Path
 from typing import Generator
 

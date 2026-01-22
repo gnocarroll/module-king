@@ -13,4 +13,5 @@ pub enum RuntimeErrorVariant {
     MemberDNE,
     BadIdent,
     UnexpectedType,
+    BuiltinFailed,
 }
