@@ -1,6 +1,6 @@
 // Module which enumerates builtin functions and allows for retrieval of their names
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 #[repr(u8)]
 pub enum Builtin {
     // create generic type

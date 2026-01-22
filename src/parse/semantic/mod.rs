@@ -1,19 +1,13 @@
 mod analyze_operation;
-pub mod builtin;
 mod util;
 
 use crate::{
     constants::{BOOLEAN_TYPE, ERROR_TYPE, FLOAT_TYPE, INTEGER_TYPE, STRING_TYPE, UNIT_TYPE},
     parse::{
-        AST, ExprReturns, ExprVariant, Identifier, IdentifierVariant, Member, MemberVariant,
-        Operation, Pattern, PatternVariant, Scope, ScopeRefersTo, ScopeVariant, TokenOrString,
-        Tokens, Type, TypeVariant, Visibility,
-        ast_contents::{ExprID, FunctionID, PatternID, ScopeID, TypeID},
-        errors::{
+        AST, ExprReturns, ExprVariant, Identifier, IdentifierVariant, Member, MemberVariant, Operation, Pattern, PatternVariant, Scope, ScopeRefersTo, ScopeVariant, TokenOrString, Tokens, Type, TypeVariant, Visibility, ast_contents::{ExprID, FunctionID, PatternID, ScopeID, TypeID}, builtin::Builtin, errors::{
             DuplicateName, ExpectedExprReturns, ExpectedType, ExprAndType, InvalidExpr,
             PatternError, SemanticError, UnexpectedExpr,
-        },
-        semantic::builtin::Builtin,
+        }
     },
     scan::TokenType,
 };

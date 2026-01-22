@@ -127,6 +127,8 @@ fn eval(
 
     let type_id = ast.objs.expr(expr).type_id;
 
+    let type_id = ast.type_resolve_aliasing(type_id);
+
     // if expr is a type itself or a module do not need to do any work
 
     match ast.objs.type_get(type_id) {
@@ -173,7 +175,7 @@ fn eval(
             return eval_operation(ast, ctx, expr, *operation);
         }
         ExprVariant::Identifier(ident) => ValueVariant::Identifier(ident.member_id),
-
+        
         // named function literal returns unit but if not named then return expr id
         ExprVariant::FunctionLiteral(func) => {
             if type_id == unit_type_id {

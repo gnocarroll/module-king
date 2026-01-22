@@ -4,6 +4,7 @@ use crate::{
     parse::{
         AST, MemberVariant, ScopeVariant, Type, TypeVariant, Visibility,
         ast_contents::{FunctionID, MemberID, ScopeID, TypeID},
+        builtin::Builtin,
     },
     run::ExecutionContext,
 };
@@ -63,6 +64,8 @@ pub enum ValueVariant {
 
     Module(ScopeID),
     Function(FunctionID),
+
+    Builtin(Builtin),
 }
 
 #[derive(Clone)]
@@ -157,6 +160,10 @@ impl RuntimeReference {
             ValueVariant::Float(val) => val.to_string(),
             ValueVariant::Boolean(val) => val.to_string(),
             ValueVariant::String(s) => s.clone(),
+            ValueVariant::Builtin(builtin) => format!(
+                "(builtin {})",
+                builtin.get_builtin_name(),
+            ),
             ValueVariant::Record(map) => {
                 let member_strings: Vec<String> = map
                     .iter()
@@ -221,7 +228,8 @@ impl RuntimeReference {
             | ValueVariant::Ref(_)
             | ValueVariant::String(_)
             | ValueVariant::Function(_)
-            | ValueVariant::Type(_) => value,
+            | ValueVariant::Type(_)
+            | ValueVariant::Builtin(_) => value,
             ValueVariant::Identifier(ident) => {
                 return ctx
                     .objs
@@ -636,7 +644,6 @@ impl ContextObjects {
 
         self.ret_locations[ret_location.id as usize]
     }
-
 
     pub fn ret_location_top(&mut self) -> RuntimeReference {
         if self.ret_locations.len() <= 1 {

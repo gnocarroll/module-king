@@ -1,4 +1,5 @@
 pub mod ast_contents;
+pub mod builtin;
 mod errors;
 pub mod operator;
 pub mod scope_members;
@@ -8,9 +9,9 @@ mod syntax;
 use crate::{
     parse::{
         ast_contents::{ASTContents, ExprID, FunctionID, MemberID, PatternID, ScopeID, TypeID},
+        builtin::Builtin,
         errors::{ParseError, SemanticError},
         scope_members::ScopeMembers,
-        semantic::builtin::Builtin,
     },
     scan::{Token, TokenType},
     tokens::{ExpectedToken, TokenOrString, Tokens},

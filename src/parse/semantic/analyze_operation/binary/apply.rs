@@ -3,7 +3,8 @@ use crate::{
     parse::{
         AST, ExprVariant, MemberVariant, ScopeVariant, Type, TypeVariant, Visibility,
         ast_contents::{ExprID, FunctionID, ScopeID, TypeID},
-        semantic::{SemanticContext, builtin::Builtin},
+        builtin::Builtin,
+        semantic::SemanticContext,
     },
 };
 

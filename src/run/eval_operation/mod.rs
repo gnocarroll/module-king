@@ -31,7 +31,8 @@ pub fn eval_eager(
             | ValueVariant::Record(_)
             | ValueVariant::String(_)
             | ValueVariant::Tuple(_)
-            | ValueVariant::Type(_) => return Ok(runtime_ref),
+            | ValueVariant::Type(_)
+            | ValueVariant::Builtin(_) => return Ok(runtime_ref),
             ValueVariant::Identifier(ident) => {
                 return Ok(ctx.objs.instance_get(ident).expect("MEMBER NOT ALLOCATED"));
             }
