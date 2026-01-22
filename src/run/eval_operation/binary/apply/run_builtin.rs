@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use crate::{
-    parse::{AST, ast_contents::ExprID},
+    parse::{AST, ast_contents::ExprID, builtin::Builtin},
     run::{
         ExecutionContext,
         context_contents::{RuntimeReference, ValueVariant},
@@ -9,13 +9,42 @@ use crate::{
     },
 };
 
-pub fn generic_push(
+pub fn container_generic(
     ast: &AST,
     ctx: &mut ExecutionContext,
     expr: ExprID,
+    builtin: Builtin,
     args: RuntimeReference,
 ) -> Result<ValueVariant, RuntimeException> {
-    
+    let args_tuple = match ctx.objs.ref_get(args).variant {
+        ValueVariant::Tuple(args_tuple) => args_tuple,
+        _ => panic!("should be tuple of args"),
+    };
+
+    let container_ref_value_id = match args_tuple.get(0) {
+        Some(id) => *id,
+        None => panic!("for generic there should be first arg which is container ref"),
+    };
+
+    let container = match ctx
+        .objs
+        .ref_get(RuntimeReference {
+            scope: args.scope,
+            value_id: container_ref_value_id,
+        })
+        .variant
+    {
+        ValueVariant::Ref(container) => container,
+        _ => panic!("first arg should be Ref for Generic"),
+    };
+
+    let value_variant = match &ctx.objs.ref_get(args).variant {
+        ValueVariant::String(s) => match builtin {
+
+        }
+    };
+
+    Ok(value_variant)
 }
 
 pub fn get_wd(expr: ExprID) -> Result<ValueVariant, RuntimeException> {

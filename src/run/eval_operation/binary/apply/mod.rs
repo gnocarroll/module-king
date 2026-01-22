@@ -211,19 +211,21 @@ fn eval_operation_apply_builtin(
         // These two return types so no real corresponding Rust function
         Builtin::Map | Builtin::List => ValueVariant::Type(type_id),
 
-        Builtin::GenericPush => "Generic_push",
-        Builtin::GenericGet => "Generic_get",
-        Builtin::GenericExists => "Generic_exists",
-        Builtin::GenericLen => "Generic_len",
+        Builtin::GenericPush
+        | Builtin::GenericGet
+        | Builtin::GenericExists
+        | Builtin::GenericLen => run_builtin::container_generic(ast, ctx, expr, builtin, args)?,
 
-        Builtin::Malloc => "m_alloc",
-        Builtin::Mfree => "m_free",
+        // TODO: start working on these allocation-related builtins
+        Builtin::Malloc => ValueVariant::Unit,
+        Builtin::Mfree => ValueVariant::Unit,
 
         Builtin::GetWD => run_builtin::get_wd(expr)?,
         Builtin::SetWD => run_builtin::set_wd(ast, ctx, expr, args)?,
 
-        Builtin::DirList => "dir_list",
-        Builtin::FileRead => "file_read",
+        // TODO: start working on these file-related builtins
+        Builtin::DirList => ValueVariant::Unit,
+        Builtin::FileRead => ValueVariant::Unit,
 
         Builtin::BuiltinCount => {
             panic!("should not have builtin with value BuiltinCount in interpreter")
