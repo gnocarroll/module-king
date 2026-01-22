@@ -66,6 +66,10 @@ pub enum ValueVariant {
     Function(FunctionID),
 
     Builtin(Builtin),
+
+    // Containers (String is also a container but it is above)
+    List(Vec<ValueID>),
+    Map(HashMap<String, ValueID>),
 }
 
 #[derive(Clone)]
@@ -137,7 +141,13 @@ impl RuntimeReference {
             ValueVariant::Type(type_id) => {
                 format!("type({})", ast.type_to_string(ctx.tokens, *type_id),)
             }
-            ValueVariant::Tuple(values) => {
+            ValueVariant::Tuple(values) | ValueVariant::List(values) => {
+                let variant_str = match value.variant {
+                    ValueVariant::Tuple(_) => "tuple",
+                    ValueVariant::List(_) => "List",
+                    _ => panic!("should be guaranteed to be Tuple or List"),
+                };
+
                 // get string for each value
 
                 let element_strings: Vec<String> = values
@@ -153,18 +163,21 @@ impl RuntimeReference {
 
                 // combine
 
-                format!("({})", element_strings.join(", "))
+                format!("{}({})", variant_str, element_strings.join(", "),)
             }
             ValueVariant::Unit => "Unit".to_string(),
             ValueVariant::Integer(val) => val.to_string(),
             ValueVariant::Float(val) => val.to_string(),
             ValueVariant::Boolean(val) => val.to_string(),
             ValueVariant::String(s) => s.clone(),
-            ValueVariant::Builtin(builtin) => format!(
-                "(builtin {})",
-                builtin.get_builtin_name(),
-            ),
-            ValueVariant::Record(map) => {
+            ValueVariant::Builtin(builtin) => format!("(builtin {})", builtin.get_builtin_name(),),
+            ValueVariant::Record(map) | ValueVariant::Map(map) => {
+                let variant_str = match value.variant {
+                    ValueVariant::Record(_) => "record",
+                    ValueVariant::Map(_) => "Map",
+                    _ => panic!("should be guarnateed to be Record or Map"),
+                };
+
                 let member_strings: Vec<String> = map
                     .iter()
                     .map(|(name, value_id)| {
@@ -178,7 +191,7 @@ impl RuntimeReference {
                     })
                     .collect();
 
-                format!("({})", member_strings.join(", "))
+                format!("{}({})", variant_str, member_strings.join(", "),)
             }
             ValueVariant::Module(scope_id) => {
                 let scope = ast.objs.scope(*scope_id);
@@ -237,7 +250,15 @@ impl RuntimeReference {
                     .expect("should have been alloced")
                     .dup_in_scope(ast, ctx, target_scope);
             }
-            ValueVariant::Tuple(value_id_vec) => {
+            ValueVariant::Tuple(value_id_vec) | ValueVariant::List(value_id_vec) => {
+                let to_variant = {
+                    match value.variant {
+                        ValueVariant::Tuple(_) => ValueVariant::Tuple,
+                        ValueVariant::List(_) => ValueVariant::List,
+                        _ => panic!("should be List or Tuple"),
+                    }
+                };
+
                 let new_vec: Vec<ValueID> = value_id_vec
                     .iter()
                     .map(|value_id| {
@@ -255,10 +276,18 @@ impl RuntimeReference {
 
                 Value {
                     type_id: value.type_id,
-                    variant: ValueVariant::Tuple(new_vec),
+                    variant: to_variant(new_vec),
                 }
             }
-            ValueVariant::Record(map) => {
+            ValueVariant::Record(map) | ValueVariant::Map(map) => {
+                let to_variant = {
+                    match value.variant {
+                        ValueVariant::Record(_) => ValueVariant::Record,
+                        ValueVariant::Map(_) => ValueVariant::Map,
+                        _ => panic!("should be List or Tuple"),
+                    }
+                };
+
                 let new_map: HashMap<String, ValueID> = map
                     .iter()
                     .map(|(name, value_id)| {
@@ -279,7 +308,7 @@ impl RuntimeReference {
 
                 Value {
                     type_id: value.type_id,
-                    variant: ValueVariant::Record(new_map),
+                    variant: to_variant(new_map),
                 }
             }
         };

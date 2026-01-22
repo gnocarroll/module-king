@@ -9,6 +9,15 @@ use crate::{
     },
 };
 
+pub fn generic_push(
+    ast: &AST,
+    ctx: &mut ExecutionContext,
+    expr: ExprID,
+    args: RuntimeReference,
+) -> Result<ValueVariant, RuntimeException> {
+    
+}
+
 pub fn get_wd(expr: ExprID) -> Result<ValueVariant, RuntimeException> {
     let s = match std::env::current_dir() {
         Ok(s) => match s.to_str() {

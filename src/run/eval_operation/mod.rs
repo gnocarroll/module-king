@@ -32,7 +32,9 @@ pub fn eval_eager(
             | ValueVariant::String(_)
             | ValueVariant::Tuple(_)
             | ValueVariant::Type(_)
-            | ValueVariant::Builtin(_) => return Ok(runtime_ref),
+            | ValueVariant::Builtin(_)
+            | ValueVariant::List(_)
+            | ValueVariant::Map(_) => return Ok(runtime_ref),
             ValueVariant::Identifier(ident) => {
                 return Ok(ctx.objs.instance_get(ident).expect("MEMBER NOT ALLOCATED"));
             }
@@ -75,7 +77,7 @@ fn eval_operation_begin(
 
     ctx.pop_curr_scope();
 
-    return Ok(expr_to_unit(ast, ctx, expr))
+    return Ok(expr_to_unit(ast, ctx, expr));
 }
 
 fn eval_operation_unary(
