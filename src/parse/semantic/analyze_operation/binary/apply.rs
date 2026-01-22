@@ -279,8 +279,11 @@ impl AST {
                 expr_mut.finalized = true;
             }
 
-            Builtin::GenericPush | Builtin::GenericGet | Builtin::GenericExists => {
-                self.analyze_generic_push_get_exists(ctx, scope, expr, builtin, arg);
+            Builtin::GenericPush
+            | Builtin::GenericGet
+            | Builtin::GenericExists
+            | Builtin::GenericLen => {
+                self.analyze_generic_push_get_exists_len(ctx, scope, expr, builtin, arg);
             }
 
             Builtin::Malloc => {
@@ -367,7 +370,7 @@ impl AST {
         }
     }
 
-    fn analyze_generic_push_get_exists(
+    fn analyze_generic_push_get_exists_len(
         &mut self,
         _ctx: &mut SemanticContext,
         _scope: ScopeID,

@@ -7,10 +7,11 @@ pub enum Builtin {
     Map,
     List,
 
-    // push to or get from generic type or check if idx/key exists
+    // functions to work with builtin containers e.g. List, Map, String
     GenericPush,
     GenericGet,
     GenericExists,
+    GenericLen,
 
     // heap allocation/free
     Malloc,
@@ -56,6 +57,7 @@ impl Builtin {
             GenericPush => "Generic_push",
             GenericGet => "Generic_get",
             GenericExists => "Generic_exists",
+            GenericLen => "Generic_len",
 
             Malloc => "m_alloc",
             Mfree => "m_free",
