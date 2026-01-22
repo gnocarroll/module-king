@@ -40,7 +40,7 @@ pub fn container_generic(
 
     let arg_count_err_msg = "should be one arg for len and two for other generics";
 
-    let arg2 = match (builtin, args_tuple.get(1)) {
+    let arg2_rref = match (builtin, args_tuple.get(1)) {
         (Builtin::GenericLen, None) => None, // Ok
         (_, Some(value_id)) => Some(RuntimeReference {
             scope: args.scope,
@@ -49,47 +49,43 @@ pub fn container_generic(
         _ => panic!("{arg_count_err_msg}"),
     };
 
-    let builtin_variant_err_msg =
-        "should be one of the builtin container-related functions e.g. push";
+    let arg2 = arg2_rref.map(|rref| ctx.objs.ref_get(rref).variant.clone());
 
     let container_variant = &ctx.objs.ref_get(container).variant;
 
     let value_variant = match &container_variant {
-        ValueVariant::String(_) => {
+        ValueVariant::String(s) => {
             if builtin == Builtin::GenericLen {
-                let map = match container_variant {
-                    ValueVariant::Map(map) => map,
-                    _ => panic!("expected Map"),
-                };
-
-                ValueVariant::Integer(map.len() as i64)
+                ValueVariant::Integer(s.len() as i64)
             } else {
+                let arg2 = arg2.expect("should be arg2 for this Generic");
+
+                match (builtin, arg2) {
+                    (Builtin::GenericExists, ValueVariant::Integer(i)) => ValueVariant::Unit,
+                    (Builtin::GenericGet, ValueVariant::Integer(i)) => ValueVariant::Unit,
+                    (Builtin::GenericPush, ValueVariant::Integer(i)) => {
+                        let c = i as u8 as char;
+
+                        ValueVariant::Unit
+                    }
+                    _ => panic!("")
+                }
+            }
+        }
+        ValueVariant::List(vec) => {
+            if builtin == Builtin::GenericLen {
+                ValueVariant::Integer(vec.len() as i64)
+            } else {
+                let arg2 = arg2.expect("should be arg2 for this Generic");
 
                 ValueVariant::Unit
             }
         }
-        ValueVariant::List(_) => {
+        ValueVariant::Map(map) => {
             if builtin == Builtin::GenericLen {
-                let map = match container_variant {
-                    ValueVariant::Map(map) => map,
-                    _ => panic!("expected Map"),
-                };
-
                 ValueVariant::Integer(map.len() as i64)
             } else {
-
-                ValueVariant::Unit
-            }
-        }
-        ValueVariant::Map(_) => {
-            if builtin == Builtin::GenericLen {
-                let map = match container_variant {
-                    ValueVariant::Map(map) => map,
-                    _ => panic!("expected Map"),
-                };
-
-                ValueVariant::Integer(map.len() as i64)
-            } else {
+                let arg2 = arg2.expect("should be arg2 for this Generic");
 
                 ValueVariant::Unit
             }
