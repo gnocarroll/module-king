@@ -257,7 +257,7 @@ pub enum ExprVariant {
     IntegerLiteral(u64),
     FloatLiteral(f64),
     CharacterLiteral(char),
-    StringLiteral(String),
+    StringLiteral(Vec<u8>),
 
     Identifier(Identifier),
 

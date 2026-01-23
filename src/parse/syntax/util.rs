@@ -50,8 +50,8 @@ pub fn tok_parse_char(tokens: &Tokens, tok: Token) -> Option<char> {
     Some(c)
 }
 
-// similar to above but for String Token -> String
-pub fn tok_parse_string(tokens: &Tokens, tok: Token) -> Option<String> {
+// similar to above but for String Token -> Vec<u8>
+pub fn tok_parse_string(tokens: &Tokens, tok: Token) -> Option<Vec<u8>> {
     if tok.ttype != TokenType::String {
         return None;
     }
@@ -64,33 +64,38 @@ pub fn tok_parse_string(tokens: &Tokens, tok: Token) -> Option<String> {
         return None;
     }
 
-    let mut ret_string = String::new();
+    let mut ret_string = Vec::<u8>::new();
 
     let mut found_end_quote = false;
     let mut is_escaped = false;
 
     while let Some(c) = chars.next() {
-        if is_escaped {
+        let push_c = if is_escaped {
             is_escaped = false;
 
-            let push_c = match c {
+            match c {
                 'n' => '\n',
                 't' => '\t',
                 'r' => '\r',
                 _ => c,
-            };
-
-            ret_string.push(push_c);
+            }
         } else {
             if c == '"' {
                 found_end_quote = true;
                 break;
             } else if c == '\\' {
                 is_escaped = true;
+                continue;
             } else {
-                ret_string.push(c);
+                c
             }
-        }
+        };
+
+        ret_string.push(
+            push_c
+                .try_into()
+                .expect("should have made sure all chars were valid u8 earlier"),
+        );
     }
 
     // should have found terminating quote
@@ -181,14 +186,11 @@ impl AST {
             ExprVariant::IntegerLiteral(i) => i.to_string(),
             ExprVariant::FloatLiteral(f) => f.to_string(),
             ExprVariant::CharacterLiteral(c) => c.to_string(),
-            ExprVariant::StringLiteral(t) => t.clone(),
+            ExprVariant::StringLiteral(v) => std::str::from_utf8(v).unwrap().to_string(),
             ExprVariant::Identifier(ident) => tokens.tok_as_str(&ident.name).to_string(),
             ExprVariant::BooleanLiteral(b) => b.to_string(),
             ExprVariant::Underscore => "_".to_string(),
-            ExprVariant::DollarNumber(i) => format!(
-                "${}",
-                i.to_string(),
-            ),
+            ExprVariant::DollarNumber(i) => format!("${}", i.to_string(),),
             ExprVariant::KWType => "KWType".to_string(),
             ExprVariant::KWModule => "KWModule".to_string(),
             ExprVariant::Operation(operation) => {
