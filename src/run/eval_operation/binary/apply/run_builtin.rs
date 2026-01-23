@@ -96,32 +96,27 @@ pub fn container_generic(
     Ok(value_variant)
 }
 
+// get working directory
+// return of empty string indicates problem occurred
 pub fn get_wd(expr: ExprID) -> Result<ValueVariant, RuntimeException> {
+    let empty_string = Ok(ValueVariant::String(b"".to_vec()));
+    
     let s = match std::env::current_dir() {
         Ok(s) => match s.to_str() {
             Some(s) => s.to_string(),
             None => {
-                return Err(RuntimeException {
-                    expr,
-                    variant: RuntimeErrorVariant::BuiltinFailed,
-                });
+                return empty_string;
             }
         },
         Err(_) => {
-            return Err(RuntimeException {
-                expr,
-                variant: RuntimeErrorVariant::BuiltinFailed,
-            });
+            return empty_string;
         }
     };
 
     let path_vec = match crate::util::string_to_ascii(s) {
         Ok(vec) => vec,
         Err(_) => {
-            return Err(RuntimeException {
-                expr,
-                variant: RuntimeErrorVariant::BuiltinFailed,
-            });
+            return empty_string;
         }
     };
 
