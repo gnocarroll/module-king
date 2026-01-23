@@ -98,9 +98,9 @@ pub fn container_generic(
 
 // get working directory
 // return of empty string indicates problem occurred
-pub fn get_wd(expr: ExprID) -> Result<ValueVariant, RuntimeException> {
+pub fn get_wd() -> Result<ValueVariant, RuntimeException> {
     let empty_string = Ok(ValueVariant::String(b"".to_vec()));
-    
+
     let s = match std::env::current_dir() {
         Ok(s) => match s.to_str() {
             Some(s) => s.to_string(),
@@ -124,14 +124,13 @@ pub fn get_wd(expr: ExprID) -> Result<ValueVariant, RuntimeException> {
 }
 
 pub fn set_wd(
-    _ast: &AST,
     ctx: &mut ExecutionContext,
-    _expr: ExprID,
     args: RuntimeReference,
 ) -> Result<ValueVariant, RuntimeException> {
     let path = match &ctx.objs.ref_get(args).variant {
         ValueVariant::String(s) => Path::new(
-            std::str::from_utf8(s).expect("user of interpreter was able to create invalid utf8, indicates bug"),
+            std::str::from_utf8(s)
+                .expect("user of interpreter was able to create invalid utf8, indicates bug"),
         ),
         _ => {
             return Ok(ValueVariant::Boolean(false));

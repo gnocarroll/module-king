@@ -220,8 +220,8 @@ fn eval_operation_apply_builtin(
         Builtin::Malloc => ValueVariant::Unit,
         Builtin::Mfree => ValueVariant::Unit,
 
-        Builtin::GetWD => run_builtin::get_wd(expr)?,
-        Builtin::SetWD => run_builtin::set_wd(ast, ctx, expr, args)?,
+        Builtin::GetWD => run_builtin::get_wd()?,
+        Builtin::SetWD => run_builtin::set_wd(ctx, args)?,
 
         // TODO: start working on these file-related builtins
         Builtin::DirList => ValueVariant::Unit,
