@@ -51,7 +51,7 @@ pub enum ValueVariant {
     Boolean(bool),
     Integer(i64),
     Float(f64),
-    String(String),
+    String(Vec<u8>),
     Identifier(MemberID),
 
     // tuples are "flattened" unlike linked-list structure used elsewhere in codebase
@@ -169,7 +169,9 @@ impl RuntimeReference {
             ValueVariant::Integer(val) => val.to_string(),
             ValueVariant::Float(val) => val.to_string(),
             ValueVariant::Boolean(val) => val.to_string(),
-            ValueVariant::String(s) => s.clone(),
+            ValueVariant::String(s) => std::str::from_utf8(s)
+                .expect("user was able to create invalid utf8, should be impossible")
+                .to_string(),
             ValueVariant::Builtin(builtin) => format!("(builtin {})", builtin.get_builtin_name(),),
             ValueVariant::Record(map) | ValueVariant::Map(map) => {
                 let variant_str = match value.variant {
@@ -453,7 +455,7 @@ fn type_to_value_id(ast: &AST, runtime_scope: &mut RuntimeScope, type_id: TypeID
     let variant = match ast.objs.type_get(type_id) {
         Type::Error => panic!("error type in type_to_value"),
         Type::Unit => ValueVariant::Unit,
-        Type::String => ValueVariant::String("".to_string()),
+        Type::String => ValueVariant::String(b"".to_vec()),
         Type::Scope(scope) => match &ast.objs.scope(*scope).variant {
             ScopeVariant::Type(variant) => match variant {
                 TypeVariant::Integer => ValueVariant::Integer(0),

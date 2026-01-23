@@ -68,7 +68,7 @@ pub fn container_generic(
 
                         ValueVariant::Unit
                     }
-                    _ => panic!("")
+                    _ => panic!(""),
                 }
             }
         }
@@ -115,7 +115,17 @@ pub fn get_wd(expr: ExprID) -> Result<ValueVariant, RuntimeException> {
         }
     };
 
-    Ok(ValueVariant::String(s))
+    let path_vec = match crate::util::string_to_ascii(s) {
+        Ok(vec) => vec,
+        Err(_) => {
+            return Err(RuntimeException {
+                expr,
+                variant: RuntimeErrorVariant::BuiltinFailed,
+            });
+        }
+    };
+
+    Ok(ValueVariant::String(path_vec))
 }
 
 pub fn set_wd(
@@ -125,7 +135,9 @@ pub fn set_wd(
     args: RuntimeReference,
 ) -> Result<ValueVariant, RuntimeException> {
     let path = match &ctx.objs.ref_get(args).variant {
-        ValueVariant::String(s) => Path::new(s),
+        ValueVariant::String(s) => Path::new(
+            std::str::from_utf8(s).expect("user of interpreter was able to create invalid utf8, indicates bug"),
+        ),
         _ => {
             return Ok(ValueVariant::Boolean(false));
         }
