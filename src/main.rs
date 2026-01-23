@@ -11,6 +11,7 @@ mod parse;
 mod run;
 mod scan;
 mod tokens;
+mod util;
 
 const MANIFEST_PATH: &str = env!("CARGO_MANIFEST_DIR");
 
@@ -69,7 +70,7 @@ fn main() -> ExitCode {
 
     // read file(s) into memory
 
-    let mut file_strings: HashMap<String, String> = HashMap::new();
+    let mut file_strings: HashMap<String, Vec<u8>> = HashMap::new();
 
     if let Some(input_files) = args.get("input") {
         for filename in input_files {
@@ -77,6 +78,14 @@ fn main() -> ExitCode {
                 Ok(s) => s,
                 Err(e) => {
                     eprintln!("Failed to read in file {filename}: {e}");
+                    return 1.into();
+                }
+            };
+
+            let file_string = match util::string_to_ascii(file_string) {
+                Ok(vec) => vec,
+                Err(e) => {
+                    eprintln!("{filename} had char which was not convertible to u8: {e}");
                     return 1.into();
                 }
             };
@@ -91,13 +100,21 @@ fn main() -> ExitCode {
             return 1.into();
         }
 
+        let stdin_string = match util::string_to_ascii(stdin_string) {
+            Ok(vec) => vec,
+            Err(e) => {
+                eprintln!("std input had char which was not convertible to u8: {e}");
+                return 1.into();
+            }
+        };
+
         file_strings.insert("STDIN".to_string(), stdin_string);
     }
 
     println!();
 
     for (filename, file_string) in file_strings {
-        let tokens = match scan::tokenize(file_string.as_str()) {
+        let tokens = match scan::tokenize(&file_string) {
             Ok(tokens) => tokens,
             Err(msg) => {
                 eprintln!("Tokenization of file {} failed: {}", filename, msg);
@@ -114,11 +131,11 @@ fn main() -> ExitCode {
                 tok.line,
                 tok.column,
                 tok.ttype,
-                tok.as_str(file_string.as_str()),
+                tok.as_str(&file_string),
             );
         }
 
-        let mut tokens = Tokens::new(file_string.as_str(), &tokens);
+        let mut tokens = Tokens::new(&file_string, &tokens);
 
         let ast = parse::parse_file(filename.as_str(), &mut tokens);
 

@@ -21,9 +21,11 @@ pub struct Tokens<'a> {
 }
 
 impl<'a> Tokens<'a> {
-    pub fn new(file_str: &'a str, tokens: &'a Vec<Token>) -> Self {
+    pub fn new(file_str: &'a [u8], tokens: &'a Vec<Token>) -> Self {
         Tokens {
-            file_str,
+            file_str: std::str::from_utf8(file_str).expect(
+                "earlier checks should guarantee valid utf8 str",
+            ),
             tokens: tokens,
             offset: 0,
         }
@@ -31,7 +33,7 @@ impl<'a> Tokens<'a> {
 
     // Token -> &str
     pub fn tok_as_str(&self, token: &Token) -> &str {
-        token.as_str(self.file_str)
+        token.as_str(self.file_str.as_bytes())
     }
 
     pub fn tok_or_string_to_string(&self, token_or_string: &TokenOrString) -> String {

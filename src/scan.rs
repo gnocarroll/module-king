@@ -516,7 +516,9 @@ pub struct Token {
 
 impl Token {
     // s is string where Token was sourced from
-    pub fn as_str<'a>(&self, s: &'a str) -> &'a str {
+    pub fn as_str<'a>(&self, s: &'a [u8]) -> &'a str {
+        let s = std::str::from_utf8(s).unwrap();
+
         &s[self.offset as usize
             ..(self.offset + self.end_column as u32 - self.column as u32) as usize]
     }
@@ -534,13 +536,20 @@ impl Default for Token {
     }
 }
 
-pub fn tokenize(s: &str) -> Result<Vec<Token>, String> {
+pub fn tokenize(s: &Vec<u8>) -> Result<Vec<Token>, String> {
     // offset in file (s)
     let mut offset = 0;
 
     // line, column are 1-indexed
     let mut line = 1;
     let mut column = 1;
+
+    let s = match std::str::from_utf8(s) {
+        Ok(s) => s,
+        Err(_) => {
+            return Err("could not convert u8 vec to str".to_string());
+        }
+    };
 
     // iterator for use throughout function and Token vec for ret
     let mut chars = s.chars();
