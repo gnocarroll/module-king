@@ -40,6 +40,33 @@ impl RuntimeReference {
     }
 }
 
+// special struct to store reference to a character in a String
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CharReference {
+    pub string_rref: RuntimeReference,
+    pub idx: usize,
+}
+
+impl CharReference {
+    pub fn load(&self, ctx: &ExecutionContext) -> u8 {
+        match &ctx.objs.ref_get(self.string_rref).variant {
+            ValueVariant::String(vec) => {
+                vec[self.idx]
+            }
+            _ => panic!("string ref in CharReference should have ValueVariant::String"),
+        }
+    }
+
+    pub fn store(&self, ctx: &mut ExecutionContext, c: u8) {
+        match &mut ctx.objs.ref_get_mut(self.string_rref).variant {
+            ValueVariant::String(vec) => {
+                vec[self.idx] = c;
+            }
+            _ => panic!("string ref in CharReference should have ValueVariant::String"),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum ValueVariant {
     Unit,
@@ -66,6 +93,8 @@ pub enum ValueVariant {
     Function(FunctionID),
 
     Builtin(Builtin),
+
+    CharReference(CharReference),
 
     // Containers (String is also a container but it is above)
     List(Vec<ValueID>),
@@ -221,6 +250,12 @@ impl RuntimeReference {
             },
             ValueVariant::Ref(runtime_ref) | ValueVariant::ImplicitRef(runtime_ref) => {
                 runtime_ref.to_string(ast, ctx)
+            }
+            ValueVariant::CharReference(CharReference {
+                string_rref,
+                idx,
+            }) => {
+
             }
         }
     }
