@@ -16,10 +16,7 @@ pub fn container_generic(
     builtin: Builtin,
     args: RuntimeReference,
 ) -> Result<ValueVariant, RuntimeException> {
-    let args_tuple = match &ctx.objs.ref_get(args).variant {
-        ValueVariant::Tuple(args_tuple) => args_tuple,
-        _ => panic!("should be tuple of args"),
-    };
+    let args_tuple: Vec<ValueID> = args.to_tuple_value_iterator(&ctx.objs).collect();
 
     let container_ref_value_id = match args_tuple.get(0) {
         Some(id) => *id,
@@ -49,26 +46,45 @@ pub fn container_generic(
         _ => panic!("{arg_count_err_msg}"),
     };
 
-    let arg2 = arg2_rref.map(|rref| ctx.objs.ref_get(rref).variant.clone());
+    let arg2_value_id = arg2_rref.map(|rref| rref.dup_in_scope_get_id(ast, ctx, container.scope));
 
-    let container_variant = &ctx.objs.ref_get(container).variant;
+    let arg2_rref = arg2_value_id.map(|value_id| RuntimeReference {
+        scope: container.scope,
+        value_id,
+    });
 
-    let value_variant = match &container_variant {
+    let arg2_variant = arg2_rref.map(|rref| ctx.objs.ref_get(rref).variant.clone());
+
+    let container_variant = &mut ctx.objs.ref_get_mut(container).variant;
+
+    let value_variant = match container_variant {
         ValueVariant::String(s) => {
             if builtin == Builtin::GenericLen {
                 ValueVariant::Integer(s.len() as i64)
             } else {
-                let arg2 = arg2.expect("should be arg2 for this Generic");
+                let (arg2_variant) = arg2_variant.expect("should have checked for arg2");
 
-                match (builtin, arg2) {
-                    (Builtin::GenericExists, ValueVariant::Integer(i)) => ValueVariant::Unit,
+                match (builtin, arg2_variant) {
+                    (Builtin::GenericExists, ValueVariant::Integer(i)) => {
+                        ValueVariant::Boolean(i >= 0 && (i as usize) < s.len())
+                    }
                     (Builtin::GenericGet, ValueVariant::Integer(i)) => ValueVariant::Unit,
                     (Builtin::GenericPush, ValueVariant::Integer(i)) => {
-                        let c = i as u8 as char;
+                        let c = match i.try_into() {
+                            Ok(c) => c,
+                            Err(_) => {
+                                return Err(RuntimeException {
+                                    expr,
+                                    variant: RuntimeErrorVariant::IntegerOverflow,
+                                });
+                            }
+                        };
+
+                        s.push(c);
 
                         ValueVariant::Unit
                     }
-                    _ => panic!(""),
+                    _ => panic!("arg type invalid, should have been checked during semantic analysis"),
                 }
             }
         }
@@ -76,16 +92,41 @@ pub fn container_generic(
             if builtin == Builtin::GenericLen {
                 ValueVariant::Integer(vec.len() as i64)
             } else {
-                let arg2 = arg2.expect("should be arg2 for this Generic");
+                let (arg2_value_id, arg2_variant) = (
+                    arg2_value_id.expect("should have checked for arg2"),
+                    arg2_variant.expect("should have checked for arg2"),
+                );
 
-                ValueVariant::Unit
+                match (builtin, arg2_variant) {
+                    (Builtin::GenericExists, ValueVariant::Integer(i)) => {
+                        ValueVariant::Boolean(i >= 0 && (i as usize) < vec.len())
+                    }
+                    (Builtin::GenericGet, ValueVariant::Integer(i)) => ValueVariant::Ref(RuntimeReference {
+                        scope: container.scope,
+                        value_id: match vec.get(i as usize) {
+                            Some(id) => *id,
+                            None => {
+                                return Err(RuntimeException { expr, variant: RuntimeErrorVariant::IndexOutOfBounds });
+                            }
+                        },
+                    }),
+                    (Builtin::GenericPush, _) => {
+                        vec.push(arg2_value_id);
+
+                        ValueVariant::Unit
+                    }
+                    _ => panic!("arg type invalid, should have been checked during semantic analysis"),
+                }
             }
         }
         ValueVariant::Map(map) => {
             if builtin == Builtin::GenericLen {
                 ValueVariant::Integer(map.len() as i64)
             } else {
-                let arg2 = arg2.expect("should be arg2 for this Generic");
+                let (arg2_value_id, arg2_variant) = (
+                    arg2_value_id.expect("should have checked for arg2"),
+                    arg2_variant.expect("should have checked for arg2"),
+                );
 
                 ValueVariant::Unit
             }

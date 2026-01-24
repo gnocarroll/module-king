@@ -14,4 +14,5 @@ pub enum RuntimeErrorVariant {
     BadIdent,
     UnexpectedType,
     BuiltinFailed,
+    IndexOutOfBounds,
 }

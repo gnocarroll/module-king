@@ -225,6 +225,17 @@ impl RuntimeReference {
         }
     }
 
+    pub fn dup_in_scope_get_id(
+        &self,
+        ast: &AST,
+        ctx: &mut ExecutionContext,
+        target_scope: RuntimeScopeID,
+    ) -> ValueID {
+        let value = self.dup_in_scope(ast, ctx, target_scope);
+
+        ctx.objs.runtime_scope_mut(target_scope).value_push(value)
+    }
+
     pub fn dup_in_scope(
         &self,
         ast: &AST,
