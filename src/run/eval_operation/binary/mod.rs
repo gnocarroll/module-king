@@ -187,7 +187,16 @@ fn do_assignment(
     ctx: &mut ExecutionContext,
     assign_to_ref: RuntimeReference,
     new_value_ref: RuntimeReference,
-) -> Result<(), RuntimeException> {
+) -> Result<(), RuntimeErrorVariant> {
+    // eager evaluate new value e.g. to pull value out of implicit ref
+
+    let new_value_ref = match eval_eager(ast, ctx, new_value_ref) {
+        Ok(rref) => rref,
+        Err(e) => {
+            return Err(e.variant);
+        },
+    };
+
     let new_value = new_value_ref.dup_in_scope(ast, ctx, assign_to_ref.scope);
 
     // if lhs is identifier then find + overwrite value
@@ -199,9 +208,31 @@ fn do_assignment(
         }
         ValueVariant::ImplicitRef(rref) => {
             ctx.objs.ref_set(rref, new_value);
+            return Ok(());
         }
         ValueVariant::ImplicitCharReference(char_ref) => {
-            
+            let i_value = match new_value.variant {
+                ValueVariant::Integer(i) => i,
+                _ => panic!("value being assigned to char ref does not have type Integer"),
+            };
+
+            let value: u8 = match i_value.try_into() {
+                Ok(i) => i,
+                Err(_) => {
+                    return Err(RuntimeErrorVariant::IntegerOverflow);
+                } 
+            };
+
+            // now place new value at index indicated by CharRef
+
+            match &mut ctx.objs.ref_get_mut(char_ref.string_rref).variant {
+                ValueVariant::String(s) => {
+                    s[char_ref.idx] = value;
+                }
+                _ => panic!("should be String ref"),
+            }
+
+            return Ok(());
         }
         _ => (),
     }
@@ -225,7 +256,15 @@ fn eval_operation_eq(
     let assign_to_ref = eval(ast, ctx, operand1)?;
     let new_value_ref = eval(ast, ctx, operand2)?;
 
-    do_assignment(ast, ctx, assign_to_ref, new_value_ref);
+    match do_assignment(ast, ctx, assign_to_ref, new_value_ref) {
+        Ok(_) => (),
+        Err(variant) => {
+            return Err(RuntimeException {
+                expr,
+                variant,
+            });
+        }
+    }
 
     Ok(expr_to_unit(ast, ctx, expr))
 }
@@ -345,7 +384,12 @@ pub fn eval_operation_binary(
 
                     let rhs = eval(ast, ctx, operand2)?;
 
-                    do_assignment(ast, ctx, lhs, rhs);
+                    match do_assignment(ast, ctx, lhs, rhs) {
+                        Ok(_) => (),
+                        Err(variant) => {
+                            return Err(RuntimeException { expr, variant });
+                        }
+                    }
                 }
                 _ => todo!("other assignment"),
             }

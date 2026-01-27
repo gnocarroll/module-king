@@ -39,9 +39,11 @@ impl RuntimeReference {
         }
     }
 
+    // will count Ptr as form of "reference"
+
     pub fn is_ref_variant(&self, ctx: &ExecutionContext) -> bool {
         match &ctx.objs.ref_get(*self).variant {
-            ValueVariant::Ref(_) | ValueVariant::CharReference(_) => true,
+            ValueVariant::Ref(_) | ValueVariant::CharReference(_) | ValueVariant::Ptr(_) => true,
             _ => false,
         }
     }
@@ -56,8 +58,8 @@ impl RuntimeReference {
                 let type_id = ast.type_resolve_aliasing(type_id);
 
                 match ast.objs.type_get(type_id) {
-                    Type::Ref(id) => Some(*id),
-                    _ => panic!("should be Ref type"),
+                    Type::Ref(id) | Type::Ptr(id) => Some(*id),
+                    _ => panic!("should be Ref (includes Ptr) type"),
                 }
             }
             None => None,
@@ -65,7 +67,7 @@ impl RuntimeReference {
 
         let ret_variant = match variant {
             ValueVariant::CharReference(char_ref) => ValueVariant::ImplicitCharReference(*char_ref),
-            ValueVariant::Ref(rref) => ValueVariant::ImplicitRef(*rref),
+            ValueVariant::Ref(rref) | ValueVariant::Ptr(rref) => ValueVariant::ImplicitRef(*rref),
             _ => panic!("expected some Ref ValueVariant"),
         };
 
@@ -132,6 +134,8 @@ pub enum ValueVariant {
 
     Ref(RuntimeReference),
     ImplicitRef(RuntimeReference),
+
+    Ptr(RuntimeReference),
 
     Module(ScopeID),
     Function(FunctionID),
@@ -293,9 +297,9 @@ impl RuntimeReference {
                 Some(runtime_ref) => runtime_ref.to_string(ast, ctx),
                 None => "ERR_IDENT_DNE".to_string(),
             },
-            ValueVariant::Ref(runtime_ref) | ValueVariant::ImplicitRef(runtime_ref) => {
-                runtime_ref.to_string(ast, ctx)
-            }
+            ValueVariant::Ref(runtime_ref)
+            | ValueVariant::Ptr(runtime_ref)
+            | ValueVariant::ImplicitRef(runtime_ref) => runtime_ref.to_string(ast, ctx),
             ValueVariant::CharReference(char_ref) => {
                 format!("(char ref to {})", char_ref.load(ctx))
             }
@@ -332,6 +336,7 @@ impl RuntimeReference {
             | ValueVariant::Module(_)
             | ValueVariant::ImplicitRef(_)
             | ValueVariant::Ref(_)
+            | ValueVariant::Ptr(_)
             | ValueVariant::ImplicitCharReference(_)
             | ValueVariant::CharReference(_)
             | ValueVariant::String(_)
