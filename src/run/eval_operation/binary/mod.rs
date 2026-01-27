@@ -187,7 +187,7 @@ fn do_assignment(
     ctx: &mut ExecutionContext,
     assign_to_ref: RuntimeReference,
     new_value_ref: RuntimeReference,
-) {
+) -> Result<(), RuntimeException> {
     let new_value = new_value_ref.dup_in_scope(ast, ctx, assign_to_ref.scope);
 
     // if lhs is identifier then find + overwrite value
@@ -195,7 +195,13 @@ fn do_assignment(
     match ctx.objs.ref_get(assign_to_ref).variant {
         ValueVariant::Identifier(member_id) => {
             ctx.objs.instance_set(member_id, new_value);
-            return;
+            return Ok(());
+        }
+        ValueVariant::ImplicitRef(rref) => {
+            ctx.objs.ref_set(rref, new_value);
+        }
+        ValueVariant::ImplicitCharReference(char_ref) => {
+            
         }
         _ => (),
     }
@@ -205,6 +211,8 @@ fn do_assignment(
     ctx.objs
         .runtime_scope_mut(assign_to_ref.scope)
         .value_overwrite(assign_to_ref.value_id, new_value);
+
+    Ok(())
 }
 
 fn eval_operation_eq(

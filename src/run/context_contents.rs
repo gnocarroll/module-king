@@ -79,7 +79,10 @@ impl RuntimeReference {
                 variant: ret_variant,
             });
 
-        RuntimeReference { scope: ctx.curr_scope, value_id }
+        RuntimeReference {
+            scope: ctx.curr_scope,
+            value_id,
+        }
     }
 }
 
@@ -93,9 +96,7 @@ pub struct CharReference {
 impl CharReference {
     pub fn load(&self, ctx: &ExecutionContext) -> u8 {
         match &ctx.objs.ref_get(self.string_rref).variant {
-            ValueVariant::String(vec) => {
-                vec[self.idx]
-            }
+            ValueVariant::String(vec) => vec[self.idx],
             _ => panic!("string ref in CharReference should have ValueVariant::String"),
         }
     }
@@ -678,6 +679,11 @@ impl ContextObjects {
     pub fn ref_get_mut(&mut self, runtime_ref: RuntimeReference) -> &mut Value {
         self.runtime_scope_mut(runtime_ref.scope)
             .value_mut(runtime_ref.value_id)
+    }
+
+    pub fn ref_set(&mut self, runtime_ref: RuntimeReference, new_value: Value) {
+        self.runtime_scope_mut(runtime_ref.scope)
+            .value_overwrite(runtime_ref.value_id, new_value);
     }
 
     // return scope and value for full locat
