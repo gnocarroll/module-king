@@ -1,6 +1,7 @@
 mod binary;
 
 use crate::{
+    constants::INTEGER_TYPE,
     parse::{AST, Operation, ast_contents::ExprID},
     run::{
         ExecutionContext, Value, ValueVariant,
@@ -14,7 +15,7 @@ use crate::{
 };
 
 pub fn eval_eager(
-    _ast: &AST,
+    ast: &AST,
     ctx: &mut ExecutionContext,
     runtime_ref: RuntimeReference,
 ) -> Result<RuntimeReference, RuntimeException> {
@@ -22,6 +23,8 @@ pub fn eval_eager(
 
     loop {
         match ctx.objs.ref_get(runtime_ref).variant {
+            // Ref types are returned by value
+            // However for IMPLICIT ref types to eager evaluate get value out
             ValueVariant::Unit
             | ValueVariant::Boolean(_)
             | ValueVariant::Float(_)
@@ -34,12 +37,32 @@ pub fn eval_eager(
             | ValueVariant::Type(_)
             | ValueVariant::Builtin(_)
             | ValueVariant::List(_)
-            | ValueVariant::Map(_) => return Ok(runtime_ref),
+            | ValueVariant::Map(_)
+            | ValueVariant::Ref(_)
+            | ValueVariant::CharReference(_) => return Ok(runtime_ref),
             ValueVariant::Identifier(ident) => {
                 return Ok(ctx.objs.instance_get(ident).expect("MEMBER NOT ALLOCATED"));
             }
-            ValueVariant::Ref(r) | ValueVariant::ImplicitRef(r) => {
+            ValueVariant::ImplicitRef(r) => {
                 runtime_ref = r;
+            }
+            ValueVariant::ImplicitCharReference(char_ref) => {
+                // get value out of char ref and then convert to i64 for ValueVariant::Integer
+
+                let type_id = Some(ast.get_builtin_type_id(INTEGER_TYPE));
+                let variant = ValueVariant::Integer(char_ref.load(ctx) as i64);
+
+                // push value to CURRENT SCOPE
+
+                let value_id = ctx
+                    .objs
+                    .runtime_scope_mut(ctx.curr_scope)
+                    .value_push(Value { type_id, variant });
+
+                return Ok(RuntimeReference {
+                    scope: ctx.curr_scope,
+                    value_id: value_id,
+                });
             }
         }
     }

@@ -38,6 +38,49 @@ impl RuntimeReference {
             value_id: self.value_id,
         }
     }
+
+    pub fn is_ref_variant(&self, ctx: &ExecutionContext) -> bool {
+        match &ctx.objs.ref_get(*self).variant {
+            ValueVariant::Ref(_) | ValueVariant::CharReference(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn deref(&self, ast: &AST, ctx: &mut ExecutionContext) -> RuntimeReference {
+        let Value { type_id, variant } = &ctx.objs.ref_get(*self);
+
+        let type_id = *type_id;
+
+        let ret_type_id = match type_id {
+            Some(type_id) => {
+                let type_id = ast.type_resolve_aliasing(type_id);
+
+                match ast.objs.type_get(type_id) {
+                    Type::Ref(id) => Some(*id),
+                    _ => panic!("should be Ref type"),
+                }
+            }
+            None => None,
+        };
+
+        let ret_variant = match variant {
+            ValueVariant::CharReference(char_ref) => ValueVariant::ImplicitCharReference(*char_ref),
+            ValueVariant::Ref(rref) => ValueVariant::ImplicitRef(*rref),
+            _ => panic!("expected some Ref ValueVariant"),
+        };
+
+        // push value to CURRENT SCOPE
+
+        let value_id = ctx
+            .objs
+            .runtime_scope_mut(ctx.curr_scope)
+            .value_push(Value {
+                type_id: ret_type_id,
+                variant: ret_variant,
+            });
+
+        RuntimeReference { scope: ctx.curr_scope, value_id }
+    }
 }
 
 // special struct to store reference to a character in a String
@@ -95,6 +138,7 @@ pub enum ValueVariant {
     Builtin(Builtin),
 
     CharReference(CharReference),
+    ImplicitCharReference(CharReference),
 
     // Containers (String is also a container but it is above)
     List(Vec<ValueID>),
@@ -251,11 +295,11 @@ impl RuntimeReference {
             ValueVariant::Ref(runtime_ref) | ValueVariant::ImplicitRef(runtime_ref) => {
                 runtime_ref.to_string(ast, ctx)
             }
-            ValueVariant::CharReference(CharReference {
-                string_rref,
-                idx,
-            }) => {
-
+            ValueVariant::CharReference(char_ref) => {
+                format!("(char ref to {})", char_ref.load(ctx))
+            }
+            ValueVariant::ImplicitCharReference(char_ref) => {
+                format!("{}", char_ref.load(ctx))
             }
         }
     }
@@ -287,6 +331,8 @@ impl RuntimeReference {
             | ValueVariant::Module(_)
             | ValueVariant::ImplicitRef(_)
             | ValueVariant::Ref(_)
+            | ValueVariant::ImplicitCharReference(_)
+            | ValueVariant::CharReference(_)
             | ValueVariant::String(_)
             | ValueVariant::Function(_)
             | ValueVariant::Type(_)

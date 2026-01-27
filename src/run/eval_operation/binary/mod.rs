@@ -110,7 +110,14 @@ fn eval_operation_period(
     operand1: ExprID,
     operand2: ExprID,
 ) -> Result<RuntimeReference, RuntimeException> {
-    let value_ref = eval(ast, ctx, operand1)?;
+    let mut value_ref = eval(ast, ctx, operand1)?;
+
+    // auto deref as much as possible like in Rust
+
+    while value_ref.is_ref_variant(ctx) {
+        value_ref = value_ref.deref(ast, ctx);
+    }
+
     let member_ref = eval(ast, ctx, operand2)?;
 
     let value_to_access = ctx.objs.ref_get(value_ref);
