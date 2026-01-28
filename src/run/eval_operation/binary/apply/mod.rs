@@ -10,7 +10,7 @@ use crate::{
     },
     run::{
         ExecutionContext,
-        context_contents::{RuntimeReference, Value, ValueID, ValueVariant},
+        context_contents::{RuntimeRef, Value, ValueID, ValueVariant},
         error::{RuntimeErrorVariant, RuntimeException},
         eval,
         eval_operation::binary::do_assignment,
@@ -28,7 +28,7 @@ pub fn eval_operation_apply(
     expr: ExprID,
     operand1: ExprID,
     operand2: ExprID,
-) -> Result<RuntimeReference, RuntimeException> {
+) -> Result<RuntimeRef, RuntimeException> {
     let runtime_ref = eval(ast, ctx, operand1)?;
     let args_ref = eval(ast, ctx, operand2)?;
 
@@ -51,8 +51,8 @@ fn eval_operation_apply_function(
     ctx: &mut ExecutionContext,
     _expr: ExprID,
     function_id: FunctionID,
-    args: RuntimeReference,
-) -> Result<RuntimeReference, RuntimeException> {
+    args: RuntimeRef,
+) -> Result<RuntimeRef, RuntimeException> {
     // save ID of outside scope, switch to function scope
 
     let outside_scope = ctx.curr_scope;
@@ -74,10 +74,10 @@ fn eval_operation_apply_function(
 
     let args_value_ids: Vec<ValueID> = args.to_tuple_value_iterator(&ctx.objs).collect();
 
-    let args_refs: Vec<RuntimeReference> = args_value_ids
+    let args_refs: Vec<RuntimeRef> = args_value_ids
         .into_iter()
         .map(|value_id| {
-            RuntimeReference {
+            RuntimeRef {
                 value_id,
                 scope: args.scope,
             }
@@ -133,8 +133,8 @@ fn eval_operation_apply_cast(
     ctx: &mut ExecutionContext,
     expr: ExprID,
     type_id: TypeID,
-    args: RuntimeReference,
-) -> Result<RuntimeReference, RuntimeException> {
+    args: RuntimeRef,
+) -> Result<RuntimeRef, RuntimeException> {
     let value_variant = match ast.type_get_variant(type_id) {
         Some(TypeVariant::Integer) => {
             let i = match ctx.objs.ref_get(args).variant {
@@ -201,8 +201,8 @@ fn eval_operation_apply_builtin(
     ctx: &mut ExecutionContext,
     expr: ExprID,
     builtin: Builtin,
-    args: RuntimeReference,
-) -> Result<RuntimeReference, RuntimeException> {
+    args: RuntimeRef,
+) -> Result<RuntimeRef, RuntimeException> {
     let type_id = ast.objs.expr(expr).type_id;
 
     let type_id = ast.type_resolve_aliasing(type_id);

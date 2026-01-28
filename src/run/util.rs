@@ -5,7 +5,7 @@ use crate::{
     },
     run::{
         ExecutionContext,
-        context_contents::{RuntimeReference, ValueVariant},
+        context_contents::{RuntimeRef, ValueVariant},
     },
 };
 
@@ -43,7 +43,7 @@ pub fn allocate_instances_from_pattern(
 pub fn runtime_ref_to_function(
     ast: &AST,
     ctx: &mut ExecutionContext,
-    runtime_ref: RuntimeReference,
+    runtime_ref: RuntimeRef,
 ) -> Option<FunctionID> {
     match &ctx.objs.ref_get(runtime_ref).variant {
         ValueVariant::Function(function_id) => Some(*function_id),
@@ -63,7 +63,7 @@ pub fn runtime_ref_to_function(
 pub fn runtime_ref_to_type(
     ast: &AST,
     ctx: &mut ExecutionContext,
-    runtime_ref: RuntimeReference,
+    runtime_ref: RuntimeRef,
 ) -> Option<TypeID> {
     match &ctx.objs.ref_get(runtime_ref).variant {
         ValueVariant::Type(type_id) => Some(*type_id),
@@ -81,7 +81,7 @@ pub fn runtime_ref_to_type(
 pub fn runtime_ref_to_builtin(
     _ast: &AST,
     ctx: &mut ExecutionContext,
-    runtime_ref: RuntimeReference,
+    runtime_ref: RuntimeRef,
 ) -> Option<Builtin> {
     match &ctx.objs.ref_get(runtime_ref).variant {
         ValueVariant::Builtin(builtin) => Some(*builtin),

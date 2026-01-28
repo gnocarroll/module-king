@@ -25,12 +25,12 @@ pub struct RetLocationID {
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub struct RuntimeReference {
+pub struct RuntimeRef {
     pub scope: RuntimeScopeID,
     pub value_id: ValueID,
 }
 
-impl RuntimeReference {
+impl RuntimeRef {
     pub fn to_tuple_value_iterator<'a>(&self, objs: &'a ContextObjects) -> TupleValueIterator<'a> {
         TupleValueIterator {
             idx: 0,
@@ -48,7 +48,7 @@ impl RuntimeReference {
         }
     }
 
-    pub fn deref(&self, ast: &AST, ctx: &mut ExecutionContext) -> RuntimeReference {
+    pub fn deref(&self, ast: &AST, ctx: &mut ExecutionContext) -> RuntimeRef {
         let Value { type_id, variant } = &ctx.objs.ref_get(*self);
 
         let type_id = *type_id;
@@ -81,7 +81,7 @@ impl RuntimeReference {
                 variant: ret_variant,
             });
 
-        RuntimeReference {
+        RuntimeRef {
             scope: ctx.curr_scope,
             value_id,
         }
@@ -91,7 +91,7 @@ impl RuntimeReference {
 // special struct to store reference to a character in a String
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct CharRef {
-    pub string_rref: RuntimeReference,
+    pub string_rref: RuntimeRef,
     pub idx: usize,
 }
 
@@ -132,10 +132,10 @@ pub enum ValueVariant {
 
     Record(HashMap<String, ValueID>),
 
-    Ref(RuntimeReference),
-    ImplicitRef(RuntimeReference),
+    Ref(RuntimeRef),
+    ImplicitRef(RuntimeRef),
 
-    Ptr(RuntimeReference),
+    Ptr(RuntimeRef),
 
     Module(ScopeID),
     Function(FunctionID),
@@ -203,15 +203,15 @@ impl Value {
         self,
         ctx: &mut ExecutionContext,
         scope: RuntimeScopeID,
-    ) -> RuntimeReference {
-        RuntimeReference {
+    ) -> RuntimeRef {
+        RuntimeRef {
             scope,
             value_id: ctx.objs.runtime_scope_mut(scope).value_push(self),
         }
     }
 }
 
-impl RuntimeReference {
+impl RuntimeRef {
     pub fn to_string(&self, ast: &AST, ctx: &ExecutionContext) -> String {
         let value = ctx.objs.ref_get(*self);
 
@@ -231,7 +231,7 @@ impl RuntimeReference {
                 let element_strings: Vec<String> = values
                     .iter()
                     .map(|value_id| {
-                        RuntimeReference {
+                        RuntimeRef {
                             scope: self.scope,
                             value_id: *value_id,
                         }
@@ -261,7 +261,7 @@ impl RuntimeReference {
                 let member_strings: Vec<String> = map
                     .iter()
                     .map(|(name, value_id)| {
-                        let value_string = RuntimeReference {
+                        let value_string = RuntimeRef {
                             scope: self.scope,
                             value_id: *value_id,
                         }
@@ -320,6 +320,20 @@ impl RuntimeReference {
         ctx.objs.runtime_scope_mut(target_scope).value_push(value)
     }
 
+    pub fn dup_in_scope_get_rref(
+        &self,
+        ast: &AST,
+        ctx: &mut ExecutionContext,
+        target_scope: RuntimeScopeID,
+    ) -> RuntimeRef {
+        let value_id = self.dup_in_scope_get_id(ast, ctx, target_scope);
+
+        RuntimeRef {
+            scope: target_scope,
+            value_id,
+        }
+    }
+
     pub fn dup_in_scope(
         &self,
         ast: &AST,
@@ -362,7 +376,7 @@ impl RuntimeReference {
                 let new_vec: Vec<ValueID> = value_id_vec
                     .iter()
                     .map(|value_id| {
-                        let new_value = RuntimeReference {
+                        let new_value = RuntimeRef {
                             scope: self.scope,
                             value_id: *value_id,
                         }
@@ -391,7 +405,7 @@ impl RuntimeReference {
                 let new_map: HashMap<String, ValueID> = map
                     .iter()
                     .map(|(name, value_id)| {
-                        let new_value = RuntimeReference {
+                        let new_value = RuntimeRef {
                             scope: self.scope,
                             value_id: *value_id,
                         }
@@ -491,7 +505,7 @@ pub struct ContextObjects {
     member_map: HashMap<MemberID, RuntimeScopeID>,
 
     // when function is returning value will be placed at top of here
-    ret_locations: Vec<RuntimeReference>,
+    ret_locations: Vec<RuntimeRef>,
 }
 
 impl Default for ContextObjects {
@@ -502,7 +516,7 @@ impl Default for ContextObjects {
         ContextObjects {
             scopes: vec![RuntimeScope::default()],
             member_map: HashMap::new(),
-            ret_locations: vec![RuntimeReference::default()],
+            ret_locations: vec![RuntimeRef::default()],
         }
     }
 }
@@ -676,30 +690,30 @@ impl ContextObjects {
         self.runtime_scope(scope).members[&member_id]
     }
 
-    pub fn ref_get(&self, runtime_ref: RuntimeReference) -> &Value {
+    pub fn ref_get(&self, runtime_ref: RuntimeRef) -> &Value {
         self.runtime_scope(runtime_ref.scope)
             .value(runtime_ref.value_id)
     }
 
-    pub fn ref_get_mut(&mut self, runtime_ref: RuntimeReference) -> &mut Value {
+    pub fn ref_get_mut(&mut self, runtime_ref: RuntimeRef) -> &mut Value {
         self.runtime_scope_mut(runtime_ref.scope)
             .value_mut(runtime_ref.value_id)
     }
 
-    pub fn ref_set(&mut self, runtime_ref: RuntimeReference, new_value: Value) {
+    pub fn ref_set(&mut self, runtime_ref: RuntimeRef, new_value: Value) {
         self.runtime_scope_mut(runtime_ref.scope)
             .value_overwrite(runtime_ref.value_id, new_value);
     }
 
     // return scope and value for full locat
-    pub fn instance_get(&self, member_id: MemberID) -> Option<RuntimeReference> {
+    pub fn instance_get(&self, member_id: MemberID) -> Option<RuntimeRef> {
         if member_id == MemberID::default() {
             panic!("provided bogus MemberID 0");
         }
 
         let scope = *self.member_map.get(&member_id)?;
 
-        Some(RuntimeReference {
+        Some(RuntimeRef {
             scope,
             value_id: self.scope_instance_get(scope, member_id),
         })
@@ -728,7 +742,7 @@ impl ContextObjects {
         ast: &AST,
         scope: RuntimeScopeID,
         member_id: MemberID,
-    ) -> RuntimeReference {
+    ) -> RuntimeRef {
         if scope.id == 0 {
             panic!("provided bogus RuntimeScopeID 0");
         } else if member_id == MemberID::default() {
@@ -755,13 +769,13 @@ impl ContextObjects {
 
         scope_obj.members.insert(member_id, value_id);
 
-        RuntimeReference { scope, value_id }
+        RuntimeRef { scope, value_id }
     }
 
     pub fn ret_location_push(&mut self, scope: RuntimeScopeID) -> RetLocationID {
         let value_id = self.runtime_scope_mut(scope).value_push(Value::default());
 
-        self.ret_locations.push(RuntimeReference {
+        self.ret_locations.push(RuntimeRef {
             scope: scope,
             value_id,
         });
@@ -771,7 +785,7 @@ impl ContextObjects {
         }
     }
 
-    pub fn ret_location(&mut self, ret_location: RetLocationID) -> RuntimeReference {
+    pub fn ret_location(&mut self, ret_location: RetLocationID) -> RuntimeRef {
         if ret_location.id == 0 {
             panic!("Bogus RetLocationID 0");
         }
@@ -779,7 +793,7 @@ impl ContextObjects {
         self.ret_locations[ret_location.id as usize]
     }
 
-    pub fn ret_location_top(&mut self) -> RuntimeReference {
+    pub fn ret_location_top(&mut self) -> RuntimeRef {
         if self.ret_locations.len() <= 1 {
             panic!("No valid ret locations currently exist")
         }

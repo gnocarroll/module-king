@@ -7,7 +7,7 @@ use crate::{
     parse::{AST, Type, ast_contents::ExprID},
     run::{
         ExecutionContext, Value, ValueVariant,
-        context_contents::RuntimeReference,
+        context_contents::RuntimeRef,
         error::{RuntimeErrorVariant, RuntimeException},
         eval,
         eval_operation::{binary::apply::eval_operation_apply, eval_eager},
@@ -77,7 +77,7 @@ fn float_cmp(ttype: TokenType) -> Option<fn(f64, f64) -> bool> {
 fn allocate_instances_from_ref(
     ast: &AST,
     ctx: &mut ExecutionContext,
-    runtime_ref: RuntimeReference,
+    runtime_ref: RuntimeRef,
 ) {
     match ctx.objs.ref_get(runtime_ref).variant {
         ValueVariant::Identifier(member_id) => {
@@ -93,7 +93,7 @@ fn eval_operation_colon(
     _expr: ExprID,
     operand1: ExprID,
     _operand2: ExprID,
-) -> Result<RuntimeReference, RuntimeException> {
+) -> Result<RuntimeRef, RuntimeException> {
     let ret = eval(ast, ctx, operand1);
 
     if let Ok(lhs_ref) = ret {
@@ -109,7 +109,7 @@ fn eval_operation_period(
     expr: ExprID,
     operand1: ExprID,
     operand2: ExprID,
-) -> Result<RuntimeReference, RuntimeException> {
+) -> Result<RuntimeRef, RuntimeException> {
     let mut value_ref = eval(ast, ctx, operand1)?;
 
     // auto deref as much as possible like in Rust
@@ -130,7 +130,7 @@ fn eval_operation_period(
                 .tok_or_string_to_string(&ast.objs.member(*member_id).name);
 
             return match map.get(&name) {
-                Some(value_id) => Ok(RuntimeReference {
+                Some(value_id) => Ok(RuntimeRef {
                     scope: ctx.curr_scope,
                     value_id: *value_id,
                 }),
@@ -168,7 +168,7 @@ fn eval_operation_period(
                 _ => panic!(),
             };
 
-            return Ok(RuntimeReference {
+            return Ok(RuntimeRef {
                 scope: ctx.curr_scope,
                 value_id,
             });
@@ -185,8 +185,8 @@ fn eval_operation_period(
 fn do_assignment(
     ast: &AST,
     ctx: &mut ExecutionContext,
-    assign_to_ref: RuntimeReference,
-    new_value_ref: RuntimeReference,
+    assign_to_ref: RuntimeRef,
+    new_value_ref: RuntimeRef,
 ) -> Result<(), RuntimeErrorVariant> {
     // eager evaluate new value e.g. to pull value out of implicit ref
 
@@ -252,7 +252,7 @@ fn eval_operation_eq(
     expr: ExprID,
     operand1: ExprID,
     operand2: ExprID,
-) -> Result<RuntimeReference, RuntimeException> {
+) -> Result<RuntimeRef, RuntimeException> {
     let assign_to_ref = eval(ast, ctx, operand1)?;
     let new_value_ref = eval(ast, ctx, operand2)?;
 
@@ -275,7 +275,7 @@ fn eval_operation_semi(
     _expr: ExprID,
     operand1: ExprID,
     operand2: ExprID,
-) -> Result<RuntimeReference, RuntimeException> {
+) -> Result<RuntimeRef, RuntimeException> {
     let unit_type = ast.get_builtin_type_id(UNIT_TYPE);
 
     let ret = Ok(Value {
@@ -303,7 +303,7 @@ fn eval_operation_comma(
     expr: ExprID,
     operand1: ExprID,
     operand2: ExprID,
-) -> Result<RuntimeReference, RuntimeException> {
+) -> Result<RuntimeRef, RuntimeException> {
     let operand1_ref = eval(ast, ctx, operand1)?;
     let operand2_ref = eval(ast, ctx, operand2)?;
 
@@ -348,7 +348,7 @@ pub fn eval_operation_binary(
     op: TokenType,
     operand1: ExprID,
     operand2: ExprID,
-) -> Result<RuntimeReference, RuntimeException> {
+) -> Result<RuntimeRef, RuntimeException> {
     let invalid_op = Err(RuntimeException {
         expr,
         variant: RuntimeErrorVariant::InvalidOperation,

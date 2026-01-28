@@ -4,7 +4,7 @@ use crate::{
     parse::{AST, ast_contents::ExprID, builtin::Builtin},
     run::{
         ExecutionContext,
-        context_contents::{CharRef, RuntimeReference, ValueID, ValueVariant},
+        context_contents::{CharRef, RuntimeRef, ValueID, ValueVariant},
         error::{RuntimeErrorVariant, RuntimeException},
     },
 };
@@ -14,7 +14,7 @@ pub fn container_generic(
     ctx: &mut ExecutionContext,
     expr: ExprID,
     builtin: Builtin,
-    args: RuntimeReference,
+    args: RuntimeRef,
 ) -> Result<ValueVariant, RuntimeException> {
     let args_tuple: Vec<ValueID> = args.to_tuple_value_iterator(&ctx.objs).collect();
 
@@ -25,7 +25,7 @@ pub fn container_generic(
 
     let container = match ctx
         .objs
-        .ref_get(RuntimeReference {
+        .ref_get(RuntimeRef {
             scope: args.scope,
             value_id: container_ref_value_id,
         })
@@ -39,7 +39,7 @@ pub fn container_generic(
 
     let arg2_rref = match (builtin, args_tuple.get(1)) {
         (Builtin::GenericLen, None) => None, // Ok
-        (_, Some(value_id)) => Some(RuntimeReference {
+        (_, Some(value_id)) => Some(RuntimeRef {
             scope: args.scope,
             value_id: *value_id,
         }),
@@ -48,7 +48,7 @@ pub fn container_generic(
 
     let arg2_value_id = arg2_rref.map(|rref| rref.dup_in_scope_get_id(ast, ctx, container.scope));
 
-    let arg2_rref = arg2_value_id.map(|value_id| RuntimeReference {
+    let arg2_rref = arg2_value_id.map(|value_id| RuntimeRef {
         scope: container.scope,
         value_id,
     });
@@ -109,7 +109,7 @@ pub fn container_generic(
                         ValueVariant::Boolean(i >= 0 && (i as usize) < vec.len())
                     }
                     (Builtin::GenericGet, ValueVariant::Integer(i)) => {
-                        ValueVariant::Ref(RuntimeReference {
+                        ValueVariant::Ref(RuntimeRef {
                             scope: container.scope,
                             value_id: match vec.get(i as usize) {
                                 Some(id) => *id,
@@ -152,7 +152,7 @@ pub fn container_generic(
                     (Builtin::GenericGet, ValueVariant::String(s)) => {
                         let s = crate::util::ascii_to_string(s);
 
-                        ValueVariant::Ref(RuntimeReference {
+                        ValueVariant::Ref(RuntimeRef {
                             scope: container.scope,
                             value_id: match map.get(&s) {
                                 Some(id) => *id,
@@ -172,7 +172,7 @@ pub fn container_generic(
                             panic!("{err_msg}")
                         }
 
-                        let string_rref = RuntimeReference {
+                        let string_rref = RuntimeRef {
                             scope: arg2_rref.scope,
                             value_id: vec[0],
                         };
@@ -239,7 +239,7 @@ pub fn get_wd() -> Result<ValueVariant, RuntimeException> {
 
 pub fn set_wd(
     ctx: &mut ExecutionContext,
-    args: RuntimeReference,
+    args: RuntimeRef,
 ) -> Result<ValueVariant, RuntimeException> {
     let path = match &ctx.objs.ref_get(args).variant {
         ValueVariant::String(s) => Path::new(
@@ -254,4 +254,24 @@ pub fn set_wd(
     let success = std::env::set_current_dir(path).is_ok();
 
     Ok(ValueVariant::Boolean(success))
+}
+
+pub fn dir_list(ctx: &mut ExecutionContext, args: RuntimeRef) -> ValueVariant {
+    let args_tuple: Vec<ValueID> = args.to_tuple_value_iterator(&ctx.objs).collect();
+
+    let filepath = match ctx
+        .objs
+        .ref_get(RuntimeRef {
+            scope: args.scope,
+            value_id: args_tuple[0],
+        })
+        .variant
+    {
+        ValueVariant::String(s) => s,
+        _ => panic!("should be passing String to dir list"),
+    };
+
+    let filepath = crate::util::ascii_to_string(filepath);
+
+
 }

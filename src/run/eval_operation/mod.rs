@@ -5,7 +5,7 @@ use crate::{
     parse::{AST, Operation, ast_contents::ExprID},
     run::{
         ExecutionContext, Value, ValueVariant,
-        context_contents::RuntimeReference,
+        context_contents::RuntimeRef,
         error::{RuntimeErrorVariant, RuntimeException},
         eval,
         eval_operation::binary::eval_operation_binary,
@@ -17,12 +17,12 @@ use crate::{
 pub fn eval_eager(
     ast: &AST,
     ctx: &mut ExecutionContext,
-    runtime_ref: RuntimeReference,
-) -> Result<RuntimeReference, RuntimeException> {
+    runtime_ref: RuntimeRef,
+) -> Result<RuntimeRef, RuntimeException> {
     let mut runtime_ref = runtime_ref;
 
     loop {
-        match ctx.objs.ref_get(runtime_ref).variant {
+        match &ctx.objs.ref_get(runtime_ref).variant {
             // Ref types are returned by value
             // However for IMPLICIT ref types to eager evaluate get value out
             ValueVariant::Unit
@@ -33,7 +33,6 @@ pub fn eval_eager(
             | ValueVariant::Module(_)
             | ValueVariant::Record(_)
             | ValueVariant::String(_)
-            | ValueVariant::Tuple(_)
             | ValueVariant::Type(_)
             | ValueVariant::Builtin(_)
             | ValueVariant::List(_)
@@ -41,11 +40,54 @@ pub fn eval_eager(
             | ValueVariant::Ref(_)
             | ValueVariant::Ptr(_)
             | ValueVariant::CharRef(_) => return Ok(runtime_ref),
+            ValueVariant::Tuple(value_ids) => {
+                let value_ids = value_ids.clone();
+
+                let type_id = ctx.objs.ref_get(runtime_ref).type_id;
+
+                // will eager evaluate each element in tuple and place new value ids in this Vec
+
+                let mut new_value_ids = Vec::new();
+
+                for value_id in value_ids {
+                    let mut rref = RuntimeRef {
+                        scope: runtime_ref.scope,
+                        value_id,
+                    };
+
+                    // eager evaluate element
+                    
+                    rref = eval_eager(ast, ctx, rref)?;
+
+                    // also if result is not in current scope then duplicate into current scope
+
+                    if rref.scope != ctx.curr_scope {
+                        rref = rref.dup_in_scope_get_rref(ast, ctx, ctx.curr_scope);
+                    }
+
+                    new_value_ids.push(rref.value_id);
+                }
+
+                // now push new tuple value, get ID, and then return rref
+
+                let value_id = ctx
+                    .objs
+                    .runtime_scope_mut(ctx.curr_scope)
+                    .value_push(Value {
+                        type_id,
+                        variant: ValueVariant::Tuple(new_value_ids),
+                    });
+
+                return Ok(RuntimeRef {
+                    scope: ctx.curr_scope,
+                    value_id: value_id,
+                });
+            }
             ValueVariant::Identifier(ident) => {
-                return Ok(ctx.objs.instance_get(ident).expect("MEMBER NOT ALLOCATED"));
+                return Ok(ctx.objs.instance_get(*ident).expect("MEMBER NOT ALLOCATED"));
             }
             ValueVariant::ImplicitRef(r) => {
-                runtime_ref = r;
+                runtime_ref = *r;
             }
             ValueVariant::ImplicitCharRef(char_ref) => {
                 // get value out of char ref and then convert to i64 for ValueVariant::Integer
@@ -60,7 +102,7 @@ pub fn eval_eager(
                     .runtime_scope_mut(ctx.curr_scope)
                     .value_push(Value { type_id, variant });
 
-                return Ok(RuntimeReference {
+                return Ok(RuntimeRef {
                     scope: ctx.curr_scope,
                     value_id: value_id,
                 });
@@ -74,7 +116,7 @@ pub fn eval_operation(
     ctx: &mut ExecutionContext,
     expr: ExprID,
     operation: Operation,
-) -> Result<RuntimeReference, RuntimeException> {
+) -> Result<RuntimeRef, RuntimeException> {
     match (operation.operand1, operation.operand2) {
         (Some(operand), None) => eval_operation_unary(ast, ctx, expr, operation.op, operand),
         (Some(operand1), Some(operand2)) => {
@@ -92,7 +134,7 @@ fn eval_operation_begin(
     ctx: &mut ExecutionContext,
     expr: ExprID,
     operand: ExprID,
-) -> Result<RuntimeReference, RuntimeException> {
+) -> Result<RuntimeRef, RuntimeException> {
     ctx.switch_to_child_scope();
 
     // now contained expr is evaluated inside new scope
@@ -110,7 +152,7 @@ fn eval_operation_unary(
     expr: ExprID,
     op: TokenType,
     operand: ExprID,
-) -> Result<RuntimeReference, RuntimeException> {
+) -> Result<RuntimeRef, RuntimeException> {
     match op {
         TokenType::Begin => return eval_operation_begin(ast, ctx, expr, operand),
         _ => (),

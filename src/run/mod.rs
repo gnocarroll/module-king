@@ -9,7 +9,7 @@ use crate::{
     constants::UNIT_TYPE,
     parse::{AST, ExprVariant, Type, While, ast_contents::ExprID},
     run::{
-        context_contents::{ContextObjects, RuntimeReference, RuntimeScopeID, Value, ValueVariant},
+        context_contents::{ContextObjects, RuntimeRef, RuntimeScopeID, Value, ValueVariant},
         error::{RuntimeErrorVariant, RuntimeException},
         eval_operation::eval_operation,
     },
@@ -61,7 +61,7 @@ impl<'a> ExecutionContext<'a> {
     }
 }
 
-fn expr_to_unit(ast: &AST, ctx: &mut ExecutionContext, expr: ExprID) -> RuntimeReference {
+fn expr_to_unit(ast: &AST, ctx: &mut ExecutionContext, expr: ExprID) -> RuntimeRef {
     let type_id = ast.objs.expr(expr).type_id;
 
     Value {
@@ -77,7 +77,7 @@ fn eval_while(
     ctx: &mut ExecutionContext,
     expr: ExprID,
     while_struct: While,
-) -> Result<RuntimeReference, RuntimeException> {
+) -> Result<RuntimeRef, RuntimeException> {
     // loop here corresponds to while loop in program
 
     loop {
@@ -122,7 +122,7 @@ fn eval(
     ast: &AST,
     ctx: &mut ExecutionContext,
     expr: ExprID,
-) -> Result<RuntimeReference, RuntimeException> {
+) -> Result<RuntimeRef, RuntimeException> {
     // 1. collect some preliminary info on expr
 
     let type_id = ast.objs.expr(expr).type_id;
