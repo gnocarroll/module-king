@@ -40,14 +40,14 @@ pub fn eval_eager(
             | ValueVariant::Map(_)
             | ValueVariant::Ref(_)
             | ValueVariant::Ptr(_)
-            | ValueVariant::CharReference(_) => return Ok(runtime_ref),
+            | ValueVariant::CharRef(_) => return Ok(runtime_ref),
             ValueVariant::Identifier(ident) => {
                 return Ok(ctx.objs.instance_get(ident).expect("MEMBER NOT ALLOCATED"));
             }
             ValueVariant::ImplicitRef(r) => {
                 runtime_ref = r;
             }
-            ValueVariant::ImplicitCharReference(char_ref) => {
+            ValueVariant::ImplicitCharRef(char_ref) => {
                 // get value out of char ref and then convert to i64 for ValueVariant::Integer
 
                 let type_id = Some(ast.get_builtin_type_id(INTEGER_TYPE));

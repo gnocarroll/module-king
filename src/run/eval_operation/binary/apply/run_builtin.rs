@@ -4,7 +4,7 @@ use crate::{
     parse::{AST, ast_contents::ExprID, builtin::Builtin},
     run::{
         ExecutionContext,
-        context_contents::{RuntimeReference, ValueID, ValueVariant},
+        context_contents::{CharRef, RuntimeReference, ValueID, ValueVariant},
         error::{RuntimeErrorVariant, RuntimeException},
     },
 };
@@ -62,13 +62,16 @@ pub fn container_generic(
             if builtin == Builtin::GenericLen {
                 ValueVariant::Integer(s.len() as i64)
             } else {
-                let (arg2_variant) = arg2_variant.expect("should have checked for arg2");
+                let arg2_variant = arg2_variant.expect("should have checked for arg2");
 
                 match (builtin, arg2_variant) {
                     (Builtin::GenericExists, ValueVariant::Integer(i)) => {
                         ValueVariant::Boolean(i >= 0 && (i as usize) < s.len())
                     }
-                    (Builtin::GenericGet, ValueVariant::Integer(i)) => ValueVariant::Unit,
+                    (Builtin::GenericGet, ValueVariant::Integer(i)) => ValueVariant::CharRef(CharRef {
+                        string_rref: container, // container is the String itself
+                        idx: i as usize,
+                    }),
                     (Builtin::GenericPush, ValueVariant::Integer(i)) => {
                         let c = match i.try_into() {
                             Ok(c) => c,
@@ -84,7 +87,9 @@ pub fn container_generic(
 
                         ValueVariant::Unit
                     }
-                    _ => panic!("arg type invalid, should have been checked during semantic analysis"),
+                    _ => panic!(
+                        "arg type invalid, should have been checked during semantic analysis"
+                    ),
                 }
             }
         }
@@ -101,21 +106,28 @@ pub fn container_generic(
                     (Builtin::GenericExists, ValueVariant::Integer(i)) => {
                         ValueVariant::Boolean(i >= 0 && (i as usize) < vec.len())
                     }
-                    (Builtin::GenericGet, ValueVariant::Integer(i)) => ValueVariant::Ref(RuntimeReference {
-                        scope: container.scope,
-                        value_id: match vec.get(i as usize) {
-                            Some(id) => *id,
-                            None => {
-                                return Err(RuntimeException { expr, variant: RuntimeErrorVariant::IndexOutOfBounds });
-                            }
-                        },
-                    }),
+                    (Builtin::GenericGet, ValueVariant::Integer(i)) => {
+                        ValueVariant::Ref(RuntimeReference {
+                            scope: container.scope,
+                            value_id: match vec.get(i as usize) {
+                                Some(id) => *id,
+                                None => {
+                                    return Err(RuntimeException {
+                                        expr,
+                                        variant: RuntimeErrorVariant::IndexOutOfBounds,
+                                    });
+                                }
+                            },
+                        })
+                    }
                     (Builtin::GenericPush, _) => {
                         vec.push(arg2_value_id);
 
                         ValueVariant::Unit
                     }
-                    _ => panic!("arg type invalid, should have been checked during semantic analysis"),
+                    _ => panic!(
+                        "arg type invalid, should have been checked during semantic analysis"
+                    ),
                 }
             }
         }

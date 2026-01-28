@@ -210,7 +210,7 @@ fn do_assignment(
             ctx.objs.ref_set(rref, new_value);
             return Ok(());
         }
-        ValueVariant::ImplicitCharReference(char_ref) => {
+        ValueVariant::ImplicitCharRef(char_ref) => {
             let i_value = match new_value.variant {
                 ValueVariant::Integer(i) => i,
                 _ => panic!("value being assigned to char ref does not have type Integer"),
