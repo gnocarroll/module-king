@@ -25,6 +25,9 @@ pub enum Builtin {
     DirList,
     FileRead,
 
+    IsFile,
+    IsDir,
+
     // do not set discriminants and keep this last and it will be correct
     BuiltinCount,
 }
@@ -67,6 +70,9 @@ impl Builtin {
 
             DirList => "dir_list",
             FileRead => "file_read",
+
+            IsFile => "is_file",
+            IsDir => "is_dir",
 
             BuiltinCount => "",
         }
