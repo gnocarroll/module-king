@@ -231,7 +231,7 @@ fn eval_operation_apply_builtin(
 
         // TODO: start working on these file-related builtins
         Builtin::DirList => run_builtin::dir_list(ctx, args),
-        Builtin::FileRead => ValueVariant::Unit,
+        Builtin::FileRead => run_builtin::file_read(ctx, args),
 
         Builtin::IsFile => run_builtin::is_file(ctx, args),
         Builtin::IsDir => run_builtin::is_dir(ctx, args),

@@ -317,6 +317,17 @@ pub fn dir_list(ctx: &mut ExecutionContext, args: RuntimeRef) -> ValueVariant {
     ValueVariant::Tuple(value_ids)
 }
 
+pub fn file_read(ctx: &mut ExecutionContext, args: RuntimeRef) -> ValueVariant {
+    let filepath = args_to_string(ctx, args);
+
+    let contents = match std::fs::read_to_string(filepath) {
+        Ok(s) => s,
+        Err(_) => "".to_string(),
+    };
+
+    ValueVariant::String(contents.into())
+}
+
 // check if provided string is a filepath to some file
 pub fn is_file(ctx: &ExecutionContext, args: RuntimeRef) -> ValueVariant {
     let filepath = args_to_string(ctx, args);
