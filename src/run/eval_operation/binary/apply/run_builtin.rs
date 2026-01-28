@@ -256,7 +256,7 @@ pub fn set_wd(
     Ok(ValueVariant::Boolean(success))
 }
 
-pub fn dir_list(ctx: &mut ExecutionContext, args: RuntimeRef) -> ValueVariant {
+fn args_to_string(ctx: &ExecutionContext, args: RuntimeRef) -> String {
     let args_tuple: Vec<ValueID> = args.to_tuple_value_iterator(&ctx.objs).collect();
 
     let filepath = match &ctx
@@ -271,7 +271,11 @@ pub fn dir_list(ctx: &mut ExecutionContext, args: RuntimeRef) -> ValueVariant {
         _ => panic!("should be passing String to dir list"),
     };
 
-    let filepath = crate::util::ascii_to_string(filepath);
+    crate::util::ascii_to_string(filepath)
+}
+
+pub fn dir_list(ctx: &mut ExecutionContext, args: RuntimeRef) -> ValueVariant {
+    let filepath = args_to_string(ctx, args);
 
     // if problem occurs then will just return empty list
 
@@ -311,4 +315,18 @@ pub fn dir_list(ctx: &mut ExecutionContext, args: RuntimeRef) -> ValueVariant {
     }
 
     ValueVariant::Tuple(value_ids)
+}
+
+// check if provided string is a filepath to some file
+pub fn is_file(ctx: &ExecutionContext, args: RuntimeRef) -> ValueVariant {
+    let filepath = args_to_string(ctx, args);
+
+    ValueVariant::Boolean(std::path::Path::new(&filepath).is_file())
+}
+
+// check if provided string is a filepath to some dir
+pub fn is_dir(ctx: &ExecutionContext, args: RuntimeRef) -> ValueVariant {
+    let filepath = args_to_string(ctx, args);
+
+    ValueVariant::Boolean(std::path::Path::new(&filepath).is_dir())
 }
