@@ -164,6 +164,14 @@ fn eval_operation_unary(
         (TokenType::Minus, ValueVariant::Integer(i)) => ValueVariant::Integer(-i),
         (TokenType::Minus, ValueVariant::Float(f)) => ValueVariant::Float(-f),
 
+        // deref
+        (TokenType::Star, ValueVariant::Ref(rref) | ValueVariant::Ptr(rref)) => {
+            ValueVariant::ImplicitRef(*rref)
+        }
+        (TokenType::Star, ValueVariant::CharRef(char_ref)) => {
+            ValueVariant::ImplicitCharRef(*char_ref)
+        }
+
         // unrecognized
         _ => {
             return invalid_op;
