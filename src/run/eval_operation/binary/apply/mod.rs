@@ -236,7 +236,9 @@ fn eval_operation_apply_builtin(
         Builtin::IsFile => run_builtin::is_file(ctx, args),
         Builtin::IsDir => run_builtin::is_dir(ctx, args),
 
-        Builtin::Print | Builtin::Println => ValueVariant::Unit,
+        Builtin::Print | Builtin::Println => {
+            run_builtin::builtin_print(ast, ctx, args, builtin == Builtin::Println)
+        }
 
         Builtin::BuiltinCount => {
             panic!("should not have builtin with value BuiltinCount in interpreter")

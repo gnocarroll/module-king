@@ -330,3 +330,13 @@ pub fn is_dir(ctx: &ExecutionContext, args: RuntimeRef) -> ValueVariant {
 
     ValueVariant::Boolean(std::path::Path::new(&filepath).is_dir())
 }
+
+pub fn builtin_print(ast: &AST, ctx: &ExecutionContext, args: RuntimeRef, is_println: bool) -> ValueVariant {
+    print!("{}", args.to_string(ast, ctx));
+
+    if is_println {
+        println!();
+    }
+
+    ValueVariant::Unit
+}
