@@ -368,6 +368,20 @@ impl AST {
                 expr_mut.finalized = true;
             }
 
+            Builtin::IsFile | Builtin::IsDir => {
+                if !self.type_eq(arg_type_id, TypeID::string()) {
+                    self.invalid_operation(expr, "provide 1 arg which is a String to is file / is dir");
+                    return;
+                }
+
+                let boolean_type_id = self.get_builtin_type_id(BOOLEAN_TYPE);
+
+                let expr_mut = self.objs.expr_mut(expr);
+
+                expr_mut.type_id = boolean_type_id;
+                expr_mut.finalized = true;
+            }
+
             Builtin::BuiltinCount => {
                 panic!("BuiltinCount enum value should never be passed to this function");
             }
