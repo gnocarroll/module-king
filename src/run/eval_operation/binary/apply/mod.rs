@@ -13,7 +13,7 @@ use crate::{
         context_contents::{RuntimeRef, Value, ValueID, ValueVariant},
         error::{RuntimeErrorVariant, RuntimeException},
         eval,
-        eval_operation::binary::do_assignment,
+        eval_operation::{binary::do_assignment, eval_eager},
         expr_to_unit,
         util::{
             allocate_instances_from_pattern, runtime_ref_to_builtin, runtime_ref_to_function,
@@ -30,7 +30,13 @@ pub fn eval_operation_apply(
     operand2: ExprID,
 ) -> Result<RuntimeRef, RuntimeException> {
     let runtime_ref = eval(ast, ctx, operand1)?;
+    
     let args_ref = eval(ast, ctx, operand2)?;
+
+    // eager evaluate args tuple, reflects how programming languages tend to work
+    // so e.g. if var x is passed as arg then get value of x to send to function
+
+    let args_ref = eval_eager(ast, ctx, args_ref)?;
 
     if let Some(function_id) = runtime_ref_to_function(ast, ctx, runtime_ref) {
         return eval_operation_apply_function(ast, ctx, expr, function_id, args_ref);
@@ -224,7 +230,7 @@ fn eval_operation_apply_builtin(
         Builtin::SetWD => run_builtin::set_wd(ctx, args)?,
 
         // TODO: start working on these file-related builtins
-        Builtin::DirList => ValueVariant::Unit,
+        Builtin::DirList => run_builtin::dir_list(ctx, args),
         Builtin::FileRead => ValueVariant::Unit,
 
         Builtin::BuiltinCount => {

@@ -1,10 +1,10 @@
 use std::{collections::HashMap, path::Path};
 
 use crate::{
-    parse::{AST, ast_contents::ExprID, builtin::Builtin},
+    parse::{AST, ast_contents::{ExprID, TypeID}, builtin::Builtin},
     run::{
         ExecutionContext,
-        context_contents::{CharRef, RuntimeRef, ValueID, ValueVariant},
+        context_contents::{CharRef, RuntimeRef, Value, ValueID, ValueVariant},
         error::{RuntimeErrorVariant, RuntimeException},
     },
 };
@@ -259,7 +259,7 @@ pub fn set_wd(
 pub fn dir_list(ctx: &mut ExecutionContext, args: RuntimeRef) -> ValueVariant {
     let args_tuple: Vec<ValueID> = args.to_tuple_value_iterator(&ctx.objs).collect();
 
-    let filepath = match ctx
+    let filepath = match &ctx
         .objs
         .ref_get(RuntimeRef {
             scope: args.scope,
@@ -267,11 +267,48 @@ pub fn dir_list(ctx: &mut ExecutionContext, args: RuntimeRef) -> ValueVariant {
         })
         .variant
     {
-        ValueVariant::String(s) => s,
+        ValueVariant::String(s) => s.clone(),
         _ => panic!("should be passing String to dir list"),
     };
 
     let filepath = crate::util::ascii_to_string(filepath);
 
+    // if problem occurs then will just return empty list
 
+    let get_list = || {
+        let mut ret_strings: Vec<Vec<u8>> = Vec::new();
+
+        let dir_iter = match std::fs::read_dir(filepath) {
+            Ok(dir_iter) => dir_iter,
+            Err(_) => {
+                return Vec::new();
+            }
+        };
+
+        for entry in dir_iter {
+            let entry = match entry {
+                Ok(entry) => entry,
+                Err(_) => {
+                    return Vec::new();
+                }
+            };
+
+            ret_strings.push(entry.file_name().as_encoded_bytes().into());
+        }
+
+        ret_strings
+    };
+
+    let ret_strings = get_list();
+
+    let mut value_ids = Vec::new();
+
+    for ret_string in ret_strings {
+        value_ids.push(ctx.objs.runtime_scope_mut(ctx.curr_scope).value_push(Value {
+            type_id: Some(TypeID::string()),
+            variant: ValueVariant::String(ret_string),
+        }));
+    }
+
+    ValueVariant::Tuple(value_ids)
 }
