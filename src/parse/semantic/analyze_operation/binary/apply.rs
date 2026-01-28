@@ -382,6 +382,15 @@ impl AST {
                 expr_mut.finalized = true;
             }
 
+            Builtin::Print | Builtin::Println => {
+                // args can be anything so just set ret type to Unit
+
+                let expr_mut = self.objs.expr_mut(expr);
+
+                expr_mut.type_id = TypeID::unit();
+                expr_mut.finalized = true;
+            }
+
             Builtin::BuiltinCount => {
                 panic!("BuiltinCount enum value should never be passed to this function");
             }

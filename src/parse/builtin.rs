@@ -28,6 +28,9 @@ pub enum Builtin {
     IsFile,
     IsDir,
 
+    Print,
+    Println,
+
     // do not set discriminants and keep this last and it will be correct
     BuiltinCount,
 }
@@ -73,6 +76,9 @@ impl Builtin {
 
             IsFile => "is_file",
             IsDir => "is_dir",
+
+            Print => "print",
+            Println => "println",
 
             BuiltinCount => "",
         }

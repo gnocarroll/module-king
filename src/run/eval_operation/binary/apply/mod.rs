@@ -30,7 +30,7 @@ pub fn eval_operation_apply(
     operand2: ExprID,
 ) -> Result<RuntimeRef, RuntimeException> {
     let runtime_ref = eval(ast, ctx, operand1)?;
-    
+
     let args_ref = eval(ast, ctx, operand2)?;
 
     // eager evaluate args tuple, reflects how programming languages tend to work
@@ -235,6 +235,8 @@ fn eval_operation_apply_builtin(
 
         Builtin::IsFile => run_builtin::is_file(ctx, args),
         Builtin::IsDir => run_builtin::is_dir(ctx, args),
+
+        Builtin::Print | Builtin::Println => ValueVariant::Unit,
 
         Builtin::BuiltinCount => {
             panic!("should not have builtin with value BuiltinCount in interpreter")
