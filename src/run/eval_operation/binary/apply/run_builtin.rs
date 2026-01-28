@@ -68,10 +68,12 @@ pub fn container_generic(
                     (Builtin::GenericExists, ValueVariant::Integer(i)) => {
                         ValueVariant::Boolean(i >= 0 && (i as usize) < s.len())
                     }
-                    (Builtin::GenericGet, ValueVariant::Integer(i)) => ValueVariant::CharRef(CharRef {
-                        string_rref: container, // container is the String itself
-                        idx: i as usize,
-                    }),
+                    (Builtin::GenericGet, ValueVariant::Integer(i)) => {
+                        ValueVariant::CharRef(CharRef {
+                            string_rref: container, // container is the String itself
+                            idx: i as usize,
+                        })
+                    }
                     (Builtin::GenericPush, ValueVariant::Integer(i)) => {
                         let c = match i.try_into() {
                             Ok(c) => c,
@@ -135,12 +137,71 @@ pub fn container_generic(
             if builtin == Builtin::GenericLen {
                 ValueVariant::Integer(map.len() as i64)
             } else {
-                let (arg2_value_id, arg2_variant) = (
+                let (arg2_rref, arg2_value_id, arg2_variant) = (
+                    arg2_rref.expect("should have checked for arg2"),
                     arg2_value_id.expect("should have checked for arg2"),
                     arg2_variant.expect("should have checked for arg2"),
                 );
 
-                ValueVariant::Unit
+                match (builtin, arg2_variant) {
+                    (Builtin::GenericExists, ValueVariant::String(s)) => {
+                        let s = crate::util::ascii_to_string(s);
+
+                        ValueVariant::Boolean(map.contains_key(&s))
+                    }
+                    (Builtin::GenericGet, ValueVariant::String(s)) => {
+                        let s = crate::util::ascii_to_string(s);
+
+                        ValueVariant::Ref(RuntimeReference {
+                            scope: container.scope,
+                            value_id: match map.get(&s) {
+                                Some(id) => *id,
+                                None => {
+                                    return Err(RuntimeException {
+                                        expr,
+                                        variant: RuntimeErrorVariant::IndexOutOfBounds,
+                                    });
+                                }
+                            },
+                        })
+                    }
+                    (Builtin::GenericPush, ValueVariant::Tuple(vec)) => {
+                        let err_msg = "semantic analysis should have checked that (String, Value) tuple is being pushed";
+
+                        if vec.len() != 2 {
+                            panic!("{err_msg}")
+                        }
+
+                        let string_rref = RuntimeReference {
+                            scope: arg2_rref.scope,
+                            value_id: vec[0],
+                        };
+                        let push_id = vec[1];
+
+                        let key = match &ctx.objs.ref_get(string_rref).variant {
+                            ValueVariant::String(s) => s.clone(),
+                            _ => panic!("{err_msg}"),
+                        };
+
+                        let key = crate::util::ascii_to_string(key);
+
+                        // get container again and perform push
+
+                        let map = match &mut ctx.objs.ref_get_mut(container).variant {
+                            ValueVariant::Map(map) => map,
+                            _ => panic!("should have already checked it is map"),
+                        };
+
+                        // note: if value already exists this will overwrite which is intended behaviour
+
+                        map.insert(key, push_id);
+
+                        ValueVariant::Unit
+                    }
+                    _ => panic!(
+                        "arg type invalid, should have been checked during semantic analysis"
+                    ),
+                }
             }
         }
         _ => panic!("should be container ValueVariant (e.g. String, List, Map"),

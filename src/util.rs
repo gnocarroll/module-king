@@ -8,3 +8,8 @@ pub fn string_to_ascii(s: String) -> Result<Vec<u8>, core::char::TryFromCharErro
 
     Ok(ascii)
 }
+
+// err => some char could not be converted to u8
+pub fn ascii_to_string(ascii: Vec<u8>) -> String {
+    ascii.into_iter().map(|val| val as char).collect()
+}
