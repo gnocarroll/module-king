@@ -14,6 +14,14 @@ pub struct RuntimeScopeID {
     id: u32,
 }
 
+impl RuntimeScopeID {
+    // default for ContextObjects should guarantee heap ID is correct/exists
+
+    pub fn heap() -> RuntimeScopeID {
+        RuntimeScopeID { id: 1 }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub struct ValueID {
     id: u32,
@@ -512,9 +520,10 @@ impl Default for ContextObjects {
     fn default() -> Self {
         // put in one RuntimeScope so that ID 0 can be a bogus ID
         // makes sense since RuntimeScopeID::default() returns 0 and you don't want that used
+        // also add second scope which will serve as the heap
 
         ContextObjects {
-            scopes: vec![RuntimeScope::default()],
+            scopes: vec![RuntimeScope::default(), RuntimeScope::default()],
             member_map: HashMap::new(),
             ret_locations: vec![RuntimeRef::default()],
         }
