@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::write};
 
 // err => some char could not be converted to u8
 pub fn string_to_ascii(s: String) -> Result<Vec<u8>, core::char::TryFromCharError> {
@@ -16,9 +16,37 @@ pub fn ascii_to_string(ascii: Vec<u8>) -> String {
     ascii.into_iter().map(|val| val as char).collect()
 }
 
+
 pub enum FileVariant {
     Regular,
     Directory(HashMap<String, FileVariant>),
+}
+
+fn print_file_variant(file_variant: &FileVariant, indent: usize, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match file_variant {
+        FileVariant::Regular => write!(f, ""),
+        FileVariant::Directory(map) => {
+            let mut ret = Ok(());
+            
+            for (name, variant) in map {
+                for _ in 0..indent {
+                    write!(f, " ");
+                }
+
+                write!(f, "{}", name);
+
+                ret = print_file_variant(variant, indent + 4, f);
+            }
+            
+            ret
+        }
+    }
+}
+
+impl std::fmt::Display for FileVariant {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        print_file_variant(self, 0, f)
+    }
 }
 
 pub fn listdir_with_ext(path: &str, ext: &str) -> Result<FileVariant, ()> {
