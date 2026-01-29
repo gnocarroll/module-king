@@ -1,5 +1,5 @@
-pub static LANG_NAME: &str = "Spectra";
-pub static LANG_FILE_EXT: &str = "sp";
+pub static LANG_NAME: &str = "ModuleKing";
+pub static LANG_FILE_EXT: &str = "mk";
 
 pub static ERROR_TYPE: &str = "Error";
 pub static UNIT_TYPE: &str = "Unit";
