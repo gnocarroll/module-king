@@ -15,105 +15,19 @@ mod util;
 
 const MANIFEST_PATH: &str = env!("CARGO_MANIFEST_DIR");
 
+enum MkFile {
+    CodeFile,
+    Directory(HashMap<String, MkFile>),
+}
+
 fn main() -> ExitCode {
     if std::env::set_current_dir(MANIFEST_PATH).is_err() {
         eprintln!("Failed to set working directory to crate directory.");
         return 1.into();
     }
 
-    let _args: Vec<String> = std::env::args().skip(1).collect();
+    
 
-    // always use input.txt for now
-    let args = vec!["assets/input.sp"];
-
-    let mut arg_parser = ArgParser::default();
-
-    let arg_infos = [("input", ArgQuantity::Multiple), ("-o", ArgQuantity::One)];
-
-    for (name, quantity) in arg_infos {
-        match arg_parser.add_argument(name, quantity) {
-            Ok(_) => {}
-            Err(msg) => {
-                eprintln!("problem while adding arg {name}: {msg}");
-                return 1.into();
-            }
-        }
-    }
-
-    println!("ARGS");
-
-    for arg in args.iter() {
-        println!("{arg}");
-    }
-
-    // skip executable name in args
-
-    let args = match arg_parser.parse_args(args.iter()) {
-        Ok(map) => map,
-        Err(msg) => {
-            eprintln!("Bad args provided: {msg}");
-            return 1.into();
-        }
-    };
-
-    println!("nargs: {}", args.len());
-
-    for (arg, vec) in &args {
-        print!("{arg}:");
-
-        for ref item in vec {
-            print!(" {item}");
-        }
-
-        println!();
-    }
-
-    // read file(s) into memory
-
-    let mut file_strings: HashMap<String, Vec<u8>> = HashMap::new();
-
-    if let Some(input_files) = args.get("input") {
-        for filename in input_files {
-            let file_string = match fs::read_to_string(filename) {
-                Ok(s) => s,
-                Err(e) => {
-                    eprintln!("Failed to read in file {filename}: {e}");
-                    return 1.into();
-                }
-            };
-
-            let file_string = match util::string_to_ascii(file_string) {
-                Ok(vec) => vec,
-                Err(e) => {
-                    eprintln!("{filename} had char which was not convertible to u8: {e}");
-                    return 1.into();
-                }
-            };
-
-            file_strings.insert(filename.to_string(), file_string);
-        }
-    } else {
-        let mut stdin_string = String::new();
-
-        if let Err(e) = std::io::stdin().read_to_string(&mut stdin_string) {
-            eprintln!("Problem occurred while reading from STDIN: {e}");
-            return 1.into();
-        }
-
-        let stdin_string = match util::string_to_ascii(stdin_string) {
-            Ok(vec) => vec,
-            Err(e) => {
-                eprintln!("std input had char which was not convertible to u8: {e}");
-                return 1.into();
-            }
-        };
-
-        file_strings.insert("STDIN".to_string(), stdin_string);
-    }
-
-    println!();
-
-    for (filename, file_string) in file_strings {
         let tokens = match scan::tokenize(&file_string) {
             Ok(tokens) => tokens,
             Err(msg) => {
@@ -144,7 +58,6 @@ fn main() -> ExitCode {
         if !ast.has_errors() {
             run::run(&tokens, &ast);
         }
-    }
 
     0.into()
 }
