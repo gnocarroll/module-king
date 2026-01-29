@@ -17,6 +17,9 @@ which will be a map from `String` -> `Type`
 Once I finish the above feature-set it should be enough to write a self-hosted
 compiler which I currently plan to make output x86 assembly text files.
 
+The git repo for the self-hosted version which I will get working on is
+[`spectra`](https://github.com/gnocarroll/spectra).
+
 ## Use of Executable
 
 Executable will look inside directory you run it in for codefiles and directories.
