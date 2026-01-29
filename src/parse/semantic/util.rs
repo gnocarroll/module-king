@@ -137,6 +137,19 @@ impl AST {
         self.objs.function(curr_func).return_type
     }
 
+    // searches ONLY scope specified
+    // (does not recurse to parent scope(s))
+    pub fn scope_search_no_recurse(&self, scope: ScopeID, name: &str) -> Option<MemberID> {
+        let scope_ref = self.objs.scope(scope);
+        let name = name.to_string();
+
+        if let Some(member) = scope_ref.members.get(&name) {
+            Some(member)
+        } else {
+            None
+        }
+    }
+    
     // search provided scope for a given name and received Member if said name
     // can be found, also recurse to parent if needed
     pub fn scope_search(&self, scope: ScopeID, name: &str) -> Option<MemberID> {

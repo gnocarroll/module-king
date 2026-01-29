@@ -730,7 +730,15 @@ impl AST {
 
     // semantic analysis on particular expression
     fn analyze_expr(&mut self, ctx: &mut SemanticContext, scope: ScopeID, expr: ExprID) {
-        match &self.expr(expr).variant {
+        let expr_struct = self.objs.expr(expr);
+
+        // already finalized => earlier pass successfully analyzed expr, continue
+
+        if expr_struct.finalized {
+            return;
+        }
+
+        match &expr_struct.variant {
             ExprVariant::Unit
             | ExprVariant::BooleanLiteral(_)
             | ExprVariant::IntegerLiteral(_)
@@ -796,6 +804,54 @@ impl AST {
         }
     }
 
+    fn add_basic_types(&mut self, ctx: &mut SemanticContext) {
+        for (name, variant) in [
+            (INTEGER_TYPE, TypeVariant::Integer),
+            (FLOAT_TYPE, TypeVariant::Float),
+            (BOOLEAN_TYPE, TypeVariant::Enum),
+        ] {
+            if self.scope_search_no_recurse(ScopeID::global(), name).is_some() {
+                continue;
+            }
+
+            self.scope_add_member_type(
+                ctx,
+                ScopeID::global(),
+                TokenOrString::String(name.to_string()),
+                variant,
+            )
+            .expect(
+                "should be no name conflict for initial insertion of Integer, Float, Boolean",
+            );
+        }
+
+        // add false, true to Boolean type
+
+        let boolean_type = self.get_builtin_type_id(BOOLEAN_TYPE);
+
+        match self.objs.type_get(boolean_type).clone() {
+            Type::Scope(scope) => {
+                for name in ["false", "true"] {
+                    if self.scope_search_no_recurse(scope, name).is_some() {
+                        continue;
+                    }
+
+                    let member_id = self.objs.member_push(Member {
+                        name: TokenOrString::String(name.to_string()),
+                        visibility: Visibility::Global,
+                        variant: MemberVariant::Instance(boolean_type),
+                    });
+
+                    self.scope_try_insert(&ctx.tokens, scope, member_id).expect(
+                        "initial insertion to Boolean of true, false should not cause conflict",
+                    );
+                }
+            }
+            _ => panic!("boolean type malformed"),
+        }
+
+    }
+
     // public function to do semantic analysis
     pub fn do_semantic_analysis(&mut self, tokens: &Tokens, module_name: &str) {
         if let Some(expr) = self.root_expr {
@@ -807,43 +863,8 @@ impl AST {
                 curr_func: None,
             };
 
-            for (name, variant) in [
-                (INTEGER_TYPE, TypeVariant::Integer),
-                (FLOAT_TYPE, TypeVariant::Float),
-                (BOOLEAN_TYPE, TypeVariant::Enum),
-            ] {
-                self.scope_add_member_type(
-                    &mut ctx,
-                    ScopeID::global(),
-                    TokenOrString::String(name.to_string()),
-                    variant,
-                )
-                .expect(
-                    "should be no name conflict for initial insertion of Integer, Float, Boolean",
-                );
-            }
-
-            // add false, true to Boolean type
-
-            let boolean_type = self.get_builtin_type_id(BOOLEAN_TYPE);
-
-            match self.objs.type_get(boolean_type).clone() {
-                Type::Scope(scope) => {
-                    for name in ["false", "true"] {
-                        let member_id = self.objs.member_push(Member {
-                            name: TokenOrString::String(name.to_string()),
-                            visibility: Visibility::Global,
-                            variant: MemberVariant::Instance(boolean_type),
-                        });
-
-                        self.scope_try_insert(&ctx.tokens, scope, member_id).expect(
-                            "initial insertion to Boolean of true, false should not cause conflict",
-                        );
-                    }
-                }
-                _ => panic!("boolean type malformed"),
-            }
-
+            self.add_basic_types(&mut ctx);
+            
             // create new scope for module
 
             let module_scope = self.objs.scope_push(Scope {
