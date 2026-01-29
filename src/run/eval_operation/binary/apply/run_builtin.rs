@@ -8,8 +8,9 @@ use crate::{
     },
     run::{
         ExecutionContext,
-        context_contents::{CharRef, RuntimeRef, Value, ValueID, ValueVariant},
+        context_contents::{CharRef, RuntimeRef, RuntimeScopeID, Value, ValueID, ValueVariant},
         error::{RuntimeErrorVariant, RuntimeException},
+        util::type_to_value_id,
     },
 };
 
@@ -365,7 +366,7 @@ pub fn builtin_print(
     ValueVariant::Unit
 }
 
-pub fn m_alloc(ctx: &ExecutionContext, args: RuntimeRef) -> ValueVariant {
+pub fn m_alloc(ast: &AST, ctx: &mut ExecutionContext, args: RuntimeRef) -> ValueVariant {
     let args_tuple: Vec<ValueID> = args.to_tuple_value_iterator(&ctx.objs).collect();
 
     let type_id = match ctx
@@ -379,4 +380,20 @@ pub fn m_alloc(ctx: &ExecutionContext, args: RuntimeRef) -> ValueVariant {
         ValueVariant::Type(type_id) => type_id,
         _ => panic!("argument to memory allocator should be type"),
     };
+
+    // now use type ID to allocate object on the "heap"
+    // (which is just a particular runtime scope)
+
+    let value_id = type_to_value_id(
+        ast,
+        ctx.objs.runtime_scope_mut(RuntimeScopeID::heap()),
+        type_id,
+    );
+
+    // return ref to new value
+
+    ValueVariant::Ref(RuntimeRef {
+        scope: RuntimeScopeID::heap(),
+        value_id,
+    })
 }
