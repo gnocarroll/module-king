@@ -1,7 +1,10 @@
 use std::{collections::HashMap, fs, io::Read, process::ExitCode};
 
 use crate::{
-    args::{ArgParser, ArgQuantity}, constants::LANG_FILE_EXT, tokens::Tokens, util::listdir_with_ext
+    args::{ArgParser, ArgQuantity},
+    constants::LANG_FILE_EXT,
+    tokens::Tokens,
+    util::listdir_with_ext,
 };
 
 mod args;
@@ -12,15 +15,7 @@ mod scan;
 mod tokens;
 mod util;
 
-const MANIFEST_PATH: &str = env!("CARGO_MANIFEST_DIR");
-
-
 fn main() -> ExitCode {
-    if std::env::set_current_dir(MANIFEST_PATH).is_err() {
-        eprintln!("Failed to set working directory to crate directory.");
-        return 1.into();
-    }
-
     let wd = match std::env::current_dir() {
         Ok(s) => match s.as_os_str().to_str() {
             Some(as_str) => as_str.to_string(),
@@ -28,7 +23,7 @@ fn main() -> ExitCode {
                 eprintln!("Could not get working directory from OS string to str");
                 return 1.into();
             }
-        }
+        },
         Err(_) => {
             eprintln!("Could not get wd");
             return 1.into();
