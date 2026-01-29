@@ -397,3 +397,35 @@ pub fn m_alloc(ast: &AST, ctx: &mut ExecutionContext, args: RuntimeRef) -> Value
         value_id,
     })
 }
+
+pub fn m_free(ctx: &mut ExecutionContext, args: RuntimeRef) -> ValueVariant {
+    let args_tuple: Vec<ValueID> = args.to_tuple_value_iterator(&ctx.objs).collect();
+
+    let rref = match ctx
+        .objs
+        .ref_get(RuntimeRef {
+            scope: args.scope,
+            value_id: args_tuple[0],
+        })
+        .variant
+    {
+        ValueVariant::Ref(rref) => rref,
+        _ => panic!("argument to free should be ref"),
+    };
+
+    // if user tries to free ref not on the heap just return
+
+    if rref.scope != RuntimeScopeID::heap() {
+        eprintln!("TRIED TO FREE NON HEAP REF");
+        return ValueVariant::Unit;
+    }
+
+    // "freeing" will just mean setting value to Unit so yes memory can accumulate but will
+    // not be a problem for initial compiler version
+
+    ctx.objs
+        .runtime_scope_mut(RuntimeScopeID::heap())
+        .value_set_unit(rref.value_id);
+
+    ValueVariant::Unit
+}

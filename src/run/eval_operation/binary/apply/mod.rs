@@ -223,8 +223,8 @@ fn eval_operation_apply_builtin(
         | Builtin::GenericLen => run_builtin::container_generic(ast, ctx, expr, builtin, args)?,
 
         // TODO: start working on these allocation-related builtins
-        Builtin::Malloc => ValueVariant::Unit,
-        Builtin::Mfree => ValueVariant::Unit,
+        Builtin::Malloc => run_builtin::m_alloc(ast, ctx, args),
+        Builtin::Mfree => run_builtin::m_free(ctx, args),
 
         Builtin::GetWD => run_builtin::get_wd()?,
         Builtin::SetWD => run_builtin::set_wd(ctx, args)?,
