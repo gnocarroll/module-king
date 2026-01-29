@@ -33,7 +33,7 @@ fn print_file_variant(file_variant: &FileVariant, indent: usize, f: &mut std::fm
                     write!(f, " ");
                 }
 
-                write!(f, "{}", name);
+                writeln!(f, "{}", name);
 
                 ret = print_file_variant(variant, indent + 4, f);
             }
@@ -49,7 +49,7 @@ impl std::fmt::Display for FileVariant {
     }
 }
 
-pub fn listdir_with_ext(path: &str, ext: &str) -> Result<FileVariant, ()> {
+pub fn listdir_with_ext(path: &str, ext: &str) -> Result<Option<FileVariant>, ()> {
     let mut ret_map = HashMap::new();
     
     let dir_iter = match std::fs::read_dir(path) {
@@ -77,6 +77,12 @@ pub fn listdir_with_ext(path: &str, ext: &str) -> Result<FileVariant, ()> {
             }
         };
 
+        // ignore hidden files
+
+        if filename.starts_with(".") {
+            continue;
+        }
+
         if metadata.is_dir() {
             let child_path = std::path::Path::new(path).join(&filename);
 
@@ -85,11 +91,17 @@ pub fn listdir_with_ext(path: &str, ext: &str) -> Result<FileVariant, ()> {
                 None => return Err(()),
             };
 
-            ret_map.insert(filename, listdir_with_ext(child_path_str, ext)?);
+            if let Some(file_variant) = listdir_with_ext(child_path_str, ext)? {
+                ret_map.insert(filename, file_variant);
+            }
         } else if filename.ends_with(ext) {
             ret_map.insert(filename, FileVariant::Regular);
         }
     }
 
-    Ok(FileVariant::Directory(ret_map))
+    if ret_map.len() > 0 {
+        Ok(Some(FileVariant::Directory(ret_map)))
+    } else {
+        Ok(None)
+    }
 }

@@ -23,7 +23,7 @@ fn main() -> ExitCode {
 
     let wd = match std::env::current_dir() {
         Ok(s) => match s.as_os_str().to_str() {
-            Some(as_str) => as_str,
+            Some(as_str) => as_str.to_string(),
             None => {
                 eprintln!("Could not get working directory from OS string to str");
                 return 1.into();
@@ -35,10 +35,18 @@ fn main() -> ExitCode {
         }
     };
 
-    let dir_structure = match listdir_with_ext(wd, LANG_FILE_EXT) {
+    let dir_structure = match listdir_with_ext(wd.as_str(), LANG_FILE_EXT) {
         Ok(dir_structure) => dir_structure,
         Err(_) => {
             eprintln!("Could not get list files in wd");
+            return 1.into();
+        }
+    };
+
+    let dir_structure = match dir_structure {
+        Some(dir_structure) => dir_structure,
+        None => {
+            eprintln!("No code files to run");
             return 1.into();
         }
     };
