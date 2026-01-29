@@ -1,7 +1,11 @@
 use std::{collections::HashMap, path::Path};
 
 use crate::{
-    parse::{AST, ast_contents::{ExprID, TypeID}, builtin::Builtin},
+    parse::{
+        AST,
+        ast_contents::{ExprID, TypeID},
+        builtin::Builtin,
+    },
     run::{
         ExecutionContext,
         context_contents::{CharRef, RuntimeRef, Value, ValueID, ValueVariant},
@@ -308,10 +312,14 @@ pub fn dir_list(ctx: &mut ExecutionContext, args: RuntimeRef) -> ValueVariant {
     let mut value_ids = Vec::new();
 
     for ret_string in ret_strings {
-        value_ids.push(ctx.objs.runtime_scope_mut(ctx.curr_scope).value_push(Value {
-            type_id: Some(TypeID::string()),
-            variant: ValueVariant::String(ret_string),
-        }));
+        value_ids.push(
+            ctx.objs
+                .runtime_scope_mut(ctx.curr_scope)
+                .value_push(Value {
+                    type_id: Some(TypeID::string()),
+                    variant: ValueVariant::String(ret_string),
+                }),
+        );
     }
 
     ValueVariant::Tuple(value_ids)
@@ -342,7 +350,12 @@ pub fn is_dir(ctx: &ExecutionContext, args: RuntimeRef) -> ValueVariant {
     ValueVariant::Boolean(std::path::Path::new(&filepath).is_dir())
 }
 
-pub fn builtin_print(ast: &AST, ctx: &ExecutionContext, args: RuntimeRef, is_println: bool) -> ValueVariant {
+pub fn builtin_print(
+    ast: &AST,
+    ctx: &ExecutionContext,
+    args: RuntimeRef,
+    is_println: bool,
+) -> ValueVariant {
     print!("{}", args.to_string(ast, ctx));
 
     if is_println {
@@ -350,4 +363,20 @@ pub fn builtin_print(ast: &AST, ctx: &ExecutionContext, args: RuntimeRef, is_pri
     }
 
     ValueVariant::Unit
+}
+
+pub fn m_alloc(ctx: &ExecutionContext, args: RuntimeRef) -> ValueVariant {
+    let args_tuple: Vec<ValueID> = args.to_tuple_value_iterator(&ctx.objs).collect();
+
+    let type_id = match ctx
+        .objs
+        .ref_get(RuntimeRef {
+            scope: args.scope,
+            value_id: args_tuple[0],
+        })
+        .variant
+    {
+        ValueVariant::Type(type_id) => type_id,
+        _ => panic!("argument to memory allocator should be type"),
+    };
 }

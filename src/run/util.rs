@@ -1,11 +1,12 @@
+use std::collections::HashMap;
+
 use crate::{
     parse::{
-        AST, MemberVariant,
-        ast_contents::{FunctionID, PatternID, ScopeID, TypeID}, builtin::Builtin,
+        AST, MemberVariant, ScopeVariant, Type, TypeVariant, Visibility, ast_contents::{FunctionID, PatternID, ScopeID, TypeID}, builtin::Builtin
     },
     run::{
         ExecutionContext,
-        context_contents::{RuntimeRef, ValueVariant},
+        context_contents::{RuntimeRef, RuntimeScope, Value, ValueID, ValueVariant},
     },
 };
 
@@ -87,4 +88,103 @@ pub fn runtime_ref_to_builtin(
         ValueVariant::Builtin(builtin) => Some(*builtin),
         _ => None,
     }
+}
+
+fn types_to_tuple_value_id(
+    ast: &AST,
+    runtime_scope: &mut RuntimeScope,
+    type_id: TypeID,
+    t1: TypeID,
+    maybe_t2: Option<TypeID>,
+) -> ValueID {
+    let mut value_id_vec = vec![type_to_value_id(ast, runtime_scope, t1)];
+
+    if let Some(t2) = maybe_t2 {
+        let mut extended_vec = false;
+        let value_id2 = type_to_value_id(ast, runtime_scope, t2);
+
+        match ast.objs.type_get(t2) {
+            Type::Unit => (),
+            Type::RestOfTuple(_) => match &runtime_scope.value(value_id2).variant {
+                ValueVariant::Tuple(value_id_vec2) => {
+                    value_id_vec.extend_from_slice(value_id_vec2);
+
+                    extended_vec = true;
+                }
+                _ => panic!("ValueVariant should be guaranteed to be tuple"),
+            },
+            _ => {
+                value_id_vec.push(value_id2);
+            }
+        }
+
+        // if we extended vec can wipe other ValueID that had second ValueID vec
+        // since it is not needed
+
+        if extended_vec {
+            runtime_scope.value_set_unit(value_id2);
+        }
+    }
+
+    runtime_scope.value_push(Value {
+        type_id: Some(type_id),
+        variant: ValueVariant::Tuple(value_id_vec),
+    })
+}
+
+pub fn type_to_value_id(ast: &AST, runtime_scope: &mut RuntimeScope, type_id: TypeID) -> ValueID {
+    let variant = match ast.objs.type_get(type_id) {
+        Type::Error => panic!("error type in type_to_value"),
+        Type::Unit => ValueVariant::Unit,
+        Type::String => ValueVariant::String(b"".to_vec()),
+        Type::Scope(scope) => match &ast.objs.scope(*scope).variant {
+            ScopeVariant::Type(variant) => match variant {
+                TypeVariant::Integer => ValueVariant::Integer(0),
+                TypeVariant::Float => ValueVariant::Float(0.0),
+                TypeVariant::Record => {
+                    // filter map function will look at members of Record and for ones that are not global (i.e. shared)
+                    // and are instances it will use this function type_to_value to create a corresponding value recursively
+
+                    let values: HashMap<String, ValueID> = ast
+                        .objs
+                        .scope(*scope)
+                        .members
+                        .get_map()
+                        .iter()
+                        .filter_map(|(name, member_id)| {
+                            let member = ast.objs.member(*member_id);
+
+                            let type_id = match (member.variant, member.visibility) {
+                                (_, Visibility::Global) => return None,
+                                (MemberVariant::Instance(t), _) => t,
+                                (_, _) => return None,
+                            };
+
+                            let value_id = type_to_value_id(ast, runtime_scope, type_id);
+
+                            Some((name.clone(), value_id))
+                        })
+                        .collect();
+
+                    ValueVariant::Record(values)
+                }
+                _ => todo!("not implemented"),
+            },
+            _ => {
+                panic!("scope retrieved using type id is not a type?");
+            }
+        },
+        Type::Tuple((t1, maybe_t2)) => {
+            return types_to_tuple_value_id(ast, runtime_scope, type_id, *t1, *maybe_t2);
+        }
+        Type::RestOfTuple((t1, t2)) => {
+            return types_to_tuple_value_id(ast, runtime_scope, type_id, *t1, Some(*t2));
+        }
+        _ => todo!("have not implemented in interpreter other sorts of types yet"),
+    };
+
+    runtime_scope.value_push(Value {
+        type_id: Some(type_id),
+        variant,
+    })
 }
