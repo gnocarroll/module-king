@@ -1,6 +1,3 @@
-'a' 'b' '\n' '\t' ' ' 'A' '0'
+println("Hello, World!");
 
-9999
-x
-
-hello
+println("My name is George!");
