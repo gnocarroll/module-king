@@ -141,10 +141,15 @@ impl<'a> FileVariantTreewalk<'_> {
 
             last_level.idx += 1;
 
+            // check if last level has been exhausted, if so pop it
+            // then will try to advance on previous level if possible etc.
+
             if last_level.idx >= last_level.filenames.len() {
                 self.levels.pop();
                 continue;
             }
+
+            // extend e.g. if new filevariant is directory then will open children
 
             self.extend_from_filevariant();
 
@@ -187,13 +192,41 @@ impl Iterator for FileVariantTreewalk<'_> {
         // then truncate to remove that extension
 
         if let Some(last) = ret_path.last_mut() {
-            if last.ends_with(self.remove_ext) {
-                last.truncate(last.len() - self.remove_ext.len());
+            if filename_has_ext(&last, self.remove_ext) {
+                let mut ext_len = self.remove_ext.len();
+
+                match self.remove_ext.chars().next() {
+                    Some('.') => (), // Ok
+                    _ => {
+                        // also remove period => add 1 to ext len
+                        ext_len += 1;
+                    }
+                }
+
+                last.truncate(last.len() - ext_len);
             }
         }
 
         Some(ret_path)
     }
+}
+
+pub fn filename_has_ext(filename: impl AsRef<str>, ext: impl AsRef<str>) -> bool {
+    let filename = filename.as_ref();
+    let ext = ext.as_ref();
+
+    if !filename.ends_with(ext) {
+        return false;
+    }
+
+    // if ext begins with '.' then return true (period was already included)
+    // otherwise check if char before ext is '.'
+
+    if let Some('.') = ext.chars().next() {
+        return true;
+    }
+
+    filename[..filename.len() - ext.len()].ends_with('.')
 }
 
 pub fn listdir_with_ext(path: &str, ext: &str) -> Result<Option<FileVariant>, ()> {
@@ -238,7 +271,7 @@ pub fn listdir_with_ext(path: &str, ext: &str) -> Result<Option<FileVariant>, ()
             if let Some(file_variant) = listdir_with_ext(child_path_str, ext)? {
                 ret_map.insert(filename, file_variant);
             }
-        } else if filename.ends_with(ext) {
+        } else if filename_has_ext(&filename, ext) {
             ret_map.insert(filename, FileVariant::Regular);
         }
     }

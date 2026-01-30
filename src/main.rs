@@ -1,12 +1,6 @@
-use std::{collections::HashMap, fs, io::Read, process::ExitCode};
+use std::{fs, path::Path, process::ExitCode};
 
-use crate::{
-    args::{ArgParser, ArgQuantity},
-    constants::LANG_FILE_EXT,
-    parse::AST,
-    tokens::Tokens,
-    util::listdir_with_ext,
-};
+use crate::{constants::{LANG_FILE_EXT, MODULE_FILENAME}, parse::AST, tokens::Tokens, util::listdir_with_ext};
 
 mod args;
 mod constants;
@@ -31,6 +25,8 @@ fn main() -> ExitCode {
         }
     };
 
+    // locate files with language extension
+
     let dir_structure = match listdir_with_ext(wd.as_str(), LANG_FILE_EXT) {
         Ok(dir_structure) => dir_structure,
         Err(_) => {
@@ -54,8 +50,31 @@ fn main() -> ExitCode {
 
     // remove lang file ext from module path
 
-    for modulepath in dir_structure.treewalk(LANG_FILE_EXT) {
+    for mut modulepath in dir_structure.treewalk(LANG_FILE_EXT) {
+        if modulepath.len() == 0 {
+            eprintln!("Found module path of length 0");
+            return 1.into();
+        }
+
+        // determine filepath corresponding to current module
+
+        let mut filepath_buf = Path::new(&wd).to_path_buf();
+
+        for filename in &modulepath {
+            filepath_buf = filepath_buf.join(filename);
+        }
+
+        filepath_buf.add_extension(LANG_FILE_EXT);
+        
+        // check if last filename indicates it is the code for a directory-based module
+        // if so, remove last filename from the modulepath
+
+        if modulepath.last().expect("should have at least one name in path") == MODULE_FILENAME {
+            modulepath.pop();
+        }
+        
         eprintln!("MODULE PATH: {}", modulepath.join("."));
+        eprintln!("FILEPATH: {:?}", filepath_buf);
     }
 
     0.into()
