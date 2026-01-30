@@ -554,10 +554,9 @@ impl AST {
     }
 }
 
-// public function to perform syntactic + semantic analysis
-pub fn parse_file(file_name: &str, tokens: &mut Tokens) -> AST {
-    let mut ast = AST::default();
-
+// module path is what module this file corresponds to e.g.
+// [a, b, c] would correspond to module a.b.c
+pub fn parse_file(ast: &mut AST, tokens: &mut Tokens, modulepath: Vec<String>) {
     // call to parse_expr does syntactic analysis
 
     ast.do_syntax_analysis(tokens);
@@ -571,11 +570,11 @@ pub fn parse_file(file_name: &str, tokens: &mut Tokens) -> AST {
 
         ast.display_parse_errors(&tokens);
 
-        return ast;
+        return;
     }
 
     // reenable later to test
-    ast.do_semantic_analysis(&tokens, file_name);
+    ast.do_semantic_analysis(&tokens, filepath);
 
     eprintln!("RAN SEMANTIC ANALYSIS FUNC");
 
@@ -588,8 +587,6 @@ pub fn parse_file(file_name: &str, tokens: &mut Tokens) -> AST {
 
         ast.display_semantic_errors(&tokens);
 
-        return ast;
+        return;
     }
-
-    ast
 }

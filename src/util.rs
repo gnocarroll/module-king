@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt::write};
 // err => some char could not be converted to u8
 pub fn string_to_ascii(s: String) -> Result<Vec<u8>, core::char::TryFromCharError> {
     let mut ascii = Vec::<u8>::new();
-    
+
     for c in s.chars() {
         ascii.push(c.try_into()?);
     }
@@ -16,18 +16,21 @@ pub fn ascii_to_string(ascii: Vec<u8>) -> String {
     ascii.into_iter().map(|val| val as char).collect()
 }
 
-
 pub enum FileVariant {
     Regular,
     Directory(HashMap<String, FileVariant>),
 }
 
-fn print_file_variant(file_variant: &FileVariant, indent: usize, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+fn print_file_variant(
+    file_variant: &FileVariant,
+    indent: usize,
+    f: &mut std::fmt::Formatter<'_>,
+) -> std::fmt::Result {
     match file_variant {
         FileVariant::Regular => write!(f, ""),
         FileVariant::Directory(map) => {
             let mut ret = Ok(());
-            
+
             for (name, variant) in map {
                 for _ in 0..indent {
                     write!(f, " ");
@@ -37,7 +40,7 @@ fn print_file_variant(file_variant: &FileVariant, indent: usize, f: &mut std::fm
 
                 ret = print_file_variant(variant, indent + 4, f);
             }
-            
+
             ret
         }
     }
@@ -49,9 +52,139 @@ impl std::fmt::Display for FileVariant {
     }
 }
 
+impl FileVariant {
+    pub fn treewalk(&self) -> FileVariantTreewalk {
+        FileVariantTreewalk::new(self)
+    }
+}
+
+struct DirIter {
+    pub filenames: Vec<String>,
+    pub idx: usize,
+}
+
+impl DirIter {
+    fn current_name(&self) -> Option<&String> {
+        self.filenames.get(self.idx)
+    }
+}
+
+pub struct FileVariantTreewalk<'a> {
+    filevariant: &'a FileVariant,
+    levels: Vec<DirIter>,
+    is_done: bool,
+}
+
+impl<'a> FileVariantTreewalk<'_> {
+    fn new(filevariant: &'a FileVariant) -> FileVariantTreewalk {
+        FileVariantTreewalk {
+            filevariant,
+            levels: Vec::new(),
+            is_done: false,
+        }
+    }
+
+    fn extend_from_filevariant(&mut self) {
+        let mut filevariant = self.filevariant;
+
+        for level in &self.levels {
+            let filename = match level.current_name() {
+                Some(name) => name,
+                None => {
+                    break;
+                }
+            };
+
+            match filevariant {
+                FileVariant::Regular => {
+                    break;
+                }
+                FileVariant::Directory(map) => {
+                    filevariant = &map[filename];
+                }
+            }
+        }
+
+        loop {
+            match filevariant {
+                FileVariant::Regular => {
+                    break;
+                }
+                FileVariant::Directory(map) => {
+                    if map.len() == 0 {
+                        break;
+                    }
+
+                    let filenames: Vec<String> = map.iter().map(|(filename, _)| filename.clone()).collect();
+
+                    filevariant = &map[&filenames[0]];
+
+                    self.levels.push(DirIter { filenames, idx: 0 });
+                }
+            }
+        }
+    }
+
+    fn levels_step(&mut self) {
+        loop {
+            let last_level = match self.levels.last_mut() {
+                Some(last) => last,
+                None => {
+                    return;
+                }
+            };
+
+            if last_level.idx >= last_level.filenames.len() {
+                self.levels.pop();
+                continue;
+            }
+
+            last_level.idx += 1;
+
+            self.extend_from_filevariant();
+
+            break;
+        }
+    }
+
+    fn init(&mut self) {
+        self.extend_from_filevariant();
+    }
+}
+
+impl Iterator for FileVariantTreewalk<'_> {
+    // yields file paths separated into vectors
+    // e.g. a/b/c -> [a, b, c]
+    type Item = Vec<String>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.is_done {
+            return None;
+        }
+        if self.levels.len() == 0 {
+            self.init();
+
+            if self.levels.len() == 0 {
+                self.is_done = true;
+                return None;
+            }
+        }
+
+        let mut ret_path = Vec::new();
+
+        for level in &self.levels {
+            ret_path.push(level.filenames[level.idx].clone());
+        }
+
+        self.levels_step();
+
+        Some(ret_path)
+    }
+}
+
 pub fn listdir_with_ext(path: &str, ext: &str) -> Result<Option<FileVariant>, ()> {
     let mut ret_map = HashMap::new();
-    
+
     let dir_iter = match std::fs::read_dir(path) {
         Ok(iter) => iter,
         Err(_) => {
@@ -67,10 +200,7 @@ pub fn listdir_with_ext(path: &str, ext: &str) -> Result<Option<FileVariant>, ()
             }
         };
 
-        let (filename, metadata) = match (
-            entry.file_name().into_string(),
-            entry.metadata(),
-        ) {
+        let (filename, metadata) = match (entry.file_name().into_string(), entry.metadata()) {
             (Ok(s), Ok(meta)) => (s, meta),
             _ => {
                 return Err(());
