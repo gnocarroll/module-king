@@ -53,8 +53,8 @@ impl std::fmt::Display for FileVariant {
 }
 
 impl FileVariant {
-    pub fn treewalk(&self) -> FileVariantTreewalk {
-        FileVariantTreewalk::new(self)
+    pub fn treewalk<'a>(&'a self, remove_ext: &'a str) -> FileVariantTreewalk<'a> {
+        FileVariantTreewalk::new(self, remove_ext)
     }
 }
 
@@ -73,14 +73,16 @@ pub struct FileVariantTreewalk<'a> {
     filevariant: &'a FileVariant,
     levels: Vec<DirIter>,
     is_done: bool,
+    remove_ext: &'a str,
 }
 
 impl<'a> FileVariantTreewalk<'_> {
-    fn new(filevariant: &'a FileVariant) -> FileVariantTreewalk {
+    fn new(filevariant: &'a FileVariant, remove_ext: &'a str) -> FileVariantTreewalk<'a> {
         FileVariantTreewalk {
             filevariant,
             levels: Vec::new(),
             is_done: false,
+            remove_ext,
         }
     }
 
@@ -130,16 +132,19 @@ impl<'a> FileVariantTreewalk<'_> {
             let last_level = match self.levels.last_mut() {
                 Some(last) => last,
                 None => {
+                    // no levels left, done
+                    self.is_done = true;
+
                     return;
                 }
             };
+
+            last_level.idx += 1;
 
             if last_level.idx >= last_level.filenames.len() {
                 self.levels.pop();
                 continue;
             }
-
-            last_level.idx += 1;
 
             self.extend_from_filevariant();
 
@@ -177,6 +182,15 @@ impl Iterator for FileVariantTreewalk<'_> {
         }
 
         self.levels_step();
+
+        // if final filename ends with ext to remove (e.g. language ext),
+        // then truncate to remove that extension
+
+        if let Some(last) = ret_path.last_mut() {
+            if last.ends_with(self.remove_ext) {
+                last.truncate(last.len() - self.remove_ext.len());
+            }
+        }
 
         Some(ret_path)
     }

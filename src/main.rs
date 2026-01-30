@@ -52,7 +52,9 @@ fn main() -> ExitCode {
 
     let mut ast = AST::default();
 
-    for modulepath in dir_structure.treewalk() {
+    // remove lang file ext from module path
+
+    for modulepath in dir_structure.treewalk(LANG_FILE_EXT) {
         eprintln!("MODULE PATH: {}", modulepath.join("."));
     }
 

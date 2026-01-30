@@ -573,6 +573,10 @@ pub fn parse_file(ast: &mut AST, tokens: &mut Tokens, modulepath: Vec<String>) {
         return;
     }
 
+    // TODO: REMOVE THIS DUMMY VALUE AND INTEGRATE MODULEPATH INTO SEMANTIC ANALYSIS
+
+    let filepath = "helllllooo";
+
     // reenable later to test
     ast.do_semantic_analysis(&tokens, filepath);
 
