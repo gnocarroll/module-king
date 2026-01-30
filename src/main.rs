@@ -1,4 +1,4 @@
-use std::{fs, path::Path, process::ExitCode};
+use std::{path::Path, process::ExitCode};
 
 use crate::{constants::{LANG_FILE_EXT, MODULE_FILENAME}, parse::AST, tokens::Tokens, util::listdir_with_ext};
 
@@ -75,6 +75,24 @@ fn main() -> ExitCode {
         
         eprintln!("MODULE PATH: {}", modulepath.join("."));
         eprintln!("FILEPATH: {:?}", filepath_buf);
+        
+        let filepath = match filepath_buf.as_os_str().to_str() {
+            Some(s) => s,
+            None => {
+                eprintln!("conversion from path buf to str failed");
+                return 1.into();
+            }
+        };
+
+        // modify AST using file
+
+        if let Err(e) = process_file(&mut ast, filepath, modulepath) {
+            eprintln!(
+                "Processing of file {} failed: {}",
+                filepath,
+                e.msg,
+            );
+        }
     }
 
     0.into()
