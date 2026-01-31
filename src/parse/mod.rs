@@ -26,7 +26,7 @@ trait HasFileModule {
         let scope_id = self.file_module_scope(ast);
 
         match &ast.objs.scope(scope_id).variant {
-            ScopeVariant::FileModule(tokens) => tokens,
+            ScopeVariant::FileModule(info) => &info.tokens,
             _ => {
                 panic!("could not get Tokens for HasFileModule");
             }
@@ -184,10 +184,16 @@ impl Default for Type {
 }
 
 #[derive(Clone)]
+struct FileModuleInfo {
+    pub tokens: Tokens,
+    pub root_expr: ExprID,
+}
+
+#[derive(Clone)]
 pub enum ScopeVariant {
     Scope, // e.g. scope for a for loop or other block
     Module,
-    FileModule(Tokens),
+    FileModule(FileModuleInfo),
     Type(TypeVariant),
 }
 
@@ -547,7 +553,7 @@ pub struct AST {
     pub parse_errors: Vec<ParseError>,
     pub semantic_errors: Vec<SemanticError>,
 
-    pub root_expr: Option<ExprID>,
+    pub curr_file_module: ScopeID,
 }
 
 impl AST {
@@ -642,10 +648,11 @@ impl AST {
             .expect("should have at least one module in modulepath");
 
         // store tokens here
+        // root expr will be set later (syntax analysis necessary)
 
         let new_module_scope_id = self.objs.scope_push(Scope {
             name: Some(TokenOrString::String(final_name.clone())),
-            variant: ScopeVariant::FileModule(tokens),
+            variant: ScopeVariant::FileModule(FileModuleInfo { tokens, root_expr: ExprID::default() }),
             parent_scope: scope_id,
             ..Default::default()
         });
@@ -665,6 +672,18 @@ impl AST {
 
         Ok(new_module_scope_id)
     }
+
+    // get tokens for current file
+    pub fn tokens(&self) -> &Tokens {
+        let scope_id = self.curr_file_module;
+
+        match &self.objs.scope(scope_id).variant {
+            ScopeVariant::FileModule(info) => &info.tokens,
+            _ => {
+                panic!("no current Tokens");
+            }
+        }
+    }
 }
 
 // module path is what module this file corresponds to e.g.
@@ -673,15 +692,33 @@ pub fn parse_file(ast: &mut AST, tokens: Tokens, modulepath: Vec<String>) {
     // tokens will be stored in Scope corresponding to module, so we create
     // that here with helper function and pass in tokens
     
-    ast.add_file_module(tokens, modulepath.clone());
+    let file_scope_id = match ast.add_file_module(tokens, modulepath.clone()) {
+        Ok(scope_id) => scope_id,
+        Err(_) => {
+            return;
+        }
+    };
     
+    // set this to indicate current file module being analyzed (its scope)
+
+    ast.curr_file_module = file_scope_id;
+
     // call to parse_expr does syntactic analysis
 
-    ast.do_syntax_analysis();
+    let root_expr = ast.do_syntax_analysis();
 
-    if let Some(expr) = ast.root_expr {
-        println!("{}", ast.expr_to_string(&tokens, expr));
+    // store root expr in info for current file/module
+
+    match &mut ast.objs.scope_mut(file_scope_id).variant {
+        ScopeVariant::FileModule(info) => {
+            info.root_expr = root_expr;
+        }
+        _ => {
+            panic!("file scope is not a file + module?");
+        }
     }
+
+    println!("{}", ast.expr_to_string(ast.tokens(), root_expr));
 
     let modulepath_string = modulepath.join(".");
 
@@ -700,13 +737,11 @@ pub fn parse_file(ast: &mut AST, tokens: Tokens, modulepath: Vec<String>) {
     let filepath = "helllllooo";
 
     // reenable later to test
-    ast.do_semantic_analysis(&tokens, filepath);
+    ast.do_semantic_analysis();
 
     eprintln!("RAN SEMANTIC ANALYSIS FUNC");
 
-    if let Some(expr) = ast.root_expr {
-        println!("{}", ast.expr_to_string(&tokens, expr));
-    }
+    println!("{}", ast.expr_to_string(ast.tokens(), root_expr));
 
     if ast.has_errors() {
         eprintln!("One or more semantic errors occurred, program will not be compiled.");
