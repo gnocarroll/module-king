@@ -1,8 +1,9 @@
 use crate::{
     constants::{ERROR_TYPE, UNIT_TYPE},
     parse::{
-        AST, ExprReturns, ExprVariant, FunctionLiteral, Identifier, Member, MemberVariant, Scope,
-        ScopeRefersTo, ScopeVariant, TokenOrString, Type, TypeOrModule, TypeVariant, Visibility,
+        AST, ExprReturns, ExprVariant, FunctionLiteral, HasFileModule, Identifier, Member,
+        MemberVariant, Scope, ScopeRefersTo, ScopeVariant, TokenOrString, Type, TypeOrModule,
+        TypeVariant, Visibility,
         ast_contents::{ExprID, FunctionID, MemberID, ScopeID, TypeID},
         errors::{DuplicateName, InvalidOperation, MissingOperand, PatternError, SemanticError},
         semantic::SemanticContext,
@@ -81,7 +82,7 @@ impl AST {
             variant: MemberVariant::Instance(type_id),
         });
 
-        self.scope_try_insert(ctx.tokens, scope, member_id)
+        self.scope_try_insert(scope, member_id)
     }
 
     pub fn set_expr_returns_unit(&mut self, _ctx: &mut SemanticContext, expr: ExprID) {
@@ -149,7 +150,7 @@ impl AST {
             None
         }
     }
-    
+
     // search provided scope for a given name and received Member if said name
     // can be found, also recurse to parent if needed
     pub fn scope_search(&self, scope: ScopeID, name: &str) -> Option<MemberID> {
@@ -213,7 +214,7 @@ impl AST {
             variant: MemberVariant::Type(type_id),
         });
 
-        self.scope_try_insert(ctx.tokens, scope, member_id)
+        self.scope_try_insert(scope, member_id)
     }
 
     // return is the id of the Scope which represents the type
@@ -246,7 +247,7 @@ impl AST {
             variant: MemberVariant::Type(type_id),
         });
 
-        self.scope_try_insert(ctx.tokens, scope, member_id)
+        self.scope_try_insert(scope, member_id)
     }
 
     // return is the id of the Scope which represents the type
@@ -265,7 +266,7 @@ impl AST {
             variant: MemberVariant::Type(type_id),
         });
 
-        self.scope_try_insert(ctx.tokens, scope, member_id)?;
+        self.scope_try_insert(scope, member_id)?;
 
         Ok(type_id)
     }
@@ -283,13 +284,12 @@ impl AST {
 
     pub fn scope_try_insert(
         &mut self,
-        tokens: &Tokens,
         scope: ScopeID,
         member_id: MemberID,
     ) -> Result<MemberID, DuplicateName> {
-        let name = &self.objs.member(member_id).name;
-
-        let name = tokens.tok_or_string_to_string(name);
+        let name = member_id
+            .get_name(self)
+            .expect("name should be guaranteed for Member");
 
         if let Err(e) = self.objs.scope_mut(scope).members.insert(name, member_id) {
             self.semantic_errors
@@ -318,7 +318,7 @@ impl AST {
 
         // insert to provided scope
 
-        self.scope_try_insert(ctx, scope, member_id)?;
+        self.scope_try_insert(scope, member_id)?;
 
         Ok(member_id)
     }
@@ -491,7 +491,11 @@ impl AST {
         }
     }
 
-    pub fn type_from_inner(&mut self, inner_type_id: TypeID, to_type: impl Fn(TypeID) -> Type) -> TypeID {
+    pub fn type_from_inner(
+        &mut self,
+        inner_type_id: TypeID,
+        to_type: impl Fn(TypeID) -> Type,
+    ) -> TypeID {
         self.objs.type_push(to_type(inner_type_id))
     }
 
@@ -502,7 +506,7 @@ impl AST {
 
         match self.objs.type_get(type_id) {
             Type::Tuple((t, None)) => self.type_resolve_aliasing(*t),
-            _ => type_id
+            _ => type_id,
         }
     }
 }
