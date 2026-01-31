@@ -10,7 +10,7 @@ use crate::{
     parse::{
         ast_contents::{ASTContents, ExprID, FunctionID, MemberID, PatternID, ScopeID, TypeID},
         builtin::Builtin,
-        errors::{ParseError, SemanticError},
+        errors::{DuplicateName, ParseError, SemanticError},
         scope_members::ScopeMembers,
     },
     scan::{Token, TokenType},
@@ -166,10 +166,11 @@ impl Default for Type {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub enum ScopeVariant {
     Scope, // e.g. scope for a for loop or other block
     Module,
+    FileModule(Tokens),
     Type(TypeVariant),
 }
 
@@ -552,11 +553,55 @@ impl AST {
             }
         }
     }
+
+    fn add_file_module(&mut self, tokens: Tokens, modulepath: Vec<String>) -> Result<ScopeID, DuplicateName> {
+        let mut scope_id = ScopeID::global();
+        let mut curr_scope = self.objs.scope(scope_id);
+
+        let create_child_module = |ast: &mut AST, insert_to: ScopeID, name: String| -> MemberID {
+            let new_module_scope_id = ast.objs.scope_push(Scope {
+                name: TokenOrString::String(name.clone()),
+                variant: ScopeVariant::Scope,
+                parent_scope: insert_to,
+                ..Default::default()
+            });
+
+            let member_id = self.objs.member_push(Member {
+                name: TokenOrString::String(name),
+                visibility: Visibility::Export,
+                variant: MemberVariant::Module(new_module_scope_id),
+            });
+
+            ast.scope_try_insert(&tokens, insert_to, member_id)
+        };
+
+        for module_name in &modulepath {
+            scope_id = match curr_scope.members.get(module_name) {
+                Some(member_id) => {
+                    match self.objs.member(member_id).variant {
+                        MemberVariant::Module(scope_id) => scope_id,
+                        _ => {
+                            self.semantic_errors.push(SemanticError::DuplicateName(DuplicateName {
+                                name: (),
+                                old_member: (),
+                                new_member: (),
+                            }))
+                        }
+                    }
+                }
+                None => {
+
+                }
+            };
+        }
+
+        Ok(scope_id)
+    }
 }
 
 // module path is what module this file corresponds to e.g.
 // [a, b, c] would correspond to module a.b.c
-pub fn parse_file(ast: &mut AST, mut tokens: Tokens, modulepath: Vec<String>) {
+pub fn parse_file(ast: &mut AST, tokens: Tokens, modulepath: Vec<String>) {
     // call to parse_expr does syntactic analysis
 
     ast.do_syntax_analysis(&mut tokens);

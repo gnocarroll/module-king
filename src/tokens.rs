@@ -12,6 +12,7 @@ pub struct ExpectedToken {
     pub found: Token,
 }
 
+#[derive(Clone)]
 pub struct Tokens {
     file_str: Vec<u8>,
     tokens: Vec<Token>,
