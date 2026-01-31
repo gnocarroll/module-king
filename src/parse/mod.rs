@@ -21,7 +21,7 @@ use crate::{
 trait HasFileModule {
     fn file_module_scope(&self, ast: &AST) -> ScopeID;
     fn get_name(&self, ast: &AST) -> Option<String>;
-    
+
     fn get_tokens<'a>(&self, ast: &'a AST) -> &'a Tokens {
         let scope_id = self.file_module_scope(ast);
 
@@ -582,57 +582,102 @@ impl AST {
         }
     }
 
-    fn add_file_module(&mut self, tokens: Tokens, modulepath: Vec<String>) -> Result<ScopeID, DuplicateName> {
+    fn add_file_module(
+        &mut self,
+        tokens: Tokens,
+        modulepath: Vec<String>,
+    ) -> Result<ScopeID, DuplicateName> {
+        let modulepath_len = modulepath.len();
+
         let mut scope_id = ScopeID::global();
-        let mut curr_scope = self.objs.scope(scope_id);
 
-        let create_child_module = |ast: &mut AST, insert_to: ScopeID, name: String| -> MemberID {
-            let new_module_scope_id = ast.objs.scope_push(Scope {
-                name: TokenOrString::String(name.clone()),
-                variant: ScopeVariant::Scope,
-                parent_scope: insert_to,
-                ..Default::default()
-            });
+        let create_child_module =
+            |ast: &mut AST, insert_to: ScopeID, name: String| -> Result<MemberID, DuplicateName> {
+                let new_module_scope_id = ast.objs.scope_push(Scope {
+                    name: Some(TokenOrString::String(name.clone())),
+                    variant: ScopeVariant::Scope,
+                    parent_scope: insert_to,
+                    ..Default::default()
+                });
 
-            let member_id = self.objs.member_push(Member {
-                name: TokenOrString::String(name),
-                visibility: Visibility::Export,
-                variant: MemberVariant::Module(new_module_scope_id),
-            });
+                // if last then this is the file module itself so set scope properly
 
-            ast.scope_try_insert(&tokens, insert_to, member_id)
-        };
+                let member_id = ast.objs.member_push(Member {
+                    name: TokenOrString::String(name),
+                    visibility: Visibility::Export,
+                    variant: MemberVariant::Module(new_module_scope_id),
+                    ..Default::default()
+                });
 
-        for module_name in &modulepath {
-            scope_id = match curr_scope.members.get(module_name) {
-                Some(member_id) => {
-                    match self.objs.member(member_id).variant {
-                        MemberVariant::Module(scope_id) => scope_id,
-                        _ => {
-                            self.semantic_errors.push(SemanticError::DuplicateName(DuplicateName {
-                                name: (),
-                                old_member: (),
-                                new_member: (),
-                            }))
-                        }
+                ast.scope_try_insert(insert_to, member_id)
+            };
+
+        for module_name in &modulepath[..(modulepath_len - 1)] {
+            scope_id = if let Some(member_id) = self.objs.scope(scope_id).members.get(module_name) {
+                match self.objs.member(member_id).variant {
+                    MemberVariant::Module(scope_id) => scope_id,
+                    _ => {
+                        create_child_module(self, scope_id, module_name.clone())?;
+
+                        panic!("err should be guaranteed for prev function call");
                     }
                 }
-                None => {
+            } else {
+                let member_id = create_child_module(self, scope_id, module_name.clone())?;
 
+                match self.objs.member(member_id).variant {
+                    MemberVariant::Module(scope_id) => scope_id,
+                    _ => {
+                        panic!("should have just created module member");
+                    }
                 }
             };
         }
 
-        Ok(scope_id)
+        // last module in modulepath refers to file, so make sure we set it up properly
+        // e.g. store tokens, indicate it is the file module scope
+
+        let final_name = modulepath
+            .last()
+            .expect("should have at least one module in modulepath");
+
+        // store tokens here
+
+        let new_module_scope_id = self.objs.scope_push(Scope {
+            name: Some(TokenOrString::String(final_name.clone())),
+            variant: ScopeVariant::FileModule(tokens),
+            parent_scope: scope_id,
+            ..Default::default()
+        });
+
+        self.objs.scope_mut(new_module_scope_id).file_module = new_module_scope_id;
+
+        // if last then this is the file module itself so set scope properly
+
+        let member_id = self.objs.member_push(Member {
+            name: TokenOrString::String(final_name.clone()),
+            visibility: Visibility::Export,
+            variant: MemberVariant::Module(new_module_scope_id),
+            file_module: new_module_scope_id,
+        });
+
+        self.scope_try_insert(scope_id, member_id);
+
+        Ok(new_module_scope_id)
     }
 }
 
 // module path is what module this file corresponds to e.g.
 // [a, b, c] would correspond to module a.b.c
 pub fn parse_file(ast: &mut AST, tokens: Tokens, modulepath: Vec<String>) {
+    // tokens will be stored in Scope corresponding to module, so we create
+    // that here with helper function and pass in tokens
+    
+    ast.add_file_module(tokens, modulepath.clone());
+    
     // call to parse_expr does syntactic analysis
 
-    ast.do_syntax_analysis(&mut tokens);
+    ast.do_syntax_analysis();
 
     if let Some(expr) = ast.root_expr {
         println!("{}", ast.expr_to_string(&tokens, expr));
