@@ -190,9 +190,43 @@ impl TypeID {
     }
 }
 
+impl HasFileModule for TypeID {
+    fn file_module_scope(&self, ast: &AST) -> ScopeID {
+        let type_id = ast.type_resolve_aliasing(*self);
+
+        match ast.objs.type_get(type_id) {
+            Type::Scope(scope_id) => scope_id.file_module_scope(ast),
+            _ => {
+                panic!("only Scope type has file module scope");
+            }
+        }
+    }
+    fn get_name(&self, ast: &AST) -> Option<String> {
+        let type_id = ast.type_resolve_aliasing(*self);
+
+        match &ast.objs.type_get(type_id) {
+            Type::Scope(scope_id) => scope_id.get_name(ast),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub struct MemberID {
     id: u32,
+}
+
+impl HasFileModule for MemberID {
+    fn file_module_scope(&self, ast: &AST) -> ScopeID {
+        ast.objs.member(*self).file_module
+    }
+
+    fn get_name(&self, ast: &AST) -> Option<String> {
+        Some(
+            self.get_tokens(ast)
+                .tok_or_string_to_string(&ast.objs.member(*self).name),
+        )
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
