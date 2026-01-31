@@ -12,28 +12,26 @@ pub struct ExpectedToken {
     pub found: Token,
 }
 
-pub struct Tokens<'a> {
-    file_str: &'a str,
-    tokens: &'a Vec<Token>,
+pub struct Tokens {
+    file_str: Vec<u8>,
+    tokens: Vec<Token>,
 
     // token not file offset
     offset: usize,
 }
 
-impl<'a> Tokens<'a> {
-    pub fn new(file_str: &'a [u8], tokens: &'a Vec<Token>) -> Self {
+impl Tokens {
+    pub fn new(file_str: Vec<u8>, tokens: Vec<Token>) -> Self {
         Tokens {
-            file_str: std::str::from_utf8(file_str).expect(
-                "earlier checks should guarantee valid utf8 str",
-            ),
-            tokens: tokens,
+            file_str,
+            tokens,
             offset: 0,
         }
     }
 
     // Token -> &str
     pub fn tok_as_str(&self, token: &Token) -> &str {
-        token.as_str(self.file_str.as_bytes())
+        token.as_str(&self.file_str)
     }
 
     pub fn tok_or_string_to_string(&self, token_or_string: &TokenOrString) -> String {

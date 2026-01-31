@@ -556,17 +556,21 @@ impl AST {
 
 // module path is what module this file corresponds to e.g.
 // [a, b, c] would correspond to module a.b.c
-pub fn parse_file(ast: &mut AST, tokens: &mut Tokens, modulepath: Vec<String>) {
+pub fn parse_file(ast: &mut AST, mut tokens: Tokens, modulepath: Vec<String>) {
     // call to parse_expr does syntactic analysis
 
-    ast.do_syntax_analysis(tokens);
+    ast.do_syntax_analysis(&mut tokens);
 
     if let Some(expr) = ast.root_expr {
         println!("{}", ast.expr_to_string(&tokens, expr));
     }
 
+    let modulepath_string = modulepath.join(".");
+
     if ast.has_errors() {
-        eprintln!("One or more syntax errors occurred, program will not be compiled.");
+        eprintln!(
+            "One or more syntax errors occurred, module {modulepath_string} will not be compiled."
+        );
 
         ast.display_parse_errors(&tokens);
 

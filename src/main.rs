@@ -90,7 +90,7 @@ fn main() -> ExitCode {
             eprintln!(
                 "Processing of file {} failed: {}",
                 filepath,
-                e.msg,
+                e,
             );
         }
     }
@@ -98,52 +98,27 @@ fn main() -> ExitCode {
     0.into()
 }
 
-enum FailVariant {
-    Read,
-    Scan,
-}
-
-struct ProcessFail {
-    pub msg: String,
-    pub variant: FailVariant,
-}
-
-fn process_file(ast: &mut AST, filepath: &str, modulepath: Vec<String>) -> Result<(), ProcessFail> {
+fn process_file(ast: &mut AST, filepath: &str, modulepath: Vec<String>) -> Result<(), String> {
     eprintln!("PROCESSING FILE: {filepath}");
-
-    eprintln!("modulepath: {}", modulepath.join("."));
-
-    // for now do not actually process
-
-    return Ok(());
 
     let file_string = match std::fs::read_to_string(filepath) {
         Ok(s) => s,
         Err(_) => {
-            return Err(ProcessFail {
-                msg: format!("reading in file {filepath} failed"),
-                variant: FailVariant::Read,
-            });
+            return Err(format!("reading in file {filepath} failed"));
         }
     };
 
     let file_string = match crate::util::string_to_ascii(file_string) {
         Ok(s) => s,
         Err(_) => {
-            return Err(ProcessFail {
-                msg: format!("a char in {filepath} could not be converted to u8"),
-                variant: FailVariant::Read,
-            });
+            return Err(format!("a char in {filepath} could not be converted to u8"));
         }
     };
 
     let tokens = match scan::tokenize(&file_string) {
         Ok(tokens) => tokens,
         Err(msg) => {
-            return Err(ProcessFail {
-                msg: format!("Tokenization of file {} failed: {}", filepath, msg),
-                variant: FailVariant::Read,
-            });
+            return Err(format!("Tokenization of file {} failed: {}", filepath, msg));
         }
     };
 
@@ -158,9 +133,9 @@ fn process_file(ast: &mut AST, filepath: &str, modulepath: Vec<String>) -> Resul
     //     );
     // }
 
-    let mut tokens = Tokens::new(&file_string, &tokens);
+    let tokens = Tokens::new(file_string, tokens);
 
-    parse::parse_file(ast, &mut tokens, modulepath);
+    parse::parse_file(ast, tokens, modulepath);
 
     Ok(())
 }
