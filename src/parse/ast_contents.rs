@@ -4,8 +4,7 @@
 use crate::{
     constants::{ERROR_TYPE, STRING_TYPE, UNIT_TYPE},
     parse::{
-        AST, Expr, Function, Member, MemberVariant, Pattern, PatternIterator, Scope, ScopeVariant,
-        TupleIterator, Type, Visibility,
+        AST, Expr, Function, HasFileModule, Member, MemberVariant, Pattern, PatternIterator, Scope, ScopeVariant, TupleIterator, Type, Visibility
     },
     tokens::TokenOrString,
 };
@@ -48,6 +47,7 @@ impl Default for ASTContents {
             variant: ScopeVariant::Module,
             parent_scope: ScopeID::global(),
             refers_to: None,
+            file_module: ScopeID::global(),
             ..Default::default()
         });
 
@@ -77,6 +77,7 @@ impl Default for ASTContents {
                 name: TokenOrString::String(name.to_string()),
                 visibility: Visibility::Export,
                 variant: MemberVariant::Type(type_id),
+                file_module: ScopeID::global(),
             });
 
             ret.scope_mut(ScopeID::global())
@@ -92,6 +93,15 @@ impl Default for ASTContents {
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub struct ExprID {
     id: u32,
+}
+
+impl HasFileModule for ExprID {
+    fn file_module_scope(&self, ast: &AST) -> ScopeID {
+        ast.objs.expr(*self).file_module
+    }
+    fn get_name(&self, _ast: &AST) -> Option<String> {
+        None
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]

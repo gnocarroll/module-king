@@ -17,6 +17,23 @@ use crate::{
     tokens::{ExpectedToken, TokenOrString, Tokens},
 };
 
+// will implement this for some of the IDs to get their file module scope and name
+trait HasFileModule {
+    fn file_module_scope(&self, ast: &AST) -> ScopeID;
+    fn get_name(&self, ast: &AST) -> Option<String>;
+    
+    fn get_tokens<'a>(&self, ast: &'a AST) -> &'a Tokens {
+        let scope_id = self.file_module_scope(ast);
+
+        match &ast.objs.scope(scope_id).variant {
+            ScopeVariant::FileModule(tokens) => tokens,
+            _ => {
+                panic!("could not get Tokens for HasFileModule");
+            }
+        }
+    }
+}
+
 // this is only for the basic types that a user can build on top of
 // e.g. a user can create a new Integer type
 // it is not for types which will remain truly built-in e.g. Unit
@@ -202,6 +219,8 @@ pub struct Function {
 
     // order in Vec should be order they are listed in program
     pub params: Vec<PatternID>,
+
+    pub file_module: ScopeID,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -313,6 +332,8 @@ pub struct Expr {
     // start off false and then set to true if/when semantic analysis is
     // successfully completed for Expr
     pub finalized: bool,
+
+    pub file_module: ScopeID,
 }
 
 impl Default for Expr {
@@ -324,6 +345,7 @@ impl Default for Expr {
             variant: ExprVariant::Unit,
             is_var: false,
             finalized: false,
+            file_module: ScopeID::default(),
         }
     }
 }
@@ -370,6 +392,8 @@ pub struct Member {
     pub visibility: Visibility,
 
     pub variant: MemberVariant,
+
+    pub file_module: ScopeID,
 }
 
 impl Default for Member {
@@ -378,6 +402,7 @@ impl Default for Member {
             name: TokenOrString::String("".to_string()),
             visibility: Visibility::Private,
             variant: MemberVariant::Instance(TypeID::error()),
+            file_module: ScopeID::default(),
         }
     }
 }
@@ -406,6 +431,8 @@ pub struct Scope {
     pub refers_to: Option<ScopeRefersTo>,
 
     pub members: ScopeMembers,
+
+    pub file_module: ScopeID,
 }
 
 impl Default for Scope {
@@ -416,6 +443,7 @@ impl Default for Scope {
             parent_scope: ScopeID::default(),
             refers_to: None,
             members: ScopeMembers::default(),
+            file_module: ScopeID::default(),
         }
     }
 }
