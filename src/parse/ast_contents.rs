@@ -4,7 +4,8 @@
 use crate::{
     constants::{ERROR_TYPE, STRING_TYPE, UNIT_TYPE},
     parse::{
-        AST, Expr, Function, HasFileModule, Member, MemberVariant, Pattern, PatternIterator, Scope, ScopeVariant, TupleIterator, Type, Visibility
+        AST, Expr, Function, HasFileModule, Member, MemberVariant, Pattern, PatternIterator, Scope,
+        ScopeVariant, TupleIterator, Type, Visibility,
     },
     tokens::TokenOrString,
 };
@@ -109,9 +110,36 @@ pub struct FunctionID {
     id: u32,
 }
 
+impl HasFileModule for FunctionID {
+    fn file_module_scope(&self, ast: &AST) -> ScopeID {
+        ast.objs.function(*self).file_module
+    }
+    fn get_name(&self, ast: &AST) -> Option<String> {
+        match ast.objs.function(*self).name {
+            Some(token) => Some(self.get_tokens(ast).tok_as_str(&token).to_string()),
+            None => None,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub struct ScopeID {
     id: u32,
+}
+
+impl HasFileModule for ScopeID {
+    fn file_module_scope(&self, ast: &AST) -> ScopeID {
+        ast.objs.scope(*self).file_module
+    }
+    fn get_name(&self, ast: &AST) -> Option<String> {
+        match &ast.objs.scope(*self).name {
+            Some(token_or_string) => Some(
+                self.get_tokens(ast)
+                    .tok_or_string_to_string(&token_or_string),
+            ),
+            None => None,
+        }
+    }
 }
 
 impl ScopeID {
