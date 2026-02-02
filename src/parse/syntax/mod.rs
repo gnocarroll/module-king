@@ -167,7 +167,9 @@ impl AST {
                     // this will cause sensible error message about expecting end token
                     let _ = self.expect(TokenType::End);
 
-                    let peek = self.tokens_mut().sync(&[TokenType::End, TokenType::Semicolon]);
+                    let peek = self
+                        .tokens_mut()
+                        .sync(&[TokenType::End, TokenType::Semicolon]);
 
                     match peek.ttype {
                         TokenType::End => {
@@ -216,7 +218,7 @@ impl AST {
         let attempt_parse_func = |ast: &mut AST| {
             if ast.expect(TokenType::LParen).is_err() {
                 let tok_idx = ast.tokens_idx();
-                
+
                 return (
                     false,
                     ast.expr_unit(tok_idx),
@@ -239,7 +241,7 @@ impl AST {
             }
 
             let return_type = match ast.tokens_peek().ttype {
-                TokenType::Return => ast.expr_unit(ast.tokens_idx()),
+                TokenType::Begin | TokenType::Return => ast.expr_unit(ast.tokens_idx()),
                 _ => ast.parse_expr(),
             };
 
@@ -247,12 +249,10 @@ impl AST {
             // body since this could lead to e.g. a lot of the rest of the
             // file being consumed as part of func body
 
-            let body = ast.parse_expr_bp(
-                match operator::get_bp(TokenType::Comma, Infix) {
-                    Some((l_bp, _)) => l_bp + 1,
-                    _ => panic!("comma is not infix op?"),
-                },
-            );
+            let body = ast.parse_expr_bp(match operator::get_bp(TokenType::Comma, Infix) {
+                Some((l_bp, _)) => l_bp + 1,
+                _ => panic!("comma is not infix op?"),
+            });
 
             // if body of function is block expr check for desired terminating token
             // (keyword "function")
@@ -367,7 +367,11 @@ impl AST {
             .expect_sequence(&[TokenType::End, type_variant_tok.ttype])
             .is_err()
         {
-            let tok = self.tokens_mut().sync(&[TokenType::Semicolon, TokenType::End, type_variant_tok.ttype]);
+            let tok = self.tokens_mut().sync(&[
+                TokenType::Semicolon,
+                TokenType::End,
+                type_variant_tok.ttype,
+            ]);
 
             match tok.ttype {
                 TokenType::End => {
@@ -466,9 +470,7 @@ impl AST {
             TokenType::While => self.parse_while(),
             TokenType::Function => self.parse_function(),
             TokenType::KWInteger | TokenType::KWFloat => self.parse_number_type_literal(),
-            TokenType::Record | TokenType::Variant | TokenType::Enum => {
-                self.parse_record_literal()
-            }
+            TokenType::Record | TokenType::Variant | TokenType::Enum => self.parse_record_literal(),
             // if no atom or other (e.g. prefix) expr is found return Unit
             _ => self.expr_unit(tok_idx),
         }
