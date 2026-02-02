@@ -588,6 +588,14 @@ impl AST {
         }
     }
 
+    // set curr file module for AST itself and ASTContents struct
+
+    pub fn set_curr_file_module(&mut self, curr_file_module: ScopeID) {
+        self.curr_file_module = curr_file_module;
+
+        self.objs.set_curr_file_module(curr_file_module);
+    }
+
     fn add_file_module(
         &mut self,
         tokens: Tokens,
@@ -680,6 +688,17 @@ impl AST {
             }
         }
     }
+
+    pub fn root_expr(&self) -> ExprID {
+        let scope_id = self.curr_file_module;
+
+        match &self.objs.scope_mut(scope_id).variant {
+            ScopeVariant::FileModule(info) => info.root_expr,
+            _ => {
+                panic!("no current Tokens");
+            }
+        }
+    }
 }
 
 // module path is what module this file corresponds to e.g.
@@ -696,10 +715,9 @@ pub fn parse_file(ast: &mut AST, tokens: Tokens, modulepath: Vec<String>) {
     };
     
     // set this to indicate current file module being analyzed (its scope)
-    // also set for ASTContents
+    // also set for ASTContents (happens inside this helper method)
 
-    ast.curr_file_module = file_scope_id;
-    ast.objs.set_curr_file_module(file_scope_id);
+    ast.set_curr_file_module(file_scope_id);
 
     // call to parse_expr does syntactic analysis
 

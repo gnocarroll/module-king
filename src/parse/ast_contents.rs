@@ -250,6 +250,9 @@ impl ASTContents {
         self.curr_file_module = curr_file_module;
     }
 
+    // push methods here will set the file module of the AST objects
+    // (links them to corresponding Tokens so you could e.g. get the text associated with a Token)
+
     // Expr
 
     pub fn expr_push(&mut self, mut expr: Expr) -> ExprID {
