@@ -593,15 +593,15 @@ impl AST {
         tokens: Tokens,
         modulepath: Vec<String>,
     ) -> Result<ScopeID, DuplicateName> {
-        let modulepath_len = modulepath.len();
-
         let mut scope_id = ScopeID::global();
+
+        // helper function to create new child module
 
         let create_child_module =
             |ast: &mut AST, insert_to: ScopeID, name: String| -> Result<MemberID, DuplicateName> {
                 let new_module_scope_id = ast.objs.scope_push(Scope {
                     name: Some(TokenOrString::String(name.clone())),
-                    variant: ScopeVariant::Scope,
+                    variant: ScopeVariant::Module,
                     parent_scope: insert_to,
                     ..Default::default()
                 });
@@ -618,7 +618,9 @@ impl AST {
                 ast.scope_try_insert(insert_to, member_id)
             };
 
-        for module_name in &modulepath[..(modulepath_len - 1)] {
+        for module_name in &modulepath {
+            // if module already exists get it, else use helper function to create it
+
             scope_id = if let Some(member_id) = self.objs.scope(scope_id).members.get(module_name) {
                 match self.objs.member(member_id).variant {
                     MemberVariant::Module(scope_id) => scope_id,
@@ -640,37 +642,19 @@ impl AST {
             };
         }
 
-        // last module in modulepath refers to file, so make sure we set it up properly
-        // e.g. store tokens, indicate it is the file module scope
+        // last scope we get is the file module scope
+        // so it is special and we should set its "variant" field
+        // and its file module is itself
 
-        let final_name = modulepath
-            .last()
-            .expect("should have at least one module in modulepath");
+        let scope_mut = self.objs.scope_mut(scope_id);
 
-        // store tokens here
-        // root expr will be set later (syntax analysis necessary)
-
-        let new_module_scope_id = self.objs.scope_push(Scope {
-            name: Some(TokenOrString::String(final_name.clone())),
-            variant: ScopeVariant::FileModule(FileModuleInfo { tokens, root_expr: ExprID::default() }),
-            parent_scope: scope_id,
-            ..Default::default()
+        scope_mut.variant = ScopeVariant::FileModule(FileModuleInfo {
+            tokens,
+            root_expr: ExprID::default(),
         });
+        scope_mut.file_module = scope_id;
 
-        self.objs.scope_mut(new_module_scope_id).file_module = new_module_scope_id;
-
-        // if last then this is the file module itself so set scope properly
-
-        let member_id = self.objs.member_push(Member {
-            name: TokenOrString::String(final_name.clone()),
-            visibility: Visibility::Export,
-            variant: MemberVariant::Module(new_module_scope_id),
-            file_module: new_module_scope_id,
-        });
-
-        self.scope_try_insert(scope_id, member_id);
-
-        Ok(new_module_scope_id)
+        Ok(scope_id)
     }
 
     // get tokens for current file
