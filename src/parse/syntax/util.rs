@@ -109,6 +109,18 @@ pub fn tok_parse_string(tokens: &Tokens, tok: Token) -> Option<Vec<u8>> {
 }
 
 impl AST {
+    pub fn tokens_peek(&self) -> Token {
+        self.tokens().peek()
+    }
+
+    pub fn tokens_idx(&self) -> u32 {
+        self.tokens().idx()
+    }
+
+    pub fn tokens_next(&mut self) -> Token {
+        self.tokens_mut().next()
+    }
+
     pub fn type_to_string(&self, tokens: &Tokens, type_id: TypeID) -> String {
         let type_ref = self.objs.type_get(type_id);
 

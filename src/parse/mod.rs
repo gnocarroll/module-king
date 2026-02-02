@@ -668,6 +668,18 @@ impl AST {
             }
         }
     }
+
+    // get tokens for current file
+    pub fn tokens_mut(&mut self) -> &mut Tokens {
+        let scope_id = self.curr_file_module;
+
+        match &mut self.objs.scope_mut(scope_id).variant {
+            ScopeVariant::FileModule(info) => &mut info.tokens,
+            _ => {
+                panic!("no current Tokens");
+            }
+        }
+    }
 }
 
 // module path is what module this file corresponds to e.g.

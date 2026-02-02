@@ -1,7 +1,7 @@
 // utility functionality related to Expr struct
 
 use crate::{
-    parse::{AST, Expr, ExprVariant, If, Operation, Tokens, ast_contents::ExprID},
+    parse::{AST, Expr, ExprVariant, If, Operation, ast_contents::ExprID},
     scan::Token,
 };
 
@@ -32,8 +32,8 @@ impl AST {
         })
     }
 
-    pub fn expr_dollar_number(&mut self, tokens: &Tokens, tok_idx: u32, tok: &Token) -> ExprID {
-        let mut chars = tokens.tok_as_str(tok).chars();
+    pub fn expr_dollar_number(&mut self, tok_idx: u32, tok: &Token) -> ExprID {
+        let mut chars = self.tokens().tok_as_str(tok).chars();
 
         chars.next();
 

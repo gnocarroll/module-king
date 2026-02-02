@@ -16,8 +16,8 @@ use crate::{
 };
 
 impl AST {
-    fn expect(&mut self, tokens: &mut Tokens, ttype: TokenType) -> Result<Token, ExpectedToken> {
-        let ret = tokens.expect(ttype);
+    fn expect(&mut self, ttype: TokenType) -> Result<Token, ExpectedToken> {
+        let ret = self.tokens_mut().expect(ttype);
 
         if let Err(e) = &ret {
             self.parse_errors.push(ParseError::ExpectedToken(*e))
@@ -27,15 +27,11 @@ impl AST {
     }
 
     // expect sequence of tokens, returns last one
-    fn expect_sequence(
-        &mut self,
-        tokens: &mut Tokens,
-        ttypes: &[TokenType],
-    ) -> Result<Token, ExpectedToken> {
+    fn expect_sequence(&mut self, ttypes: &[TokenType]) -> Result<Token, ExpectedToken> {
         let mut ret: Token = Token::default();
 
         for ttype in ttypes {
-            ret = match self.expect(tokens, *ttype) {
+            ret = match self.expect(*ttype) {
                 Ok(t) => t,
                 Err(e) => return Err(e),
             }
@@ -64,41 +60,43 @@ impl AST {
         }
     }
 
-    fn parse_while(&mut self, tokens: &mut Tokens) -> ExprID {
-        let start_tok_idx = tokens.idx();
+    fn parse_while(&mut self) -> ExprID {
+        let start_tok_idx = self.tokens_idx();
 
-        tokens.next();
+        self.tokens_next();
 
-        let cond = self.parse_expr(tokens);
+        let cond = self.parse_expr();
 
-        let _ = self.expect(tokens, TokenType::Do);
+        let _ = self.expect(TokenType::Do);
 
-        let body = self.parse_expr(tokens);
+        let body = self.parse_expr();
 
         if self
-            .expect_sequence(tokens, &[TokenType::End, TokenType::While])
+            .expect_sequence(&[TokenType::End, TokenType::While])
             .is_err()
         {
-            let found = tokens.sync(&[TokenType::End, TokenType::Semicolon]);
+            let found = self
+                .tokens_mut()
+                .sync(&[TokenType::End, TokenType::Semicolon]);
 
             if found.ttype == TokenType::End {
-                tokens.next();
+                self.tokens_next();
 
-                if tokens.peek().ttype == TokenType::While {
-                    tokens.next();
+                if self.tokens_peek().ttype == TokenType::While {
+                    self.tokens_next();
                 }
             }
         }
 
         self.objs.expr_push(Expr {
             tok: start_tok_idx,
-            end_tok: tokens.idx(),
+            end_tok: self.tokens_idx(),
             variant: ExprVariant::While(While { cond, body }),
             ..Default::default()
         })
     }
 
-    fn parse_if(&mut self, tokens: &mut Tokens) -> ExprID {
+    fn parse_if(&mut self) -> ExprID {
         let set_else_arm = |ast: &mut AST, target: Option<ExprID>, else_expr: ExprID| {
             if let Some(target) = target {
                 match &mut ast.objs.expr_mut(target).variant {
@@ -120,13 +118,13 @@ impl AST {
 
         loop {
             // consume if/elif token
-            tokens.next();
+            self.tokens_next();
 
-            let cond = self.parse_expr(tokens);
+            let cond = self.parse_expr();
 
-            let _ = tokens.expect(TokenType::Then);
+            let _ = self.expect(TokenType::Then);
 
-            let body = self.parse_expr(tokens);
+            let body = self.parse_expr();
 
             // else_expr is set later
             let if_expr = self.expr_if(cond, body, None, is_elif);
@@ -140,43 +138,43 @@ impl AST {
 
             set_else_arm(self, prev_expr, if_expr);
 
-            match tokens.peek().ttype {
+            match self.tokens_peek().ttype {
                 TokenType::Elif => (), // => do another loop
 
                 // otherwise loop will be terminating because of else, end, or invalid token
                 TokenType::Else => {
-                    tokens.next();
+                    self.tokens_next();
 
-                    let else_expr = self.parse_expr(tokens);
+                    let else_expr = self.parse_expr();
 
                     set_else_arm(self, Some(if_expr), else_expr);
 
                     if self
-                        .expect_sequence(tokens, &[TokenType::End, TokenType::If])
+                        .expect_sequence(&[TokenType::End, TokenType::If])
                         .is_err()
                     {
-                        tokens.sync(&[TokenType::Semicolon]);
+                        self.tokens_mut().sync(&[TokenType::Semicolon]);
                     }
 
                     break;
                 }
                 TokenType::End => {
-                    tokens.next();
-                    let _ = self.expect(tokens, TokenType::If);
+                    self.tokens_next();
+                    let _ = self.expect(TokenType::If);
                     break;
                 }
                 _ => {
                     // this will cause sensible error message about expecting end token
-                    let _ = self.expect(tokens, TokenType::End);
+                    let _ = self.expect(TokenType::End);
 
-                    let peek = tokens.sync(&[TokenType::End, TokenType::Semicolon]);
+                    let peek = self.tokens_mut().sync(&[TokenType::End, TokenType::Semicolon]);
 
                     match peek.ttype {
                         TokenType::End => {
-                            tokens.next();
+                            self.tokens_next();
 
-                            if tokens.peek().ttype != TokenType::Semicolon {
-                                tokens.next();
+                            if self.tokens_peek().ttype != TokenType::Semicolon {
+                                self.tokens_next();
                             }
                         }
                         _ => (),
@@ -197,16 +195,16 @@ impl AST {
 
     // NOTE: this function assumes "function" is upcoming token so that should
     // have been checked at call site
-    fn parse_function(&mut self, tokens: &mut Tokens) -> ExprID {
-        let tok_idx = tokens.idx();
+    fn parse_function(&mut self) -> ExprID {
+        let tok_idx = self.tokens_idx();
 
-        tokens.next();
+        self.tokens_next();
 
-        let tok = tokens.peek();
+        let tok = self.tokens_peek();
 
         let name = match tok.ttype {
             TokenType::Identifier => {
-                tokens.next();
+                self.tokens_next();
 
                 Some(tok)
             }
@@ -215,30 +213,34 @@ impl AST {
 
         // having this in lambda makes it easy to jump ahead if failure occurs
         // it is Temu goto
-        let attempt_parse_func = |ast: &mut AST, tokens: &mut Tokens| {
-            if ast.expect(tokens, TokenType::LParen).is_err() {
+        let attempt_parse_func = |ast: &mut AST| {
+            if ast.expect(TokenType::LParen).is_err() {
+                let tok_idx = ast.tokens_idx();
+                
                 return (
                     false,
-                    ast.expr_unit(tokens.idx()),
-                    ast.expr_unit(tokens.idx()),
-                    ast.expr_unit(tokens.idx()),
+                    ast.expr_unit(tok_idx),
+                    ast.expr_unit(tok_idx),
+                    ast.expr_unit(tok_idx),
                 );
             }
 
-            let params = ast.parse_expr(tokens);
+            let params = ast.parse_expr();
 
-            if ast.expect(tokens, TokenType::RParen).is_err() {
+            if ast.expect(TokenType::RParen).is_err() {
+                let tok_idx = ast.tokens_idx();
+
                 return (
                     false,
                     params,
-                    ast.expr_unit(tokens.idx()),
-                    ast.expr_unit(tokens.idx()),
+                    ast.expr_unit(tok_idx),
+                    ast.expr_unit(tok_idx),
                 );
             }
 
-            let return_type = match tokens.peek().ttype {
-                TokenType::Return => ast.expr_unit(tokens.idx()),
-                _ => ast.parse_expr(tokens),
+            let return_type = match ast.tokens_peek().ttype {
+                TokenType::Return => ast.expr_unit(ast.tokens_idx()),
+                _ => ast.parse_expr(),
             };
 
             // prevent consumption of semicolon/comma if there is one after function
@@ -246,7 +248,6 @@ impl AST {
             // file being consumed as part of func body
 
             let body = ast.parse_expr_bp(
-                tokens,
                 match operator::get_bp(TokenType::Comma, Infix) {
                     Some((l_bp, _)) => l_bp + 1,
                     _ => panic!("comma is not infix op?"),
@@ -260,7 +261,7 @@ impl AST {
                 ExprVariant::Operation(Operation {
                     op: TokenType::Begin,
                     ..
-                }) => ast.expect(tokens, TokenType::Function).is_ok(),
+                }) => ast.expect(TokenType::Function).is_ok(),
                 ExprVariant::Operation(Operation {
                     op: TokenType::Return,
                     ..
@@ -279,13 +280,13 @@ impl AST {
             (success, params, return_type, body)
         };
 
-        let (success, params, return_type, body) = attempt_parse_func(self, tokens);
+        let (success, params, return_type, body) = attempt_parse_func(self);
 
         // if problem occurred during function parsing try to
         // recover by skipping ahead to one of these ttypes
 
         if !success {
-            let found = tokens.sync(&[
+            let found = self.tokens_mut().sync(&[
                 TokenType::End,
                 TokenType::Function,
                 TokenType::Semicolon,
@@ -294,17 +295,17 @@ impl AST {
 
             match found.ttype {
                 TokenType::End => {
-                    tokens.next();
+                    self.tokens_next();
 
-                    match tokens.peek().ttype {
+                    match self.tokens_peek().ttype {
                         TokenType::Function | TokenType::Identifier => {
-                            tokens.next();
+                            self.tokens_next();
                         }
                         _ => (),
                     };
                 }
                 TokenType::Function => {
-                    tokens.next();
+                    self.tokens_next();
                 }
                 _ => (),
             };
@@ -318,7 +319,7 @@ impl AST {
 
         self.expr_push(Expr {
             tok: tok_idx,
-            end_tok: tokens.idx(),
+            end_tok: self.tokens_idx(),
             variant: ExprVariant::FunctionLiteral(FunctionLiteral {
                 params: params,
                 return_type_expr: return_type,
@@ -328,10 +329,10 @@ impl AST {
         })
     }
 
-    fn parse_number_type_literal(&mut self, tokens: &mut Tokens) -> ExprID {
-        let tok_idx = tokens.idx();
+    fn parse_number_type_literal(&mut self) -> ExprID {
+        let tok_idx = self.tokens_idx();
 
-        let variant = match tokens.next().ttype {
+        let variant = match self.tokens_next().ttype {
             TokenType::KWInteger => TypeVariant::Integer,
             TokenType::KWFloat => TypeVariant::Float,
             _ => panic!("unexpected ttype for beginning of type literal"),
@@ -341,15 +342,15 @@ impl AST {
 
         self.expr_push(Expr {
             tok: tok_idx,
-            end_tok: tokens.idx(),
+            end_tok: self.tokens_idx(),
             variant: ExprVariant::TypeLiteral(TypeLiteral { variant, body }),
             ..Default::default()
         })
     }
 
-    fn parse_record_literal(&mut self, tokens: &mut Tokens) -> ExprID {
-        let tok_idx = tokens.idx();
-        let type_variant_tok = tokens.next();
+    fn parse_record_literal(&mut self) -> ExprID {
+        let tok_idx = self.tokens_idx();
+        let type_variant_tok = self.tokens_next();
 
         let variant = match type_variant_tok.ttype {
             TokenType::Record => TypeVariant::Record,
@@ -360,24 +361,24 @@ impl AST {
 
         // don't want to consume semicolon as part of body
 
-        let body = self.parse_expr(tokens);
+        let body = self.parse_expr();
 
         if self
-            .expect_sequence(tokens, &[TokenType::End, type_variant_tok.ttype])
+            .expect_sequence(&[TokenType::End, type_variant_tok.ttype])
             .is_err()
         {
-            let tok = tokens.sync(&[TokenType::Semicolon, TokenType::End, type_variant_tok.ttype]);
+            let tok = self.tokens_mut().sync(&[TokenType::Semicolon, TokenType::End, type_variant_tok.ttype]);
 
             match tok.ttype {
                 TokenType::End => {
-                    tokens.next();
+                    self.tokens_next();
 
-                    if tokens.peek().ttype == type_variant_tok.ttype {
-                        tokens.next();
+                    if self.tokens_peek().ttype == type_variant_tok.ttype {
+                        self.tokens_next();
                     }
                 }
                 val @ _ if val == type_variant_tok.ttype => {
-                    tokens.next();
+                    self.tokens_next();
                 }
                 _ => (),
             }
@@ -385,20 +386,20 @@ impl AST {
 
         self.expr_push(Expr {
             tok: tok_idx,
-            end_tok: tokens.idx(),
+            end_tok: self.tokens_idx(),
             variant: ExprVariant::TypeLiteral(TypeLiteral { variant, body }),
             ..Default::default()
         })
     }
 
     // atom e.g. literal like integer
-    fn parse_atom(&mut self, tokens: &mut Tokens) -> ExprID {
-        let tok_idx = tokens.idx();
-        let tok = tokens.peek();
+    fn parse_atom(&mut self) -> ExprID {
+        let tok_idx = self.tokens_idx();
+        let tok = self.tokens_peek();
 
         match tok.ttype {
             TokenType::True | TokenType::False => {
-                tokens.next();
+                self.tokens_next();
 
                 let value = tok.ttype == TokenType::True;
 
@@ -410,12 +411,12 @@ impl AST {
                 })
             }
             TokenType::Underscore => {
-                tokens.next();
+                self.tokens_next();
                 self.expr_underscore(tok_idx)
             }
             TokenType::DollarNumber => {
-                tokens.next();
-                self.expr_dollar_number(tokens, tok_idx, &tok)
+                self.tokens_next();
+                self.expr_dollar_number(tok_idx, &tok)
             }
             // single token (e.g. integer) literals or ident
             TokenType::Integer
@@ -423,30 +424,30 @@ impl AST {
             | TokenType::String
             | TokenType::Character
             | TokenType::Identifier => {
-                tokens.next();
+                self.tokens_next();
 
                 self.expr_push(Expr {
                     tok: tok_idx,
                     end_tok: tok_idx + 1,
                     variant: match tok.ttype {
                         TokenType::Integer => ExprVariant::IntegerLiteral(
-                            tokens
+                            self.tokens()
                                 .tok_as_str(&tok)
                                 .parse::<u64>()
                                 .expect("integer scanning or getting token text is broken"),
                         ),
                         TokenType::Float => ExprVariant::FloatLiteral(
-                            tokens
+                            self.tokens()
                                 .tok_as_str(&tok)
                                 .parse::<f64>()
                                 .expect("float scanning or getting token text is broken"),
                         ),
                         TokenType::String => ExprVariant::StringLiteral(
-                            util::tok_parse_string(tokens, tok)
+                            util::tok_parse_string(self.tokens(), tok)
                                 .expect("failed to get String from Token"),
                         ),
                         TokenType::Character => ExprVariant::CharacterLiteral(
-                            util::tok_parse_char(tokens, tok)
+                            util::tok_parse_char(self.tokens(), tok)
                                 .expect("failed to get char from Token"),
                         ),
                         TokenType::Identifier => ExprVariant::Identifier(Identifier {
@@ -461,28 +462,28 @@ impl AST {
                     ..Default::default()
                 })
             }
-            TokenType::If => self.parse_if(tokens),
-            TokenType::While => self.parse_while(tokens),
-            TokenType::Function => self.parse_function(tokens),
-            TokenType::KWInteger | TokenType::KWFloat => self.parse_number_type_literal(tokens),
+            TokenType::If => self.parse_if(),
+            TokenType::While => self.parse_while(),
+            TokenType::Function => self.parse_function(),
+            TokenType::KWInteger | TokenType::KWFloat => self.parse_number_type_literal(),
             TokenType::Record | TokenType::Variant | TokenType::Enum => {
-                self.parse_record_literal(tokens)
+                self.parse_record_literal()
             }
             // if no atom or other (e.g. prefix) expr is found return Unit
             _ => self.expr_unit(tok_idx),
         }
     }
 
-    fn parse_lhs(&mut self, tokens: &mut Tokens) -> ExprID {
-        let tok = tokens.peek();
+    fn parse_lhs(&mut self) -> ExprID {
+        let tok = self.tokens_peek();
 
         // see if you have prefix op
 
         match operator::get_bp(tok.ttype, Prefix) {
             Some((_, r_bp)) => {
-                tokens.next();
+                self.tokens_next();
 
-                let rhs = self.parse_expr_bp(tokens, r_bp);
+                let rhs = self.parse_expr_bp(r_bp);
 
                 return self.expr_prefix(tok, rhs);
             }
@@ -494,13 +495,13 @@ impl AST {
         for op_variant in [Around, PrefixAround] {
             match operator::get_bp(tok.ttype, op_variant) {
                 Some((_, r_bp)) => {
-                    tokens.next();
+                    self.tokens_next();
 
-                    let lhs = self.parse_expr(tokens);
+                    let lhs = self.parse_expr();
 
                     let mut found_end = false;
 
-                    match tokens.expect(match tok.ttype {
+                    match self.expect(match tok.ttype {
                         TokenType::LParen => TokenType::RParen,
                         TokenType::LBrace => TokenType::RBrace,
                         TokenType::Begin => TokenType::End,
@@ -518,7 +519,7 @@ impl AST {
                     if op_variant == Around {
                         return self.expr_around(tok, lhs, found_end);
                     } else {
-                        let rhs = self.parse_expr_bp(tokens, r_bp);
+                        let rhs = self.parse_expr_bp(r_bp);
 
                         return self.expr_prefix_around(tok, lhs, rhs);
                     }
@@ -527,12 +528,12 @@ impl AST {
             }
         }
 
-        self.parse_atom(tokens)
+        self.parse_atom()
     }
 
     // bp is Binding Power (Pratt parsing) and ret is expr id
-    fn parse_expr_bp(&mut self, tokens: &mut Tokens, min_bp: u8) -> ExprID {
-        let mut lhs = self.parse_lhs(tokens);
+    fn parse_expr_bp(&mut self, min_bp: u8) -> ExprID {
+        let mut lhs = self.parse_lhs();
 
         // if lhs is Unit then do not try to parse further operators
         // there is no Infix, Postfix, or PostfixAround operator where it would be
@@ -544,7 +545,7 @@ impl AST {
         }
 
         loop {
-            let op = tokens.peek();
+            let op = self.tokens_peek();
 
             // see if one of the operator variants e.g. Infix works with
             // above token and get binding power if so
@@ -565,13 +566,13 @@ impl AST {
                     break;
                 }
 
-                tokens.next();
+                self.tokens_next();
 
                 // how lhs is replaced depends on op variant
 
                 match op_variant {
                     Infix => {
-                        let rhs = self.parse_expr_bp(tokens, r_bp);
+                        let rhs = self.parse_expr_bp(r_bp);
 
                         lhs = self.expr_infix(op, lhs, rhs);
                     }
@@ -580,11 +581,11 @@ impl AST {
                     }
                     PostfixAround => {
                         // e.g. function call
-                        let rhs = self.parse_expr(tokens);
+                        let rhs = self.parse_expr();
 
                         let mut found_end = false;
 
-                        match tokens.expect(match op.ttype {
+                        match self.expect(match op.ttype {
                             TokenType::LParen => TokenType::RParen,
                             TokenType::LBrace => TokenType::RBrace,
                             TokenType::Begin => TokenType::End,
@@ -611,15 +612,15 @@ impl AST {
     }
 
     // ret expr id
-    fn parse_expr(&mut self, tokens: &mut Tokens) -> ExprID {
-        self.parse_expr_bp(tokens, 0)
+    fn parse_expr(&mut self) -> ExprID {
+        self.parse_expr_bp(0)
     }
 
-    pub fn do_syntax_analysis(&mut self, tokens: &mut Tokens) -> ExprID {
-        let ret = self.parse_expr(tokens);
+    pub fn do_syntax_analysis(&mut self) -> ExprID {
+        let ret = self.parse_expr();
 
         // should be on EOF at this point
-        let _ = self.expect(tokens, TokenType::Eof);
+        let _ = self.expect(TokenType::Eof);
 
         ret
     }
