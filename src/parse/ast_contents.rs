@@ -224,10 +224,12 @@ impl HasFileModule for MemberID {
     }
 
     fn get_name(&self, ast: &AST) -> Option<String> {
-        Some(
-            self.get_tokens(ast)
-                .tok_or_string_to_string(&ast.objs.member(*self).name),
-        )
+        let s = match &ast.objs.member(*self).name {
+            TokenOrString::String(s) => s.clone(),
+            TokenOrString::Token(token) => self.get_tokens(ast).tok_as_str(token).to_string(),
+        };
+
+        Some(s)
     }
 }
 
