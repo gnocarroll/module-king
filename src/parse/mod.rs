@@ -696,8 +696,10 @@ pub fn parse_file(ast: &mut AST, tokens: Tokens, modulepath: Vec<String>) {
     };
     
     // set this to indicate current file module being analyzed (its scope)
+    // also set for ASTContents
 
     ast.curr_file_module = file_scope_id;
+    ast.objs.set_curr_file_module(file_scope_id);
 
     // call to parse_expr does syntactic analysis
 

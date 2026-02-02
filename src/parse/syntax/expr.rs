@@ -19,7 +19,6 @@ impl AST {
             tok: tok_idx,
             end_tok: tok_idx,
             variant: ExprVariant::Unit,
-            file_module: self.curr_file_module,
             ..Default::default()
         })
     }
@@ -29,7 +28,6 @@ impl AST {
             tok: tok_idx,
             end_tok: tok_idx + 1,
             variant: ExprVariant::Underscore,
-            file_module: self.curr_file_module,
             ..Default::default()
         })
     }
@@ -48,7 +46,6 @@ impl AST {
             tok: tok_idx,
             end_tok: tok_idx + 1,
             variant: ExprVariant::DollarNumber(val),
-            file_module: self.curr_file_module,
             ..Default::default()
         })
     }
@@ -66,7 +63,6 @@ impl AST {
                 operand1: Some(lhs),
                 operand2: Some(rhs),
             }),
-            file_module: self.curr_file_module,
             ..Default::default()
         })
     }
@@ -86,7 +82,6 @@ impl AST {
                 operand1: Some(lhs),
                 operand2: Some(rhs),
             }),
-            file_module: self.curr_file_module,
             ..Default::default()
         })
     }
@@ -100,7 +95,6 @@ impl AST {
                 operand1: Some(rhs),
                 operand2: None,
             }),
-            file_module: self.curr_file_module,
             ..Default::default()
         })
     }
@@ -114,7 +108,6 @@ impl AST {
                 operand1: Some(rhs),
                 operand2: None,
             }),
-            file_module: self.curr_file_module,
             ..Default::default()
         })
     }
@@ -128,7 +121,6 @@ impl AST {
                 operand1: Some(rhs),
                 operand2: None,
             }),
-            file_module: self.curr_file_module,
             ..Default::default()
         })
     }
@@ -142,7 +134,6 @@ impl AST {
                 operand1: Some(lhs),
                 operand2: Some(rhs),
             }),
-            file_module: self.curr_file_module,
             ..Default::default()
         })
     }
@@ -168,7 +159,6 @@ impl AST {
             } else {
                 ExprVariant::If(if_struct)
             },
-            file_module: self.curr_file_module,
             ..Default::default()
         })
     }

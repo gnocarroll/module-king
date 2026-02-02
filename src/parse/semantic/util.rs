@@ -80,6 +80,7 @@ impl AST {
             name,
             visibility: Visibility::Private,
             variant: MemberVariant::Instance(type_id),
+            file_module: self.curr_file_module,
         });
 
         self.scope_try_insert(scope, member_id)
@@ -212,6 +213,7 @@ impl AST {
             name: name.expect("CURRENTLY CAN ONLY ADD NAMED TYPE AS SCOPE MEMBER"),
             visibility: Visibility::Private,
             variant: MemberVariant::Type(type_id),
+            ..Default::default()
         });
 
         self.scope_try_insert(scope, member_id)
@@ -245,6 +247,7 @@ impl AST {
             name: name,
             visibility: Visibility::Private,
             variant: MemberVariant::Type(type_id),
+            ..Default::default()
         });
 
         self.scope_try_insert(scope, member_id)
@@ -264,6 +267,7 @@ impl AST {
             name: name,
             visibility: Visibility::Private,
             variant: MemberVariant::Type(type_id),
+            ..Default::default()
         });
 
         self.scope_try_insert(scope, member_id)?;
@@ -314,6 +318,7 @@ impl AST {
             name: TokenOrString::Token(name),
             visibility: Visibility::Export,
             variant: MemberVariant::Function(function),
+            ..Default::default()
         });
 
         // insert to provided scope

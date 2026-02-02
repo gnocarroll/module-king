@@ -92,7 +92,6 @@ impl AST {
             tok: start_tok_idx,
             end_tok: self.tokens_idx(),
             variant: ExprVariant::While(While { cond, body }),
-            file_module: self.curr_file_module,
             ..Default::default()
         })
     }
@@ -326,7 +325,6 @@ impl AST {
                 return_type_expr: return_type,
                 function_id,
             }),
-            file_module: self.curr_file_module,
             ..Default::default()
         })
     }
@@ -346,7 +344,6 @@ impl AST {
             tok: tok_idx,
             end_tok: self.tokens_idx(),
             variant: ExprVariant::TypeLiteral(TypeLiteral { variant, body }),
-            file_module: self.curr_file_module,
             ..Default::default()
         })
     }
@@ -391,7 +388,6 @@ impl AST {
             tok: tok_idx,
             end_tok: self.tokens_idx(),
             variant: ExprVariant::TypeLiteral(TypeLiteral { variant, body }),
-            file_module: self.curr_file_module,
             ..Default::default()
         })
     }
@@ -411,7 +407,6 @@ impl AST {
                     tok: tok_idx,
                     end_tok: tok_idx + 1,
                     variant: ExprVariant::BooleanLiteral(value),
-                    file_module: self.curr_file_module,
                     ..Default::default()
                 })
             }
@@ -464,7 +459,6 @@ impl AST {
                         }),
                         _ => panic!("single token literal parsing broken"),
                     },
-                    file_module: self.curr_file_module,
                     ..Default::default()
                 })
             }

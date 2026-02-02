@@ -24,6 +24,8 @@ pub struct ASTContents {
     pub patterns: Vec<Pattern>,
 
     pub functions: Vec<Function>,
+
+    curr_file_module: ScopeID,
 }
 
 impl Default for ASTContents {
@@ -39,6 +41,7 @@ impl Default for ASTContents {
             members: vec![Member::default()],
             patterns: vec![Pattern::default()],
             functions: vec![Function::default()],
+            curr_file_module: ScopeID::global(),
         };
 
         // ensure global scope has ID 1
@@ -48,7 +51,6 @@ impl Default for ASTContents {
             variant: ScopeVariant::Module,
             parent_scope: ScopeID::global(),
             refers_to: None,
-            file_module: ScopeID::global(),
             ..Default::default()
         });
 
@@ -244,9 +246,15 @@ impl PatternID {
 }
 
 impl ASTContents {
+    pub fn set_curr_file_module(&mut self, curr_file_module: ScopeID) {
+        self.curr_file_module = curr_file_module;
+    }
+
     // Expr
 
-    pub fn expr_push(&mut self, expr: Expr) -> ExprID {
+    pub fn expr_push(&mut self, mut expr: Expr) -> ExprID {
+        expr.file_module = self.curr_file_module;
+
         self.exprs.push(expr);
 
         ExprID {
@@ -272,7 +280,9 @@ impl ASTContents {
 
     // Scope
 
-    pub fn scope_push(&mut self, scope: Scope) -> ScopeID {
+    pub fn scope_push(&mut self, mut scope: Scope) -> ScopeID {
+        scope.file_module = self.curr_file_module;
+
         self.scopes.push(scope);
 
         ScopeID {
@@ -324,7 +334,9 @@ impl ASTContents {
 
     // Member
 
-    pub fn member_push(&mut self, member: Member) -> MemberID {
+    pub fn member_push(&mut self, mut member: Member) -> MemberID {
+        member.file_module = self.curr_file_module;
+
         self.members.push(member);
 
         MemberID {
@@ -376,7 +388,9 @@ impl ASTContents {
 
     // Function
 
-    pub fn function_push(&mut self, function: Function) -> FunctionID {
+    pub fn function_push(&mut self, mut function: Function) -> FunctionID {
+        function.file_module = self.curr_file_module;
+
         self.functions.push(function);
 
         FunctionID {
