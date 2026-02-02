@@ -268,7 +268,11 @@ impl AST {
         };
 
         let name = match &mut self.objs.expr_mut(operand2).variant {
-            ExprVariant::Identifier(ident) => ctx.tokens.tok_as_str(&ident.name).to_string(),
+            ExprVariant::Identifier(ident) => {
+                let ident = ident.clone();
+
+                self.tokens().tok_as_str(&ident.name).to_string()
+            },
             _ => {
                 self.invalid_operation(expr, "rhs of access should be an identifier");
                 return;
@@ -444,7 +448,7 @@ impl AST {
                     // add mapping from member name -> MemberID to scope
 
                     if self
-                        .scope_try_insert(ctx.tokens, scope, ident.member_id)
+                        .scope_try_insert(scope, ident.member_id)
                         .is_err()
                     {
                         // duplicate ident => problem

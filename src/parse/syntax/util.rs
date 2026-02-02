@@ -1,6 +1,6 @@
 use crate::{
     parse::{
-        AST, ExprVariant, ScopeVariant, Type,
+        AST, ExprVariant, HasFileModule, ScopeVariant, Type,
         ast_contents::{ExprID, ScopeID, TypeID},
     },
     scan::{Token, TokenType},
@@ -121,7 +121,7 @@ impl AST {
         self.tokens_mut().next()
     }
 
-    pub fn type_to_string(&self, tokens: &Tokens, type_id: TypeID) -> String {
+    pub fn type_to_string(&self, type_id: TypeID) -> String {
         let type_ref = self.objs.type_get(type_id);
 
         match type_ref.clone() {
@@ -130,45 +130,41 @@ impl AST {
             Type::Error => "error".to_string(),
             Type::Unit => "Unit".to_string(),
             Type::AnyType => "AnyType".to_string(),
-            Type::Type(t) => format!("type({})", self.type_to_string(tokens, t),),
+            Type::Type(t) => format!("type({})", self.type_to_string(t),),
             Type::AnyModule => "AnyModule".to_string(),
             Type::Module(_) => "module".to_string(),
-            Type::Alias(t) => self.type_to_string(tokens, t),
-            Type::Ptr(t) => format!("*{}", self.type_to_string(tokens, t)),
-            Type::Ref(t) => format!("&{}", self.type_to_string(tokens, t)),
-            Type::Tuple((t, None)) => format!("({},)", self.type_to_string(tokens, t)),
+            Type::Alias(t) => self.type_to_string(t),
+            Type::Ptr(t) => format!("*{}", self.type_to_string(t)),
+            Type::Ref(t) => format!("&{}", self.type_to_string(t)),
+            Type::Tuple((t, None)) => format!("({},)", self.type_to_string(t)),
             Type::Tuple((t1, Some(t2))) => format!(
                 "tuple({}, {})",
-                self.type_to_string(tokens, t1),
-                self.type_to_string(tokens, t2)
+                self.type_to_string(t1),
+                self.type_to_string(t2)
             ),
-            Type::RestOfTuple((t1, t2)) => format!(
-                "{}, {}",
-                self.type_to_string(tokens, t1),
-                self.type_to_string(tokens, t2)
-            ),
+            Type::RestOfTuple((t1, t2)) => {
+                format!("{}, {}", self.type_to_string(t1), self.type_to_string(t2))
+            }
             Type::Function((params, ret)) => format!(
                 "(function {} => {})",
-                self.type_to_string(tokens, params),
-                self.type_to_string(tokens, ret),
+                self.type_to_string(params),
+                self.type_to_string(ret),
             ),
             Type::Builtin(builtin) => format!("(builtin {})", builtin.get_builtin_name(),),
-            Type::Slice((idx, t)) => format!(
-                "[{}]{}",
-                self.expr_to_string(tokens, idx),
-                self.type_to_string(tokens, t),
-            ),
-            Type::Scope(scope) => {
-                let scope = self.objs.scope(scope);
-
-                let name = match &scope.name {
-                    Some(t_or_s) => tokens.tok_or_string_to_string(t_or_s),
-                    None => "(anonymous)".to_string(),
-                };
+            Type::Slice((idx, t)) => {
+                format!("[{}]{}", self.expr_to_string(idx), self.type_to_string(t),)
+            }
+            Type::Scope(scope_id) => {
+                let scope = self.objs.scope(scope_id);
 
                 let variant_string = match scope.variant {
                     ScopeVariant::Type(type_variant) => format!("{:?}", type_variant),
                     _ => "BAD_SCOPE_VARIANT".to_string(),
+                };
+
+                let name = match &scope.name {
+                    Some(t_or_s) => scope_id.get_tokens(self).tok_or_string_to_string(t_or_s),
+                    None => "(anonymous)".to_string(),
                 };
 
                 // TODO: provide more information about members of type
@@ -176,21 +172,23 @@ impl AST {
                 format!("({} {})", variant_string, name)
             }
             Type::ImportTarget(scope_id) => {
-                format!("(from {})", self.scope_to_string(tokens, scope_id),)
+                format!("(from {})", self.scope_to_string(scope_id))
             }
         }
     }
 
-    pub fn scope_to_string(&self, tokens: &Tokens, scope: ScopeID) -> String {
+    pub fn scope_to_string(&self, scope: ScopeID) -> String {
         let name = match &self.objs.scope(scope).name {
-            Some(token_or_string) => tokens.tok_or_string_to_string(token_or_string),
+            Some(token_or_string) => scope
+                .get_tokens(self)
+                .tok_or_string_to_string(token_or_string),
             None => "(anonymous)".to_string(),
         };
 
         format!("(scope {})", name,)
     }
 
-    pub fn expr_to_string(&self, tokens: &Tokens, expr: ExprID) -> String {
+    pub fn expr_to_string(&self, expr: ExprID) -> String {
         let expr_ref = self.expr(expr);
 
         match &expr_ref.variant {
@@ -199,7 +197,11 @@ impl AST {
             ExprVariant::FloatLiteral(f) => f.to_string(),
             ExprVariant::CharacterLiteral(c) => c.to_string(),
             ExprVariant::StringLiteral(v) => std::str::from_utf8(v).unwrap().to_string(),
-            ExprVariant::Identifier(ident) => tokens.tok_as_str(&ident.name).to_string(),
+            ExprVariant::Identifier(ident) => {
+                let ident = ident.clone();
+
+                expr.get_tokens(self).tok_as_str(&ident.name).to_string()
+            }
             ExprVariant::BooleanLiteral(b) => b.to_string(),
             ExprVariant::Underscore => "_".to_string(),
             ExprVariant::DollarNumber(i) => format!("${}", i.to_string(),),
@@ -207,7 +209,7 @@ impl AST {
             ExprVariant::KWModule => "KWModule".to_string(),
             ExprVariant::Operation(operation) => {
                 let operand_to_string = |operand: Option<ExprID>| match operand {
-                    Some(id) => format!(" {}", self.expr_to_string(tokens, id),),
+                    Some(id) => format!(" {}", self.expr_to_string(id),),
                     None => "".to_string(),
                 };
 
@@ -221,10 +223,10 @@ impl AST {
             ExprVariant::If(if_expr) | ExprVariant::Elif(if_expr) => {
                 format!(
                     "(if {} then {}{})",
-                    self.expr_to_string(tokens, if_expr.cond),
-                    self.expr_to_string(tokens, if_expr.body),
+                    self.expr_to_string(if_expr.cond),
+                    self.expr_to_string(if_expr.body),
                     match if_expr.else_expr {
-                        Some(expr) => format!(" else {}", self.expr_to_string(tokens, expr)),
+                        Some(expr) => format!(" else {}", self.expr_to_string(expr)),
                         None => "".to_string(),
                     }
                 )
@@ -232,8 +234,8 @@ impl AST {
             ExprVariant::While(while_struct) => {
                 format!(
                     "(while {} do {})",
-                    self.expr_to_string(tokens, while_struct.cond),
-                    self.expr_to_string(tokens, while_struct.body),
+                    self.expr_to_string(while_struct.cond),
+                    self.expr_to_string(while_struct.body),
                 )
             }
             ExprVariant::FunctionLiteral(function_literal) => {
@@ -242,19 +244,19 @@ impl AST {
                 format!(
                     "(function {}{} => {} = {})",
                     match func.name {
-                        Some(tok) => format!("{} ", tokens.tok_as_str(&tok),),
+                        Some(tok) => format!("{} ", expr.get_tokens(self).tok_as_str(&tok),),
                         None => "".to_string(),
                     },
-                    self.expr_to_string(tokens, function_literal.params),
-                    self.expr_to_string(tokens, function_literal.return_type_expr),
-                    self.expr_to_string(tokens, func.body),
+                    self.expr_to_string(function_literal.params),
+                    self.expr_to_string(function_literal.return_type_expr),
+                    self.expr_to_string(func.body),
                 )
             }
             ExprVariant::TypeLiteral(type_literal) => {
                 format!(
                     "(type {:?} {})",
                     type_literal.variant,
-                    self.expr_to_string(tokens, type_literal.body),
+                    self.expr_to_string(type_literal.body),
                 )
             }
         }

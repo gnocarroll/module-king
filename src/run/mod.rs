@@ -16,21 +16,19 @@ use crate::{
     tokens::Tokens,
 };
 
-pub struct ExecutionContext<'a> {
-    pub tokens: &'a Tokens<'a>,
+pub struct ExecutionContext {
     pub objs: ContextObjects,
     pub curr_scope: RuntimeScopeID,
 
     pub return_now: bool,
 }
 
-impl<'a> ExecutionContext<'a> {
-    pub fn new(tokens: &'a Tokens) -> Self {
+impl ExecutionContext {
+    pub fn new() -> Self {
         let mut objs = ContextObjects::default();
         let curr_scope = objs.runtime_scope_new();
 
         ExecutionContext {
-            tokens,
             objs,
             curr_scope,
             return_now: false,
@@ -218,7 +216,7 @@ fn eval(
 // program tokens and AST with semantic information
 pub fn run(tokens: &Tokens, ast: &AST) {
     if let Some(expr) = ast.root_expr {
-        let mut ctx = ExecutionContext::new(tokens);
+        let mut ctx = ExecutionContext::new();
 
         if let Ok(value) = eval(ast, &mut ctx, expr) {
             eprintln!();

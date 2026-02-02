@@ -2,7 +2,9 @@ use std::collections::HashMap;
 
 use crate::{
     parse::{
-        AST, MemberVariant, ScopeVariant, Type, TypeVariant, Visibility, ast_contents::{FunctionID, PatternID, ScopeID, TypeID}, builtin::Builtin
+        AST, HasFileModule, MemberVariant, ScopeVariant, Type, TypeVariant, Visibility,
+        ast_contents::{FunctionID, PatternID, ScopeID, TypeID},
+        builtin::Builtin,
     },
     run::{
         ExecutionContext,
@@ -19,7 +21,7 @@ pub fn allocate_instances_from_pattern(
     scope: ScopeID,
 ) {
     for (name, _) in pattern.to_pattern_iterator(ast) {
-        let name = ctx.tokens.tok_as_str(&name).to_string();
+        let name = scope.get_tokens(ast).tok_as_str(&name).to_string();
 
         let scope_struct = ast.objs.scope(scope);
 
@@ -48,12 +50,10 @@ pub fn runtime_ref_to_function(
 ) -> Option<FunctionID> {
     match &ctx.objs.ref_get(runtime_ref).variant {
         ValueVariant::Function(function_id) => Some(*function_id),
-        ValueVariant::Identifier(member_id) => {
-            match ast.objs.member(*member_id).variant {
-                MemberVariant::Function(function_id) => Some(function_id),
-                _ => None
-            }
-        }
+        ValueVariant::Identifier(member_id) => match ast.objs.member(*member_id).variant {
+            MemberVariant::Function(function_id) => Some(function_id),
+            _ => None,
+        },
 
         _ => None,
     }
@@ -68,12 +68,10 @@ pub fn runtime_ref_to_type(
 ) -> Option<TypeID> {
     match &ctx.objs.ref_get(runtime_ref).variant {
         ValueVariant::Type(type_id) => Some(*type_id),
-        ValueVariant::Identifier(member_id) => {
-            match ast.objs.member(*member_id).variant {
-                MemberVariant::Type(type_id) => Some(type_id),
-                _ => None
-            }
-        }
+        ValueVariant::Identifier(member_id) => match ast.objs.member(*member_id).variant {
+            MemberVariant::Type(type_id) => Some(type_id),
+            _ => None,
+        },
 
         _ => None,
     }

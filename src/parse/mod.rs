@@ -18,7 +18,7 @@ use crate::{
 };
 
 // will implement this for some of the IDs to get their file module scope and name
-trait HasFileModule {
+pub trait HasFileModule {
     fn file_module_scope(&self, ast: &AST) -> ScopeID;
     fn get_name(&self, ast: &AST) -> Option<String>;
 
@@ -561,7 +561,7 @@ impl AST {
         self.parse_errors.len() > 0 || self.semantic_errors.len() > 0
     }
 
-    pub fn display_parse_errors(&self, _tokens: &Tokens) {
+    pub fn display_parse_errors(&self) {
         for err in &self.parse_errors {
             match err {
                 ParseError::ExpectedToken(ExpectedToken { expected, found }) => {
@@ -575,7 +575,7 @@ impl AST {
         }
     }
 
-    pub fn display_semantic_errors(&self, _tokens: &Tokens) {
+    pub fn display_semantic_errors(&self) {
         for err in &self.semantic_errors {
             match err {
                 SemanticError::InvalidOperation(invalid_op) => {
@@ -692,7 +692,7 @@ impl AST {
     pub fn root_expr(&self) -> ExprID {
         let scope_id = self.curr_file_module;
 
-        match &self.objs.scope_mut(scope_id).variant {
+        match &self.objs.scope(scope_id).variant {
             ScopeVariant::FileModule(info) => info.root_expr,
             _ => {
                 panic!("no current Tokens");
@@ -734,7 +734,7 @@ pub fn parse_file(ast: &mut AST, tokens: Tokens, modulepath: Vec<String>) {
         }
     }
 
-    println!("{}", ast.expr_to_string(ast.tokens(), root_expr));
+    println!("{}", ast.expr_to_string(root_expr));
 
     let modulepath_string = modulepath.join(".");
 
@@ -753,7 +753,7 @@ pub fn parse_file(ast: &mut AST, tokens: Tokens, modulepath: Vec<String>) {
 
     eprintln!("RAN SEMANTIC ANALYSIS FUNC");
 
-    println!("{}", ast.expr_to_string(ast.tokens(), root_expr));
+    println!("{}", ast.expr_to_string(root_expr));
 
     if ast.has_errors() {
         eprintln!("One or more semantic errors occurred, program will not be compiled.");

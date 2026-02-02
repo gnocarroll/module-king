@@ -4,7 +4,7 @@ use std::ops::{Add, Div, Mul, Rem, Sub};
 
 use crate::{
     constants::UNIT_TYPE,
-    parse::{AST, Type, ast_contents::ExprID},
+    parse::{AST, HasFileModule, Type, ast_contents::ExprID},
     run::{
         ExecutionContext, Value, ValueVariant,
         context_contents::RuntimeRef,
@@ -74,11 +74,7 @@ fn float_cmp(ttype: TokenType) -> Option<fn(f64, f64) -> bool> {
     }
 }
 
-fn allocate_instances_from_ref(
-    ast: &AST,
-    ctx: &mut ExecutionContext,
-    runtime_ref: RuntimeRef,
-) {
+fn allocate_instances_from_ref(ast: &AST, ctx: &mut ExecutionContext, runtime_ref: RuntimeRef) {
     match ctx.objs.ref_get(runtime_ref).variant {
         ValueVariant::Identifier(member_id) => {
             ctx.objs.instance_alloc(ast, ctx.curr_scope, member_id);
@@ -125,9 +121,11 @@ fn eval_operation_period(
 
     match (&value_to_access.variant, &member.variant) {
         (ValueVariant::Record(map), ValueVariant::Identifier(member_id)) => {
-            let name = ctx
-                .tokens
-                .tok_or_string_to_string(&ast.objs.member(*member_id).name);
+            let name = ast.objs.member(*member_id).name.clone();
+            
+            let name = member_id
+                .get_tokens(ast)
+                .tok_or_string_to_string(&name);
 
             return match map.get(&name) {
                 Some(value_id) => Ok(RuntimeRef {
@@ -151,9 +149,11 @@ fn eval_operation_period(
                 }
             };
 
-            let name = ctx
-                .tokens
-                .tok_or_string_to_string(&ast.objs.member(*field_member_id).name);
+            let name = ast.objs.member(*field_member_id).name.clone();
+
+            let name = field_member_id
+                .get_tokens(ast)
+                .tok_or_string_to_string(&name);
 
             let value_id = *match &ctx.objs.ref_get(runtime_ref).variant {
                 ValueVariant::Record(map) => match map.get(&name) {
@@ -194,7 +194,7 @@ fn do_assignment(
         Ok(rref) => rref,
         Err(e) => {
             return Err(e.variant);
-        },
+        }
     };
 
     let new_value = new_value_ref.dup_in_scope(ast, ctx, assign_to_ref.scope);
@@ -220,7 +220,7 @@ fn do_assignment(
                 Ok(i) => i,
                 Err(_) => {
                     return Err(RuntimeErrorVariant::IntegerOverflow);
-                } 
+                }
             };
 
             // now place new value at index indicated by CharRef
@@ -259,10 +259,7 @@ fn eval_operation_eq(
     match do_assignment(ast, ctx, assign_to_ref, new_value_ref) {
         Ok(_) => (),
         Err(variant) => {
-            return Err(RuntimeException {
-                expr,
-                variant,
-            });
+            return Err(RuntimeException { expr, variant });
         }
     }
 
@@ -338,7 +335,8 @@ fn eval_operation_comma(
     Ok(Value {
         type_id: Some(type_id),
         variant: ValueVariant::Tuple(value_id_vec),
-    }.to_runtime_ref(ctx, ctx.curr_scope))
+    }
+    .to_runtime_ref(ctx, ctx.curr_scope))
 }
 
 pub fn eval_operation_binary(

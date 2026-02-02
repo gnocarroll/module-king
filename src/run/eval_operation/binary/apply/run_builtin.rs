@@ -142,9 +142,8 @@ pub fn container_generic(
             if builtin == Builtin::GenericLen {
                 ValueVariant::Integer(map.len() as i64)
             } else {
-                let (arg2_rref, arg2_value_id, arg2_variant) = (
+                let (arg2_rref, arg2_variant) = (
                     arg2_rref.expect("should have checked for arg2"),
-                    arg2_value_id.expect("should have checked for arg2"),
                     arg2_variant.expect("should have checked for arg2"),
                 );
 

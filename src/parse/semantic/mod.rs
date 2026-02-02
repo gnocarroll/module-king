@@ -4,10 +4,15 @@ mod util;
 use crate::{
     constants::{BOOLEAN_TYPE, ERROR_TYPE, FLOAT_TYPE, INTEGER_TYPE, STRING_TYPE, UNIT_TYPE},
     parse::{
-        AST, ExprReturns, ExprVariant, Identifier, IdentifierVariant, Member, MemberVariant, Operation, Pattern, PatternVariant, Scope, ScopeRefersTo, ScopeVariant, TokenOrString, Tokens, Type, TypeVariant, Visibility, ast_contents::{ExprID, FunctionID, PatternID, ScopeID, TypeID}, builtin::Builtin, errors::{
+        AST, ExprReturns, ExprVariant, Identifier, IdentifierVariant, Member, MemberVariant,
+        Operation, Pattern, PatternVariant, Scope, ScopeRefersTo, ScopeVariant, TokenOrString,
+        Type, TypeVariant, Visibility,
+        ast_contents::{ExprID, FunctionID, PatternID, ScopeID, TypeID},
+        builtin::Builtin,
+        errors::{
             DuplicateName, ExpectedExprReturns, ExpectedType, ExprAndType, InvalidExpr,
             PatternError, SemanticError, UnexpectedExpr,
-        }
+        },
     },
     scan::TokenType,
 };
@@ -26,8 +31,7 @@ pub enum AnalyzingNow {
     Expr, // if specification is unnecessary
 }
 
-pub struct SemanticContext<'a> {
-    tokens: &'a Tokens<'a>,
+pub struct SemanticContext {
     analyzing_now: AnalyzingNow,
 
     // ID of current function, if one is being analyzed
@@ -569,7 +573,7 @@ impl AST {
                 .objs
                 .type_push(Type::Function((input_type, ret_type_id)));
 
-            eprintln!("TYPE: {}", self.type_to_string(ctx.tokens, func_type));
+            eprintln!("TYPE: {}", self.type_to_string(func_type));
 
             func_type
         } else {
@@ -594,10 +598,7 @@ impl AST {
         // add function as member of parent scope
 
         if let (true, Some(name)) = (finalized, func_name) {
-            if self
-                .scope_add_function(ctx.tokens, scope, name, function_id)
-                .is_err()
-            {
+            if self.scope_add_function(scope, name, function_id).is_err() {
                 // duplicate name => problem
                 self.objs.expr_mut(expr).finalized = false;
             }
@@ -668,7 +669,7 @@ impl AST {
         expr: ExprID,
         ident: Identifier,
     ) {
-        let name = ctx.tokens.tok_as_str(&ident.name);
+        let name = self.tokens().tok_as_str(&ident.name).to_string();
 
         // test if name of ident is a built-in function
 
@@ -695,7 +696,7 @@ impl AST {
             return;
         }
 
-        if let Some(member_id) = self.scope_search(scope, name) {
+        if let Some(member_id) = self.scope_search(scope, name.as_str()) {
             let member = self.objs.member(member_id);
 
             let (type_id, ident_variant) = match member.variant {
@@ -810,7 +811,10 @@ impl AST {
             (FLOAT_TYPE, TypeVariant::Float),
             (BOOLEAN_TYPE, TypeVariant::Enum),
         ] {
-            if self.scope_search_no_recurse(ScopeID::global(), name).is_some() {
+            if self
+                .scope_search_no_recurse(ScopeID::global(), name)
+                .is_some()
+            {
                 continue;
             }
 
@@ -820,9 +824,7 @@ impl AST {
                 TokenOrString::String(name.to_string()),
                 variant,
             )
-            .expect(
-                "should be no name conflict for initial insertion of Integer, Float, Boolean",
-            );
+            .expect("should be no name conflict for initial insertion of Integer, Float, Boolean");
         }
 
         // add false, true to Boolean type
@@ -840,45 +842,30 @@ impl AST {
                         name: TokenOrString::String(name.to_string()),
                         visibility: Visibility::Global,
                         variant: MemberVariant::Instance(boolean_type),
+                        ..Default::default()
                     });
 
-                    self.scope_try_insert(&ctx.tokens, scope, member_id).expect(
+                    self.scope_try_insert(scope, member_id).expect(
                         "initial insertion to Boolean of true, false should not cause conflict",
                     );
                 }
             }
             _ => panic!("boolean type malformed"),
         }
-
     }
 
     // public function to do semantic analysis
     pub fn do_semantic_analysis(&mut self) {
-        if let Some(expr) = self.root_expr {
-            // create global scope and add built-ins
-
-            let mut ctx = SemanticContext {
-                tokens: tokens,
-                analyzing_now: AnalyzingNow::Expr,
-                curr_func: None,
-            };
-
-            self.add_basic_types(&mut ctx);
-            
-            // create new scope for module
-
-            let module_scope = self.objs.scope_push(Scope {
-                name: Some(TokenOrString::String(module_name.to_string())),
-                variant: ScopeVariant::Module,
-                parent_scope: ScopeID::global(),
-                refers_to: None,
-
-                ..Default::default()
-            });
-
-            // analyze root expr and provided new scope as scope
-
-            self.analyze_expr(&mut ctx, module_scope, expr);
+        let mut ctx = SemanticContext {
+            analyzing_now: AnalyzingNow::Expr,
+            curr_func: None,
         };
+
+        self.add_basic_types(&mut ctx);
+
+        // provide file module scope as scope
+        // use current root expr (found/created from syntax analysis)
+
+        self.analyze_expr(&mut ctx, self.curr_file_module, self.root_expr());
     }
 }

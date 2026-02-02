@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     parse::{
-        AST, MemberVariant, Type,
+        AST, HasFileModule, MemberVariant, Type,
         ast_contents::{FunctionID, MemberID, ScopeID, TypeID},
         builtin::Builtin,
     },
@@ -221,7 +221,7 @@ impl RuntimeRef {
 
         match &value.variant {
             ValueVariant::Type(type_id) => {
-                format!("type({})", ast.type_to_string(ctx.tokens, *type_id),)
+                format!("type({})", ast.type_to_string(*type_id),)
             }
             ValueVariant::Tuple(values) | ValueVariant::List(values) => {
                 let variant_str = match value.variant {
@@ -281,17 +281,19 @@ impl RuntimeRef {
                 let scope = ast.objs.scope(*scope_id);
 
                 let name_string = match &scope.name {
-                    Some(tok_or_string) => ctx.tokens.tok_or_string_to_string(tok_or_string),
+                    Some(tok_or_string) => scope_id
+                        .get_tokens(ast)
+                        .tok_or_string_to_string(tok_or_string),
                     None => "(anonymous)".to_string(),
                 };
 
                 format!("module {}", name_string)
             }
-            ValueVariant::Function(func) => {
-                let func = ast.objs.function(*func);
+            ValueVariant::Function(function_id) => {
+                let func = ast.objs.function(*function_id);
 
                 let func_name_str = match func.name {
-                    Some(t) => ctx.tokens.tok_as_str(&t),
+                    Some(t) => function_id.get_tokens(ast).tok_as_str(&t),
                     None => "(anonymous)",
                 };
 

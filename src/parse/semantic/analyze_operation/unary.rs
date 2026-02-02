@@ -59,7 +59,7 @@ impl AST {
                 self.invalid_operation(expr, "you may only import from an enum or variant type");
                 return;
             }
-            ScopeVariant::Module => (), // Ok
+            ScopeVariant::Module | ScopeVariant::FileModule(_) => (), // Ok
         }
 
         let type_id = self.objs.type_push(Type::ImportTarget(expr_scope_id));

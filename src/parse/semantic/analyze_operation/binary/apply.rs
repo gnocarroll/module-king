@@ -37,8 +37,8 @@ impl AST {
         ctx.analyzing_now = old_analyzing_now;
 
         eprintln!(
-            "{}",
-            self.type_to_string(ctx.tokens, self.objs.expr(operand2).type_id)
+            "ARGS: {}",
+            self.type_to_string(self.objs.expr(operand2).type_id)
         );
 
         let mut finalized = true;

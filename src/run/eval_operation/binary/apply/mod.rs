@@ -4,7 +4,7 @@ use std::iter::zip;
 
 use crate::{
     parse::{
-        AST, TypeVariant,
+        AST, HasFileModule, TypeVariant,
         ast_contents::{ExprID, FunctionID, TypeID},
         builtin::Builtin,
     },
@@ -101,7 +101,7 @@ fn eval_operation_apply_function(
             .flat_map(|pattern_id| pattern_id.to_pattern_iterator(ast)),
         args_refs.iter(),
     ) {
-        let name = ctx.tokens.tok_as_str(&name).to_string();
+        let name = function_id.get_tokens(ast).tok_as_str(&name).to_string();
 
         let member_id = ast
             .objs

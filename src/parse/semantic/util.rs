@@ -9,7 +9,6 @@ use crate::{
         semantic::SemanticContext,
     },
     scan::Token,
-    tokens::Tokens,
 };
 
 impl AST {
@@ -80,7 +79,7 @@ impl AST {
             name,
             visibility: Visibility::Private,
             variant: MemberVariant::Instance(type_id),
-            file_module: self.curr_file_module,
+            ..Default::default()
         });
 
         self.scope_try_insert(scope, member_id)
@@ -307,7 +306,6 @@ impl AST {
 
     pub fn scope_add_function(
         &mut self,
-        ctx: &Tokens,
         scope: ScopeID,
         name: Token,
         function: FunctionID,
