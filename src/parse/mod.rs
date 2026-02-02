@@ -723,14 +723,10 @@ pub fn parse_file(ast: &mut AST, tokens: Tokens, modulepath: Vec<String>) {
             "One or more syntax errors occurred, module {modulepath_string} will not be compiled."
         );
 
-        ast.display_parse_errors(&tokens);
+        ast.display_parse_errors();
 
         return;
     }
-
-    // TODO: REMOVE THIS DUMMY VALUE AND INTEGRATE MODULEPATH INTO SEMANTIC ANALYSIS
-
-    let filepath = "helllllooo";
 
     // reenable later to test
     ast.do_semantic_analysis();
@@ -742,7 +738,7 @@ pub fn parse_file(ast: &mut AST, tokens: Tokens, modulepath: Vec<String>) {
     if ast.has_errors() {
         eprintln!("One or more semantic errors occurred, program will not be compiled.");
 
-        ast.display_semantic_errors(&tokens);
+        ast.display_semantic_errors();
 
         return;
     }

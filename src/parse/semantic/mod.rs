@@ -853,7 +853,7 @@ impl AST {
     }
 
     // public function to do semantic analysis
-    pub fn do_semantic_analysis(&mut self, tokens: &Tokens, module_name: &str) {
+    pub fn do_semantic_analysis(&mut self) {
         if let Some(expr) = self.root_expr {
             // create global scope and add built-ins
 
