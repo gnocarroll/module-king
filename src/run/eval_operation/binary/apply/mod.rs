@@ -52,7 +52,7 @@ pub fn eval_operation_apply(
     });
 }
 
-fn eval_operation_apply_function(
+pub fn eval_operation_apply_function(
     ast: &AST,
     ctx: &mut ExecutionContext,
     _expr: ExprID,

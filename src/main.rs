@@ -1,6 +1,11 @@
 use std::{path::Path, process::ExitCode};
 
-use crate::{constants::{LANG_FILE_EXT, MODULE_FILENAME}, parse::AST, tokens::Tokens, util::listdir_with_ext};
+use crate::{
+    constants::{LANG_FILE_EXT, MODULE_FILENAME},
+    parse::AST,
+    tokens::Tokens,
+    util::listdir_with_ext,
+};
 
 mod args;
 mod constants;
@@ -65,17 +70,21 @@ fn main() -> ExitCode {
         }
 
         filepath_buf.add_extension(LANG_FILE_EXT);
-        
+
         // check if last filename indicates it is the code for a directory-based module
         // if so, remove last filename from the modulepath
 
-        if modulepath.last().expect("should have at least one name in path") == MODULE_FILENAME {
+        if modulepath
+            .last()
+            .expect("should have at least one name in path")
+            == MODULE_FILENAME
+        {
             modulepath.pop();
         }
-        
+
         eprintln!("MODULE PATH: {}", modulepath.join("."));
         eprintln!("FILEPATH: {:?}", filepath_buf);
-        
+
         let filepath = match filepath_buf.as_os_str().to_str() {
             Some(s) => s,
             None => {
@@ -87,12 +96,12 @@ fn main() -> ExitCode {
         // modify AST using file
 
         if let Err(e) = process_file(&mut ast, filepath, modulepath) {
-            eprintln!(
-                "Processing of file {} failed: {}",
-                filepath,
-                e,
-            );
+            eprintln!("Processing of file {} failed: {}", filepath, e,);
         }
+    }
+
+    if !ast.has_errors() {
+        run::run(&ast);
     }
 
     0.into()

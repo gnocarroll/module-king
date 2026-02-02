@@ -1,4 +1,4 @@
-mod apply;
+pub mod apply;
 
 use std::ops::{Add, Div, Mul, Rem, Sub};
 

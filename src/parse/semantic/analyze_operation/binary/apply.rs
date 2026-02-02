@@ -38,7 +38,7 @@ impl AST {
 
         eprintln!(
             "ARGS: {}",
-            self.type_to_string(self.objs.expr(operand2).type_id)
+            self.type_to_string(self.objs.expr(operand2).type_id),
         );
 
         let mut finalized = true;
@@ -370,7 +370,10 @@ impl AST {
 
             Builtin::IsFile | Builtin::IsDir => {
                 if !self.type_eq(arg_type_id, TypeID::string()) {
-                    self.invalid_operation(expr, "provide 1 arg which is a String to is file / is dir");
+                    self.invalid_operation(
+                        expr,
+                        "provide 1 arg which is a String to is file / is dir",
+                    );
                     return;
                 }
 

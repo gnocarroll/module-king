@@ -1,4 +1,4 @@
-mod binary;
+pub mod binary;
 
 use crate::{
     constants::INTEGER_TYPE,

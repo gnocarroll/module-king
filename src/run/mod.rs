@@ -7,11 +7,14 @@ mod util;
 
 use crate::{
     constants::UNIT_TYPE,
-    parse::{AST, ExprVariant, Type, While, ast_contents::ExprID},
+    parse::{
+        AST, ExprVariant, MemberVariant, Type, While,
+        ast_contents::{ExprID, FunctionID, ScopeID, TypeID},
+    },
     run::{
         context_contents::{ContextObjects, RuntimeRef, RuntimeScopeID, Value, ValueVariant},
         error::{RuntimeErrorVariant, RuntimeException},
-        eval_operation::eval_operation,
+        eval_operation::{binary::apply::eval_operation_apply_function, eval_operation},
     },
     tokens::Tokens,
 };
@@ -212,16 +215,69 @@ fn eval(
     Ok(ret)
 }
 
+fn eval_main(
+    ast: &AST,
+    ctx: &mut ExecutionContext,
+    function_id: FunctionID,
+) -> Result<RuntimeRef, RuntimeException> {
+    let value_id = ctx
+        .objs
+        .runtime_scope_mut(ctx.curr_scope)
+        .value_push(Value {
+            type_id: Some(TypeID::unit()),
+            variant: ValueVariant::Unit,
+        });
+
+    let args = RuntimeRef {
+        scope: ctx.curr_scope,
+        value_id,
+    };
+
+    eval_operation_apply_function(ast, ctx, ExprID::default(), function_id, args)
+}
+
 // central public function of this module, used to run interpreter given
 // program tokens and AST with semantic information
-pub fn run(tokens: &Tokens, ast: &AST) {
-    if let Some(expr) = ast.root_expr {
-        let mut ctx = ExecutionContext::new();
+pub fn run(ast: &AST) {
+    let main_string = "main".to_string();
 
-        if let Ok(value) = eval(ast, &mut ctx, expr) {
-            eprintln!();
-            eprintln!("PROG RETURN VALUE BELOW:");
-            eprintln!("{}", value.to_string(ast, &ctx));
+    let scope_id = match ast.objs.scope(ScopeID::global()).members.get(&main_string) {
+        Some(member_id) => match ast.objs.member(member_id).variant {
+            MemberVariant::Module(scope_id) => Some(scope_id),
+            _ => None,
+        },
+        None => None,
+    };
+
+    let scope_id = match scope_id {
+        Some(scope_id) => scope_id,
+        None => {
+            eprintln!("NO MAIN MODULE FOUND");
+            return;
         }
+    };
+
+    let function_id = match ast.objs.scope(scope_id).members.get(&main_string) {
+        Some(member_id) => match ast.objs.member(member_id).variant {
+            MemberVariant::Function(function_id) => Some(function_id),
+            _ => None,
+        },
+        None => None,
+    };
+
+    let function_id = match function_id {
+        Some(function_id) => function_id,
+        None => {
+            eprintln!("MAIN MODULE FOUND BUT NO MAIN FUNCTION");
+            return;
+        }
+    };
+
+    let mut ctx = ExecutionContext::new();
+
+    if let Ok(value) = eval_main(ast, &mut ctx, function_id) {
+        eprintln!();
+        eprintln!("PROG RETURN VALUE BELOW:");
+        eprintln!("{}", value.to_string(ast, &ctx));
     }
 }
