@@ -605,7 +605,7 @@ impl AST {
         }
     }
 
-    fn semantic_analyze_type_literal(
+    fn analyze_type_literal(
         &mut self,
         ctx: &mut SemanticContext,
         scope: ScopeID,
@@ -626,6 +626,10 @@ impl AST {
         });
 
         let type_id = self.type_push_scope(type_scope);
+
+        // connect scope back to type it is related to
+
+        self.objs.scope_mut(type_scope).refers_to = Some(ScopeRefersTo::Type(type_id));
 
         let old_analyzing_now = ctx.analyzing_now;
 
@@ -692,7 +696,43 @@ impl AST {
         }
 
         if let AnalyzingNow::TypeBody(_) = ctx.analyzing_now {
-            // TODO: attempt to add discriminant-only member to enum or variant
+            // attempt to add discriminant-only member to enum or variant
+
+            let scope_struct = self.objs.scope(scope);
+
+            match scope_struct.variant {
+                ScopeVariant::Type(TypeVariant::Enum | TypeVariant::Variant) => (), // Ok
+                _ => {
+                    self.semantic_errors.push(SemanticError::UnexpectedExpr(UnexpectedExpr { expr }));
+                    return;
+                }
+            }
+
+            let type_id = match scope_struct.refers_to {
+                Some(ScopeRefersTo::Type(type_id)) => type_id,
+                _ => {
+                    panic!("Current scope should be type if analyzing type body");
+                }
+            };
+
+            // create member for new addition to enum/variant
+
+            let new_member_id = self.objs.member_push(Member {
+                name: TokenOrString::Token(ident.name),
+
+                // global (not tied to specific instance)
+                visibility: Visibility::Global,
+
+                // type is enum/variant type itself
+                variant: MemberVariant::Instance(type_id),
+                
+                ..Default::default()
+            });
+
+            // now attempt to insert new member
+
+            self.scope_try_insert(scope, new_member_id);
+
             return;
         }
 
@@ -796,7 +836,7 @@ impl AST {
                     return;
                 }
 
-                self.semantic_analyze_type_literal(ctx, scope, expr);
+                self.analyze_type_literal(ctx, scope, expr);
             }
             ExprVariant::Operation(_) => {
                 self.analyze_operation(ctx, scope, expr);
