@@ -9,7 +9,7 @@ use crate::{
     },
     run::{
         ExecutionContext, Value, ValueVariant,
-        context_contents::RuntimeRef,
+        context_contents::{RuntimeRef, RuntimeScopeID, ValueID},
         error::{RuntimeErrorVariant, RuntimeException},
         eval,
         eval_operation::{binary::apply::eval_operation_apply, eval_eager},
@@ -376,18 +376,20 @@ fn eval_operation_braces(
 ) -> Result<RuntimeRef, RuntimeException> {
     let type_id = Some(ast.objs.expr(expr).type_id);
 
-    let operand1_ref = eval(ast, ctx, operand1)?;
+    let mut operand1_ref = eval(ast, ctx, operand1)?;
+
+    match &ctx.objs.ref_get(operand1_ref).variant {
+        ValueVariant::ImplicitRef(rref) => {
+            operand1_ref = *rref;
+        }
+        _ => (),
+    }
+
     let operand2_ref = eval(ast, ctx, operand2)?;
 
-    let variant = match (
-        &ctx.objs.ref_get(operand1_ref).variant,
-        &ctx.objs.ref_get(operand2_ref).variant,
-    ) {
-        (ValueVariant::Array(value_id_vec), ValueVariant::Integer(idx)) => {
-            // scope is array's scope, then get particular value id of member
-
-            let scope = operand1_ref.scope;
-            let value_id = match value_id_vec.get((*idx) as usize) {
+    let index_value_id_vec =
+        |scope: RuntimeScopeID, value_id_vec: &Vec<ValueID>, idx: usize| -> Result<ValueVariant, RuntimeException> {
+            let value_id = match value_id_vec.get(idx) {
                 Some(value_id) => *value_id,
                 None => {
                     return Err(RuntimeException {
@@ -397,7 +399,23 @@ fn eval_operation_braces(
                 }
             };
 
-            ValueVariant::ImplicitRef(RuntimeRef { scope, value_id })
+            Ok(ValueVariant::ImplicitRef(RuntimeRef { scope, value_id }))
+        };
+
+    let variant = match (
+        &ctx.objs.ref_get(operand1_ref).variant,
+        &ctx.objs.ref_get(operand2_ref).variant,
+    ) {
+        // index array with Integer
+        (ValueVariant::Array(value_id_vec), ValueVariant::Integer(idx)) => {
+            // scope is array's scope, then get particular value id of member
+
+            index_value_id_vec(operand1_ref.scope, value_id_vec, (*idx) as usize)?
+        }
+
+        // index array with Enum
+        (ValueVariant::Array(value_id_vec), ValueVariant::Enum(idx)) => {
+            index_value_id_vec(operand1_ref.scope, value_id_vec, *idx)?
         }
 
         _ => {
