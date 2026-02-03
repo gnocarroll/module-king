@@ -339,6 +339,47 @@ fn eval_operation_comma(
     .to_runtime_ref(ctx, ctx.curr_scope))
 }
 
+fn eval_operation_braces(
+    ast: &AST,
+    ctx: &mut ExecutionContext,
+    expr: ExprID,
+    operand1: ExprID,
+    operand2: ExprID,
+) -> Result<RuntimeRef, RuntimeException> {
+    let type_id = Some(ast.objs.expr(expr).type_id);
+
+    let operand1_ref = eval(ast, ctx, operand1)?;
+    let operand2_ref = eval(ast, ctx, operand2)?;
+
+    let variant = match (&ctx.objs.ref_get(operand1_ref).variant, &ctx.objs.ref_get(operand2_ref).variant) {
+        (ValueVariant::Array(value_id_vec), ValueVariant::Integer(idx)) => {
+            // scope is array's scope, then get particular value id of member
+            
+            let scope = operand1_ref.scope;
+            let value_id = match value_id_vec.get((*idx) as usize) {
+                Some(value_id) => *value_id,
+                None => {
+                    return Err(RuntimeException { expr, variant: RuntimeErrorVariant::IndexOutOfBounds });
+                }
+            };
+            
+            ValueVariant::ImplicitRef(RuntimeRef {
+                scope,
+                value_id,
+            })
+        }
+
+        _ => {
+            return Err(RuntimeException { expr, variant: RuntimeErrorVariant::InvalidOperation })
+        }
+    };
+
+    Ok(Value {
+        type_id,
+        variant,
+    }.to_runtime_ref(ctx, ctx.curr_scope))
+}
+
 pub fn eval_operation_binary(
     ast: &AST,
     ctx: &mut ExecutionContext,
@@ -366,6 +407,8 @@ pub fn eval_operation_binary(
         TokenType::Period => return eval_operation_period(ast, ctx, expr, operand1, operand2),
 
         TokenType::LParen => return eval_operation_apply(ast, ctx, expr, operand1, operand2),
+
+        TokenType::LBrace => return eval_operation_braces(ast, ctx, expr, operand1, operand2),
 
         TokenType::Semicolon => return eval_operation_semi(ast, ctx, expr, operand1, operand2),
 
