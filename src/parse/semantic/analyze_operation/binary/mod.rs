@@ -3,8 +3,8 @@ mod apply;
 use crate::{
     constants::{BOOLEAN_TYPE, ERROR_TYPE, UNIT_TYPE},
     parse::{
-        AST, ExprVariant, IdentifierVariant, MemberVariant, Operation, ScopeVariant, Type,
-        TypeVariant, Visibility,
+        AST, ExprVariant, IdentifierVariant, MemberVariant, Operation, ScopeVariant, SliceIndex,
+        Type, TypeVariant, Visibility,
         ast_contents::{ExprID, ScopeID, TypeID},
         operator,
         semantic::{AnalyzingNow, SemanticContext},
@@ -272,7 +272,7 @@ impl AST {
                 let ident = ident.clone();
 
                 self.tokens().tok_as_str(&ident.name).to_string()
-            },
+            }
             _ => {
                 self.invalid_operation(expr, "rhs of access should be an identifier");
                 return;
@@ -447,10 +447,7 @@ impl AST {
                 ExprVariant::Identifier(ident) => {
                     // add mapping from member name -> MemberID to scope
 
-                    if self
-                        .scope_try_insert(scope, ident.member_id)
-                        .is_err()
-                    {
+                    if self.scope_try_insert(scope, ident.member_id).is_err() {
                         // duplicate ident => problem
                         finalized = false;
                     }
@@ -603,6 +600,58 @@ impl AST {
 
         expr_mut.type_id = type_id;
         expr_mut.finalized = finalized;
+    }
+
+    // can be creation of array/slice type or access to array/slice
+    fn analyze_operation_braces(
+        &mut self,
+        ctx: &mut SemanticContext,
+        scope: ScopeID,
+        expr: ExprID,
+        operand1: ExprID,
+        operand2: ExprID,
+    ) {
+        self.analyze_expr(ctx, scope, operand1);
+        self.analyze_expr(ctx, scope, operand2);
+
+        if !self.expr(operand1).finalized || !self.expr(operand2).finalized {
+            return;
+        }
+
+        let operand1_type_id = self.objs.expr(operand1).type_id;
+        let operand2_type_id = self.objs.expr(operand2).type_id;
+
+        match (
+            self.objs.type_get(operand1_type_id),
+            self.objs.type_get(operand2_type_id),
+        ) {
+            // creation of new array type
+            (Type::Type(contained_type_id), Type::Type(idx_type_id)) => {
+                let arr_type_id = self.objs.type_push(Type::Slice((
+                    *contained_type_id,
+                    SliceIndex {
+                        type_id: *idx_type_id,
+                        range: None,
+                    },
+                )));
+
+                let type_id = self.objs.type_push(Type::Type(arr_type_id));
+
+                let expr_mut = self.objs.expr_mut(expr);
+
+                expr_mut.type_id = type_id;
+                expr_mut.finalized = true;
+            }
+
+            // access to existing array
+            (Type::Slice((type_id, slice_index)), _) => {
+
+            }
+
+            _ => {
+                self.invalid_operation(expr, "invalid application of [] operator");
+            }
+        }
     }
 
     pub fn analyze_operation_binary(
