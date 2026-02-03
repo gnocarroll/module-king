@@ -665,7 +665,7 @@ impl AST {
                 return;
             }
 
-            // array with integer length
+            // array with integer length (create new type)
             (Type::Type(contained_type_id), _, ExprVariant::IntegerLiteral(len)) => {
                 let integer_type_id = self.get_builtin_type_id(INTEGER_TYPE);
                 let len = *len;
@@ -708,6 +708,7 @@ impl AST {
                 let expr_mut = self.objs.expr_mut(expr);
 
                 expr_mut.type_id = type_id;
+                expr_mut.is_var = true;
                 expr_mut.finalized = true;
 
                 return;

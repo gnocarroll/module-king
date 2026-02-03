@@ -275,9 +275,14 @@ pub fn run(ast: &AST) {
 
     let mut ctx = ExecutionContext::new();
 
-    if let Ok(value) = eval_main(ast, &mut ctx, function_id) {
-        eprintln!();
-        eprintln!("PROG RETURN VALUE BELOW:");
-        eprintln!("{}", value.to_string(ast, &ctx));
+    match eval_main(ast, &mut ctx, function_id) {
+        Ok(value) => {
+            eprintln!();
+            eprintln!("PROG RETURN VALUE BELOW:");
+            eprintln!("{}", value.to_string(ast, &ctx));
+        }
+        Err(e) => {
+            eprintln!("RUNTIME EXCEPTION: {}", e.to_string(ast));
+        }
     }
 }

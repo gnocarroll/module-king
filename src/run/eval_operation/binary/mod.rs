@@ -382,6 +382,9 @@ fn eval_operation_braces(
         ValueVariant::ImplicitRef(rref) => {
             operand1_ref = *rref;
         }
+        ValueVariant::Identifier(member_id) => {
+            operand1_ref = ctx.objs.instance_get(*member_id).expect("should be allocated");
+        }
         _ => (),
     }
 
