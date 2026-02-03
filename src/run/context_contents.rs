@@ -138,6 +138,8 @@ pub enum ValueVariant {
     // tuples are "flattened" unlike linked-list structure used elsewhere in codebase
     Tuple(Vec<ValueID>),
 
+    Array(Vec<ValueID>),
+
     Record(HashMap<String, ValueID>),
 
     Ref(RuntimeRef),
@@ -223,10 +225,13 @@ impl RuntimeRef {
             ValueVariant::Type(type_id) => {
                 format!("type({})", ast.type_to_string(*type_id),)
             }
-            ValueVariant::Tuple(values) | ValueVariant::List(values) => {
+            ValueVariant::Tuple(values)
+            | ValueVariant::List(values)
+            | ValueVariant::Array(values) => {
                 let variant_str = match value.variant {
                     ValueVariant::Tuple(_) => "tuple",
                     ValueVariant::List(_) => "List",
+                    ValueVariant::Array(_) => "array",
                     _ => panic!("should be guaranteed to be Tuple or List"),
                 };
 
@@ -370,7 +375,9 @@ impl RuntimeRef {
                     .expect("should have been alloced")
                     .dup_in_scope(ast, ctx, target_scope);
             }
-            ValueVariant::Tuple(value_id_vec) | ValueVariant::List(value_id_vec) => {
+            ValueVariant::Tuple(value_id_vec)
+            | ValueVariant::List(value_id_vec)
+            | ValueVariant::Array(value_id_vec) => {
                 let to_variant = {
                     match value.variant {
                         ValueVariant::Tuple(_) => ValueVariant::Tuple,
