@@ -8,6 +8,8 @@ use crate::parse::{ast_contents::MemberID, errors::DuplicateName};
 pub struct ScopeMembers {
     map: HashMap<String, MemberID>,
     order: Vec<String>,
+
+    member_to_idx: HashMap<MemberID, usize>,
 }
 
 impl ScopeMembers {
@@ -29,6 +31,10 @@ impl ScopeMembers {
         self.order.len()
     }
 
+    pub fn member_idx(&self, member_id: MemberID) -> Option<usize> {
+        self.member_to_idx.get(&member_id).map(|idx| *idx)
+    }
+
     // try to insert to scope, return error if name exists
     pub fn insert(&mut self, s: String, member: MemberID) -> Result<MemberID, DuplicateName> {
         if let Some(old_member) = self.map.get(&s) {
@@ -41,6 +47,10 @@ impl ScopeMembers {
 
         self.order.push(s.clone());
         self.map.insert(s, member);
+
+        // it is at last index of order vec so index is len - 1
+
+        self.member_to_idx.insert(member, self.order.len() - 1);
 
         Ok(member)
     }

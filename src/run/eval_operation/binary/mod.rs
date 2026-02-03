@@ -120,6 +120,9 @@ fn eval_operation_period(
     let member = ctx.objs.ref_get(member_ref);
 
     match (&value_to_access.variant, &member.variant) {
+        (ValueVariant::Type(type_id), ValueVariant::Identifier(member_id)) => {
+            
+        }
         (ValueVariant::Record(map), ValueVariant::Identifier(member_id)) => {
             let name = ast.objs.member(*member_id).name.clone();
             
