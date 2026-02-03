@@ -36,6 +36,10 @@ impl AST {
         self.analyze_expr(ctx, scope, operand2);
         ctx.analyzing_now = old_analyzing_now;
 
+        if !self.expr(operand1).finalized || !self.expr(operand2).finalized {
+            return;
+        }
+
         eprintln!(
             "ARGS: {}",
             self.type_to_string(self.objs.expr(operand2).type_id),
