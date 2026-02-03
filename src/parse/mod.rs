@@ -742,7 +742,7 @@ pub fn parse_file(ast: &mut AST, tokens: Tokens, modulepath: Vec<String>) {
         }
     }
 
-    println!("{}", ast.expr_to_string(root_expr));
+    eprintln!("{}", ast.expr_to_string(root_expr));
 
     let modulepath_string = modulepath.join(".");
 
@@ -761,7 +761,7 @@ pub fn parse_file(ast: &mut AST, tokens: Tokens, modulepath: Vec<String>) {
 
     eprintln!("RAN SEMANTIC ANALYSIS FUNC");
 
-    println!("{}", ast.expr_to_string(root_expr));
+    eprintln!("{}", ast.expr_to_string(root_expr));
 
     if ast.has_errors() {
         eprintln!("One or more semantic errors occurred, program will not be compiled.");
