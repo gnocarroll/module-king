@@ -1,15 +1,14 @@
 use std::collections::HashMap;
 
 use crate::{
-    parse::{
+    constants::INTEGER_TYPE, parse::{
         AST, HasFileModule, MemberVariant, ScopeVariant, Type, TypeVariant, Visibility,
         ast_contents::{FunctionID, PatternID, ScopeID, TypeID},
         builtin::Builtin,
-    },
-    run::{
+    }, run::{
         ExecutionContext,
         context_contents::{RuntimeRef, RuntimeScope, Value, ValueID, ValueVariant},
-    },
+    }
 };
 
 // for each member that can be located from pattern,
@@ -183,6 +182,31 @@ pub fn type_to_value_id(ast: &AST, runtime_scope: &mut RuntimeScope, type_id: Ty
             let idx_type_id = slice_index.type_id;
 
             let mut value_id_vec = Vec::new();
+
+            let arr_size = match (slice_index.size, ast.objs.type_get(idx_type_id)) {
+                (Some(size), _) => size,
+                (None, Type::Scope(scope_id)) => {
+                    let scope_struct = ast.objs.scope(*scope_id);
+
+                    match scope_struct.variant {
+                        ScopeVariant::Type(TypeVariant::Enum) => (), // Ok
+                        _ => {
+                            panic!("if size for arr not provided should be using enum as index");
+                        }
+                    }
+
+                    scope_struct.members.member_count()
+                }
+                _ => {
+                    panic!("creating slice value should have arr size or type with scope");
+                }
+            };
+
+            // fill array with default values of element type
+
+            for _ in 0..arr_size {
+                value_id_vec.push(type_to_value_id(ast, runtime_scope, element_type_id));
+            }
 
             ValueVariant::Array(value_id_vec)
         }
