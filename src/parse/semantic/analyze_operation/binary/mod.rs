@@ -645,7 +645,19 @@ impl AST {
 
             // access to existing array
             (Type::Slice((type_id, slice_index)), _) => {
+                if !self.type_eq(slice_index.type_id, operand2_type_id) {
+                    self.invalid_operation(expr, "ensure value used to index array matches index type of array");
+                    return;
+                }
 
+                // ret type of this expr is inner type of array (because array is being indexed)
+
+                let type_id = *type_id;
+
+                let expr_mut = self.objs.expr_mut(expr);
+
+                expr_mut.type_id = type_id;
+                expr_mut.finalized = true;
             }
 
             _ => {
