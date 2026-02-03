@@ -121,7 +121,12 @@ fn eval_operation_period(
 
     match (&value_to_access.variant, &member.variant) {
         (ValueVariant::Type(type_id), ValueVariant::Identifier(member_id)) => {
-            
+            let scope_id = match ast.type_get(*type_id) {
+                Type::Scope(scope_id) => scope_id,
+                _ => panic!("type being accessed with period should have scope"),
+            };
+
+            let discriminant = ast.objs.scope(scope_id).members.member_idx(*member_id).expect("member not found in Type");
         }
         (ValueVariant::Record(map), ValueVariant::Identifier(member_id)) => {
             let name = ast.objs.member(*member_id).name.clone();

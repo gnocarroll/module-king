@@ -39,7 +39,9 @@ pub fn eval_eager(
             | ValueVariant::Map(_)
             | ValueVariant::Ref(_)
             | ValueVariant::Ptr(_)
-            | ValueVariant::CharRef(_) => return Ok(runtime_ref),
+            | ValueVariant::CharRef(_)
+            | ValueVariant::Enum(_)
+            | ValueVariant::Array(_) => return Ok(runtime_ref),
             ValueVariant::Tuple(value_ids) => {
                 let value_ids = value_ids.clone();
 

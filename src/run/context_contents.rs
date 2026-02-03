@@ -135,6 +135,9 @@ pub enum ValueVariant {
     String(Vec<u8>),
     Identifier(MemberID),
 
+    // contains discriminant
+    Enum(usize),
+
     // tuples are "flattened" unlike linked-list structure used elsewhere in codebase
     Tuple(Vec<ValueID>),
 
@@ -220,6 +223,8 @@ impl Value {
 impl RuntimeRef {
     pub fn to_string(&self, ast: &AST, ctx: &ExecutionContext) -> String {
         let value = ctx.objs.ref_get(*self);
+
+        let type_id = value.type_id;
 
         match &value.variant {
             ValueVariant::Type(type_id) => {
@@ -317,6 +322,24 @@ impl RuntimeRef {
             ValueVariant::ImplicitCharRef(char_ref) => {
                 format!("{}", char_ref.load(ctx))
             }
+            ValueVariant::Enum(discriminant) => {
+                let type_id = type_id.expect("type should exist for enum Value");
+
+                let scope_id = match ast.objs.type_get(type_id) {
+                    Type::Scope(scope_id) => {
+                        *scope_id
+                    }
+                    _ => {
+                        panic!("enum should have scope");
+                    }
+                };
+
+                let member_id = ast.objs.scope(scope_id).members.nth_member(*discriminant);
+
+                let name = member_id.get_name(ast).expect("enum member should have name");
+
+                name
+            }
         }
     }
 
@@ -367,7 +390,8 @@ impl RuntimeRef {
             | ValueVariant::String(_)
             | ValueVariant::Function(_)
             | ValueVariant::Type(_)
-            | ValueVariant::Builtin(_) => value,
+            | ValueVariant::Builtin(_)
+            | ValueVariant::Enum(_) => value,
             ValueVariant::Identifier(ident) => {
                 return ctx
                     .objs
