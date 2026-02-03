@@ -244,23 +244,33 @@ impl AST {
             return;
         }
 
-        // TODO: search global/shared members of types
-        // right now only doing modules and instances
-
         let search_scope = match self.objs.type_get(operand1_struct.type_id) {
+            // member of module is what is being accessed
             Type::Module(scope) => *scope,
             _ => {
                 let mut type_id = operand1_struct.type_id;
 
-                let scope = loop {
-                    match self.objs.type_get(type_id) {
-                        Type::Scope(scope) => break *scope,
-                        Type::Alias(t) | Type::Ptr(t) | Type::Ref(t) => type_id = *t,
+                let scope = match self.objs.type_get(type_id) {
+                    // access member of a type (e.g. for an enum Color take the expr "Color.red")
+                    Type::Type(inner_type_id) => match self.objs.type_get(*inner_type_id) {
+                        Type::Scope(scope_id) => *scope_id,
                         _ => {
-                            self.invalid_operation(expr, "cannot access members of this type");
+                            self.invalid_operation(expr, "type must have corresponding scope");
                             return;
                         }
-                    }
+                    },
+
+                    // accessing member of an instance as opposed to type itself
+                    _ => loop {
+                        match self.objs.type_get(type_id) {
+                            Type::Scope(scope) => break *scope,
+                            Type::Alias(t) | Type::Ptr(t) | Type::Ref(t) => type_id = *t,
+                            _ => {
+                                self.invalid_operation(expr, "cannot access members of this type");
+                                return;
+                            }
+                        }
+                    },
                 };
 
                 scope
@@ -324,6 +334,12 @@ impl AST {
 
         expr_mut.is_var = true;
         expr_mut.finalized = true;
+
+        let operand2_mut = self.objs.expr_mut(operand2);
+
+        operand2_mut.type_id = expr_type_id;
+        operand2_mut.is_var = true;
+        operand2_mut.finalized = true;
     }
 
     // var creation + assignment + type inference
@@ -641,12 +657,17 @@ impl AST {
 
                 expr_mut.type_id = type_id;
                 expr_mut.finalized = true;
+
+                return;
             }
 
             // access to existing array
             (Type::Slice((type_id, slice_index)), _) => {
                 if !self.type_eq(slice_index.type_id, operand2_type_id) {
-                    self.invalid_operation(expr, "ensure value used to index array matches index type of array");
+                    self.invalid_operation(
+                        expr,
+                        "ensure value used to index array matches index type of array",
+                    );
                     return;
                 }
 
@@ -658,12 +679,14 @@ impl AST {
 
                 expr_mut.type_id = type_id;
                 expr_mut.finalized = true;
+
+                return;
             }
 
-            _ => {
-                self.invalid_operation(expr, "invalid application of [] operator");
-            }
+            _ => (),
         }
+
+        self.invalid_operation(expr, "invalid application of [] operator");
     }
 
     pub fn analyze_operation_binary(
