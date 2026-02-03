@@ -151,8 +151,8 @@ impl AST {
                 self.type_to_string(ret),
             ),
             Type::Builtin(builtin) => format!("(builtin {})", builtin.get_builtin_name(),),
-            Type::Slice((idx, t)) => {
-                format!("[{}]{}", self.expr_to_string(idx), self.type_to_string(t),)
+            Type::Slice((t, idx)) => {
+                format!("{}[{}]", self.type_to_string(t), self.type_to_string(idx.type_id),)
             }
             Type::Scope(scope_id) => {
                 let scope = self.objs.scope(scope_id);

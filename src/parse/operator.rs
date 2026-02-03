@@ -394,12 +394,6 @@ static OP_INFO_TABLE: &[&[OperatorInfo]] = &[
             assoc: Assoc::Right,
             _is_rhs_optional: false,
         },
-        OperatorInfo {
-            ttype: TokenType::LBrace,
-            variant: PrefixAround,
-            assoc: Assoc::Right,
-            _is_rhs_optional: false,
-        },
         // e.g. (type Point) is ...
         OperatorInfo {
             ttype: TokenType::Type,
@@ -439,6 +433,13 @@ static OP_INFO_TABLE: &[&[OperatorInfo]] = &[
             variant: PostfixAround,
             assoc: Assoc::Left,
             _is_rhs_optional: true,
+        },
+
+        OperatorInfo {
+            ttype: TokenType::LBrace,
+            variant: PostfixAround,
+            assoc: Assoc::Left,
+            _is_rhs_optional: false,
         },
     ],
 ];

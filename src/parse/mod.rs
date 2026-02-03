@@ -59,6 +59,14 @@ pub struct TypeLiteral {
     pub body: ExprID,
 }
 
+#[derive(Clone, Copy, PartialEq)]
+pub struct SliceIndex {
+    pub type_id: TypeID,
+
+    // optional and would indicate limited index range e.g. 0..5
+    pub range: Option<ExprID>,
+}
+
 #[derive(Clone, PartialEq)]
 pub enum Type {
     Error,
@@ -91,8 +99,8 @@ pub enum Type {
     // actually separate type
     Alias(TypeID),
 
-    // [Expr]Type
-    Slice((ExprID, TypeID)),
+    // Type[Expr]
+    Slice((TypeID, SliceIndex)),
 
     // for tuple with > 2 elements second u32 will link to a RestOfTuple
     Tuple((TypeID, Option<TypeID>)),
