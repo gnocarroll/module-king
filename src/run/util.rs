@@ -178,6 +178,14 @@ pub fn type_to_value_id(ast: &AST, runtime_scope: &mut RuntimeScope, type_id: Ty
         Type::RestOfTuple((t1, t2)) => {
             return types_to_tuple_value_id(ast, runtime_scope, type_id, *t1, Some(*t2));
         }
+        Type::Slice((element_type_id, slice_index)) => {
+            let element_type_id = *element_type_id;
+            let idx_type_id = slice_index.type_id;
+
+            let mut value_id_vec = Vec::new();
+
+            ValueVariant::Array(value_id_vec)
+        }
         _ => todo!("have not implemented in interpreter other sorts of types yet"),
     };
 

@@ -1,7 +1,7 @@
 mod apply;
 
 use crate::{
-    constants::{BOOLEAN_TYPE, ERROR_TYPE, UNIT_TYPE},
+    constants::{BOOLEAN_TYPE, ERROR_TYPE, INTEGER_TYPE, UNIT_TYPE},
     parse::{
         AST, ExprVariant, IdentifierVariant, MemberVariant, Operation, ScopeVariant, SliceIndex,
         Type, TypeVariant, Visibility,
@@ -635,19 +635,49 @@ impl AST {
         }
 
         let operand1_type_id = self.objs.expr(operand1).type_id;
-        let operand2_type_id = self.objs.expr(operand2).type_id;
+
+        let operand2_struct = self.objs.expr(operand2);
+
+        let operand2_type_id = operand2_struct.type_id;
 
         match (
             self.objs.type_get(operand1_type_id),
             self.objs.type_get(operand2_type_id),
+            &operand2_struct.variant,
         ) {
             // creation of new array type
-            (Type::Type(contained_type_id), Type::Type(idx_type_id)) => {
+            (Type::Type(contained_type_id), Type::Type(idx_type_id), _) => {
                 let arr_type_id = self.objs.type_push(Type::Slice((
                     *contained_type_id,
                     SliceIndex {
                         type_id: *idx_type_id,
-                        range: None,
+                        size: None,
+                    },
+                )));
+
+                let type_id = self.objs.type_push(Type::Type(arr_type_id));
+
+                let expr_mut = self.objs.expr_mut(expr);
+
+                expr_mut.type_id = type_id;
+                expr_mut.finalized = true;
+
+                return;
+            }
+
+            // array with integer length
+            (Type::Type(contained_type_id), _, ExprVariant::IntegerLiteral(len)) => {
+                let integer_type_id = self.get_builtin_type_id(INTEGER_TYPE);
+                let len = *len;
+
+                let arr_type_id = self.objs.type_push(Type::Slice((
+                    *contained_type_id,
+                    SliceIndex {
+                        type_id: integer_type_id,
+                        size: Some(
+                            len.try_into()
+                                .expect("expected that u64 len could be converted into usize"),
+                        ),
                     },
                 )));
 
@@ -662,7 +692,7 @@ impl AST {
             }
 
             // access to existing array
-            (Type::Slice((type_id, slice_index)), _) => {
+            (Type::Slice((type_id, slice_index)), _, _) => {
                 if !self.type_eq(slice_index.type_id, operand2_type_id) {
                     self.invalid_operation(
                         expr,
@@ -764,6 +794,10 @@ impl AST {
             }
             TokenType::LParen => {
                 self.analyze_operation_apply(ctx, scope, expr, operand1, operand2);
+                return;
+            }
+            TokenType::LBrace => {
+                self.analyze_operation_braces(ctx, scope, expr, operand1, operand2);
                 return;
             }
             TokenType::Comma => {

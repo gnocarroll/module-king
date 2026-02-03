@@ -63,8 +63,7 @@ pub struct TypeLiteral {
 pub struct SliceIndex {
     pub type_id: TypeID,
 
-    // optional and would indicate limited index range e.g. 0..5
-    pub range: Option<ExprID>,
+    pub size: Option<usize>,
 }
 
 #[derive(Clone, PartialEq)]
