@@ -15,6 +15,8 @@ mod scan;
 mod tokens;
 mod util;
 
+const MANIFEST_PATH: &str = env!("CARGO_MANIFEST_DIR");
+
 fn main() -> ExitCode {
     let wd = match std::env::current_dir() {
         Ok(s) => match s.as_os_str().to_str() {
@@ -29,6 +31,12 @@ fn main() -> ExitCode {
             return 1.into();
         }
     };
+
+    // hardcode path to spectra for now for debugging
+
+    let path = Path::new(MANIFEST_PATH).parent().unwrap().join("spectra").join("src");
+
+    let wd = path.as_os_str().to_str().unwrap().to_string();
 
     // locate files with language extension
 
