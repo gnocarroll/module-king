@@ -414,6 +414,55 @@ impl AST {
         (pattern, err)
     }
 
+    fn analyze_if_elif(&mut self, ctx: &mut SemanticContext, scope: ScopeID, expr: ExprID) {
+        let if_struct = match &self.objs.expr(expr).variant {
+            ExprVariant::If(if_struct) | ExprVariant::Elif(if_struct) => if_struct.clone(),
+            _ => panic!("should be func literal"),
+        };
+
+        let boolean_type_id = self.get_builtin_type_id(BOOLEAN_TYPE);
+
+        self.analyze_expr(ctx, scope, if_struct.cond);
+
+        let mut finalized = true;
+
+        let cond_struct = self.objs.expr(if_struct.cond);
+
+        if cond_struct.finalized {
+            if !self.type_eq(cond_struct.type_id, boolean_type_id) {
+                self.semantic_errors
+                    .push(SemanticError::ExpectedType(ExpectedType {
+                        expr,
+                        expected: boolean_type_id,
+                        found: cond_struct.type_id,
+                    }));
+
+                finalized = false;
+            }
+        } else {
+            finalized = false;
+        }
+
+        self.analyze_expr(ctx, scope, if_struct.body);
+
+        if !self.objs.expr(if_struct.body).finalized {
+            finalized = false;
+        }
+
+        if let Some(else_expr) = if_struct.else_expr {
+            self.analyze_expr(ctx, scope, else_expr);
+
+            if !self.objs.expr(else_expr).finalized {
+                finalized = false;
+            }
+        }
+
+        let expr_mut = self.expr_mut(expr);
+
+        expr_mut.type_id = TypeID::unit();
+        expr_mut.finalized = finalized;
+    }
+
     fn analyze_while(&mut self, ctx: &mut SemanticContext, scope: ScopeID, expr: ExprID) {
         let while_struct = match &self.objs.expr(expr).variant {
             ExprVariant::While(while_struct) => while_struct.clone(),
@@ -605,12 +654,7 @@ impl AST {
         }
     }
 
-    fn analyze_type_literal(
-        &mut self,
-        ctx: &mut SemanticContext,
-        scope: ScopeID,
-        expr: ExprID,
-    ) {
+    fn analyze_type_literal(&mut self, ctx: &mut SemanticContext, scope: ScopeID, expr: ExprID) {
         let type_literal = match &self.objs.expr(expr).variant {
             ExprVariant::TypeLiteral(t) => t.clone(),
             _ => panic!(),
@@ -703,7 +747,8 @@ impl AST {
             match scope_struct.variant {
                 ScopeVariant::Type(TypeVariant::Enum | TypeVariant::Variant) => (), // Ok
                 _ => {
-                    self.semantic_errors.push(SemanticError::UnexpectedExpr(UnexpectedExpr { expr }));
+                    self.semantic_errors
+                        .push(SemanticError::UnexpectedExpr(UnexpectedExpr { expr }));
                     return;
                 }
             }
@@ -725,13 +770,13 @@ impl AST {
 
                 // type is enum/variant type itself
                 variant: MemberVariant::Instance(type_id),
-                
+
                 ..Default::default()
             });
 
             // now attempt to insert new member
 
-            self.scope_try_insert(scope, new_member_id);
+            let _ = self.scope_try_insert(scope, new_member_id);
 
             return;
         }
@@ -810,6 +855,9 @@ impl AST {
             }
             ExprVariant::Identifier(ident) => {
                 self.analyze_ident(ctx, scope, expr, ident.clone());
+            }
+            ExprVariant::If(_) | ExprVariant::Elif(_) => {
+                self.analyze_if_elif(ctx, scope, expr);
             }
             ExprVariant::While(_) => {
                 self.analyze_while(ctx, scope, expr);
