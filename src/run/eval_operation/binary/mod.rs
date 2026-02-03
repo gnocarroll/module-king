@@ -4,7 +4,9 @@ use std::ops::{Add, Div, Mul, Rem, Sub};
 
 use crate::{
     constants::UNIT_TYPE,
-    parse::{AST, HasFileModule, Type, ast_contents::ExprID},
+    parse::{
+        AST, HasFileModule, ScopeRefersTo, ScopeVariant, Type, TypeVariant, ast_contents::ExprID,
+    },
     run::{
         ExecutionContext, Value, ValueVariant,
         context_contents::RuntimeRef,
@@ -106,6 +108,8 @@ fn eval_operation_period(
     operand1: ExprID,
     operand2: ExprID,
 ) -> Result<RuntimeRef, RuntimeException> {
+    let expr_type_id = ast.objs.expr(expr).type_id;
+
     let mut value_ref = eval(ast, ctx, operand1)?;
 
     // auto deref as much as possible like in Rust
@@ -121,19 +125,35 @@ fn eval_operation_period(
 
     match (&value_to_access.variant, &member.variant) {
         (ValueVariant::Type(type_id), ValueVariant::Identifier(member_id)) => {
-            let scope_id = match ast.type_get(*type_id) {
+            let scope_id = match ast.objs.type_get(*type_id) {
                 Type::Scope(scope_id) => scope_id,
                 _ => panic!("type being accessed with period should have scope"),
             };
 
-            let discriminant = ast.objs.scope(scope_id).members.member_idx(*member_id).expect("member not found in Type");
+            let scope_struct = ast.objs.scope(*scope_id);
+
+            let discriminant = scope_struct
+                .members
+                .member_idx(*member_id)
+                .expect("member not found in Type");
+
+            match scope_struct.variant {
+                ScopeVariant::Type(TypeVariant::Enum) => {
+                    return Ok(Value {
+                        type_id: Some(expr_type_id),
+                        variant: ValueVariant::Enum(discriminant),
+                    }
+                    .to_runtime_ref(ctx, ctx.curr_scope));
+                }
+                _ => {
+                    panic!("only implemented global members for enum so far");
+                }
+            }
         }
         (ValueVariant::Record(map), ValueVariant::Identifier(member_id)) => {
             let name = ast.objs.member(*member_id).name.clone();
-            
-            let name = member_id
-                .get_tokens(ast)
-                .tok_or_string_to_string(&name);
+
+            let name = member_id.get_tokens(ast).tok_or_string_to_string(&name);
 
             return match map.get(&name) {
                 Some(value_id) => Ok(RuntimeRef {
@@ -359,33 +379,36 @@ fn eval_operation_braces(
     let operand1_ref = eval(ast, ctx, operand1)?;
     let operand2_ref = eval(ast, ctx, operand2)?;
 
-    let variant = match (&ctx.objs.ref_get(operand1_ref).variant, &ctx.objs.ref_get(operand2_ref).variant) {
+    let variant = match (
+        &ctx.objs.ref_get(operand1_ref).variant,
+        &ctx.objs.ref_get(operand2_ref).variant,
+    ) {
         (ValueVariant::Array(value_id_vec), ValueVariant::Integer(idx)) => {
             // scope is array's scope, then get particular value id of member
-            
+
             let scope = operand1_ref.scope;
             let value_id = match value_id_vec.get((*idx) as usize) {
                 Some(value_id) => *value_id,
                 None => {
-                    return Err(RuntimeException { expr, variant: RuntimeErrorVariant::IndexOutOfBounds });
+                    return Err(RuntimeException {
+                        expr,
+                        variant: RuntimeErrorVariant::IndexOutOfBounds,
+                    });
                 }
             };
-            
-            ValueVariant::ImplicitRef(RuntimeRef {
-                scope,
-                value_id,
-            })
+
+            ValueVariant::ImplicitRef(RuntimeRef { scope, value_id })
         }
 
         _ => {
-            return Err(RuntimeException { expr, variant: RuntimeErrorVariant::InvalidOperation })
+            return Err(RuntimeException {
+                expr,
+                variant: RuntimeErrorVariant::InvalidOperation,
+            });
         }
     };
 
-    Ok(Value {
-        type_id,
-        variant,
-    }.to_runtime_ref(ctx, ctx.curr_scope))
+    Ok(Value { type_id, variant }.to_runtime_ref(ctx, ctx.curr_scope))
 }
 
 pub fn eval_operation_binary(

@@ -58,7 +58,7 @@ pub fn eval_eager(
                     };
 
                     // eager evaluate element
-                    
+
                     rref = eval_eager(ast, ctx, rref)?;
 
                     // also if result is not in current scope then duplicate into current scope
