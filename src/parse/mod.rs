@@ -10,7 +10,7 @@ use crate::{
     parse::{
         ast_contents::{ASTContents, ExprID, FunctionID, MemberID, PatternID, ScopeID, TypeID},
         builtin::Builtin,
-        errors::{DuplicateName, ParseError, SemanticError},
+        errors::{DuplicateName, ParseError, PatternError, SemanticError},
         scope_members::ScopeMembers,
     },
     scan::{Token, TokenType},
@@ -317,7 +317,7 @@ impl Default for ExprVariant {
     }
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ExprReturns {
     Error,
     Unit,
@@ -584,9 +584,18 @@ impl AST {
 
     pub fn display_semantic_errors(&self) {
         for err in &self.semantic_errors {
+            eprintln!("{:?}", err);
+            
             match err {
                 SemanticError::InvalidOperation(invalid_op) => {
-                    eprintln!("invalid op: {}", invalid_op.msg);
+                    eprintln!("EXPR TEXT: {}", self.expr_to_string(invalid_op.operation));
+                    eprintln!("MSG: {}", invalid_op.msg);
+                }
+                SemanticError::PatternError(pattern_err) => match pattern_err {
+                    PatternError::TypeMissing(expr) => {
+                        eprintln!("TYPE MISSING: {}", self.expr_to_string(*expr));
+                    }
+                    _ => (),
                 }
                 _ => {
                     eprintln!("Displaying not implemented for this kind of semantic error.")
@@ -741,7 +750,7 @@ pub fn parse_file(ast: &mut AST, tokens: Tokens, modulepath: Vec<String>) {
         }
     }
 
-    eprintln!("{}", ast.expr_to_string(root_expr));
+    // eprintln!("{}", ast.expr_to_string(root_expr));
 
     let modulepath_string = modulepath.join(".");
 
@@ -760,7 +769,7 @@ pub fn parse_file(ast: &mut AST, tokens: Tokens, modulepath: Vec<String>) {
 
     eprintln!("RAN SEMANTIC ANALYSIS FUNC");
 
-    eprintln!("{}", ast.expr_to_string(root_expr));
+    // eprintln!("{}", ast.expr_to_string(root_expr));
 
     if ast.has_errors() {
         eprintln!("One or more semantic errors occurred, program will not be compiled.");

@@ -501,7 +501,7 @@ impl TokenType {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Token {
     pub ttype: TokenType,
     pub line: u16,

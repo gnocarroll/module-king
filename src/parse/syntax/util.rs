@@ -125,7 +125,8 @@ impl AST {
         let type_ref = self.objs.type_get(type_id);
 
         match type_ref.clone() {
-            Type::List(_) | Type::Map(_) => todo!(),
+            Type::List(type_id) => format!("List({})", self.type_to_string(type_id)),
+            Type::Map(type_id) => format!("Map({})", self.type_to_string(type_id)),
             Type::String => "String".to_string(),
             Type::Error => "error".to_string(),
             Type::Unit => "Unit".to_string(),

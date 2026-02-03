@@ -10,7 +10,7 @@ use crate::{
 };
 
 // e.g. function beginning, end name does not match
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct NameMismatch {
     pub expected: Token,
     pub found: Token,
@@ -24,27 +24,27 @@ pub enum ParseError {
 // an expr could return different things e.g. a module or a type
 // so if you tried to assign a module to an Integer or something
 // this should be recorded
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ExpectedExprReturns {
     pub expr: ExprID,
     pub expected: ExprReturns,
     pub found: ExprReturns,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct InvalidOperation {
     pub operation: ExprID, // expr id
     pub msg: &'static str,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ExpectedType {
     pub expr: ExprID,
     pub expected: TypeID,
     pub found: TypeID,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MissingOperand {
     pub operation: ExprID, // expr id
 
@@ -52,7 +52,7 @@ pub struct MissingOperand {
     pub operand_missing: u32,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct InvalidExpr {
     pub expr: ExprID,
     pub msg: &'static str,
@@ -60,7 +60,7 @@ pub struct InvalidExpr {
 
 // maybe in the future should add more context
 // i.e. why is expr unexpected there
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct UnexpectedExpr {
     pub expr: ExprID,
 }
@@ -76,7 +76,7 @@ pub struct DuplicateName {
     pub new_member: MemberID,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum SemanticError {
     ExpectedExprReturns(ExpectedExprReturns),
     InvalidOperation(InvalidOperation),
@@ -88,13 +88,13 @@ pub enum SemanticError {
     DuplicateName(DuplicateName)
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct ExprAndType {
     pub expr: ExprID,
     pub type_id: TypeID,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum PatternError {
     ParenMismatch(ExprAndType),
     TypeMissing(ExprID),
