@@ -8,7 +8,7 @@ mod util;
 use crate::{
     constants::UNIT_TYPE,
     parse::{
-        AST, ExprVariant, If, MemberVariant, Type, While, ast_contents::{ExprID, FunctionID, ScopeID, TypeID}
+        AST, Block, ExprVariant, If, MemberVariant, Type, While, ast_contents::{ExprID, FunctionID, ScopeID, TypeID}
     },
     run::{
         context_contents::{ContextObjects, RuntimeRef, RuntimeScopeID, Value, ValueVariant},
@@ -118,6 +118,23 @@ fn eval_while(
     Ok(expr_to_unit(ast, ctx, expr))
 }
 
+fn eval_block(
+    ast: &AST,
+    ctx: &mut ExecutionContext,
+    expr: ExprID,
+    block: Block,
+) -> Result<RuntimeRef, RuntimeException> {
+    ctx.switch_to_child_scope();
+
+    // now contained expr is evaluated inside new scope
+
+    eval(ast, ctx, block.body)?;
+
+    ctx.pop_curr_scope();
+
+    return Ok(expr_to_unit(ast, ctx, expr));
+}
+
 // eval if/elif loop
 fn eval_if_elif(
     ast: &AST,
@@ -222,6 +239,10 @@ fn eval(
 
         ExprVariant::While(while_struct) => {
             return eval_while(ast, ctx, expr, while_struct.clone());
+        }
+
+        ExprVariant::Block(block_struct) => {
+            return eval_block(ast, ctx, expr, block_struct.clone());
         }
 
         ExprVariant::If(if_struct) | ExprVariant::Elif(if_struct) => {
