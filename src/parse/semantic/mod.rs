@@ -709,6 +709,8 @@ impl AST {
             _ => panic!("should be guaranteed to be TypeLiteral"),
         };
 
+        // create scope and ID for new type or get them if they already exist
+
         let (type_scope, type_id) = if type_literal.type_id != TypeID::default() {
             let type_scope = match self.objs.type_get(type_literal.type_id) {
                 Type::Scope(scope_id) => *scope_id,
@@ -732,6 +734,10 @@ impl AST {
 
             let type_id = self.type_push_scope(type_scope);
 
+            // connect scope back to type it is related to
+
+            self.objs.scope_mut(type_scope).refers_to = Some(ScopeRefersTo::Type(type_id));
+
             match &mut self.objs.expr_mut(expr).variant {
                 ExprVariant::TypeLiteral(t) => t.type_id = type_id,
                 _ => panic!("should be guaranteed to be TypeLiteral"),
@@ -739,10 +745,6 @@ impl AST {
 
             (type_scope, type_id)
         };
-
-        // connect scope back to type it is related to
-
-        self.objs.scope_mut(type_scope).refers_to = Some(ScopeRefersTo::Type(type_id));
 
         let old_analyzing_now = ctx.analyzing_now;
 
@@ -756,14 +758,23 @@ impl AST {
         self.analyze_expr(ctx, type_scope, type_literal.body);
         ctx.analyzing_now = old_analyzing_now;
 
-        // this is how we indicate that expr is returning type itself rather than a value
+        let finalized = self.expr(type_literal.body).finalized;
 
-        let type_id = self.objs.type_push(Type::Type(type_id));
+        // check if TypeID of expr needs to be set or if it was set on previous pass
+        // ret of this expr will be the type itself
+
+        let existing_expr_type_id = self.expr(expr).type_id;
+
+        let expr_type_id = if existing_expr_type_id != TypeID::default() {
+            existing_expr_type_id
+        } else {
+            self.objs.type_push(Type::Type(type_id))
+        };
 
         let expr_mut = self.objs.expr_mut(expr);
 
-        expr_mut.type_id = type_id;
-        expr_mut.finalized = true;
+        expr_mut.type_id = expr_type_id;
+        expr_mut.finalized = finalized;
     }
 
     fn test_analyzing_now(
