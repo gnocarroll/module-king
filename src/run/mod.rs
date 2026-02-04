@@ -8,8 +8,7 @@ mod util;
 use crate::{
     constants::UNIT_TYPE,
     parse::{
-        AST, ExprVariant, MemberVariant, Type, While,
-        ast_contents::{ExprID, FunctionID, ScopeID, TypeID},
+        AST, ExprVariant, If, MemberVariant, Type, While, ast_contents::{ExprID, FunctionID, ScopeID, TypeID}
     },
     run::{
         context_contents::{ContextObjects, RuntimeRef, RuntimeScopeID, Value, ValueVariant},
@@ -119,6 +118,16 @@ fn eval_while(
     Ok(expr_to_unit(ast, ctx, expr))
 }
 
+// eval if/elif loop
+fn eval_if_elif(
+    ast: &AST,
+    ctx: &mut ExecutionContext,
+    expr: ExprID,
+    if_struct: If,
+) -> Result<RuntimeRef, RuntimeException> {
+
+}
+
 fn eval(
     ast: &AST,
     ctx: &mut ExecutionContext,
@@ -195,6 +204,10 @@ fn eval(
 
         ExprVariant::While(while_struct) => {
             return eval_while(ast, ctx, expr, while_struct.clone());
+        }
+
+        ExprVariant::If(if_struct) | ExprVariant::Elif(if_struct) => {
+            return eval_if_elif(ast, ctx, expr, if_struct.clone());
         }
 
         // no handling for given expr variant

@@ -211,6 +211,9 @@ pub fn type_to_value_id(ast: &AST, runtime_scope: &mut RuntimeScope, type_id: Ty
 
             ValueVariant::Array(value_id_vec)
         }
+        Type::Ref(_) => {
+            ValueVariant::Ref(RuntimeRef::default())
+        }
         t @ _ => {
             eprintln!("{:?}", t);
 
