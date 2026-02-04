@@ -125,7 +125,25 @@ fn eval_if_elif(
     expr: ExprID,
     if_struct: If,
 ) -> Result<RuntimeRef, RuntimeException> {
+    let cond_result = eval(ast, ctx, if_struct.cond)?;
 
+    let cond_bool = match ctx.objs.ref_get(cond_result).variant {
+        ValueVariant::Boolean(b) => b,
+        _ => {
+            panic!("IF CONDITION DID NOT RETURN BOOLEAN");
+        }
+    };
+
+    // cond evaluates to true => execute body
+    // otherwise execute else arm if it exists
+
+    if cond_bool {
+        eval(ast, ctx, if_struct.body)?;
+    } else if let Some(else_expr) = if_struct.else_expr {
+        eval(ast, ctx, else_expr)?;
+    }
+
+    return Ok(expr_to_unit(ast, ctx, expr));
 }
 
 fn eval(
