@@ -417,7 +417,28 @@ impl AST {
     fn analyze_if_elif(&mut self, ctx: &mut SemanticContext, scope: ScopeID, expr: ExprID) {
         let if_struct = match &self.objs.expr(expr).variant {
             ExprVariant::If(if_struct) | ExprVariant::Elif(if_struct) => if_struct.clone(),
-            _ => panic!("should be func literal"),
+            _ => panic!("should be if"),
+        };
+
+        // get if scope or create if necessary
+
+        let if_scope = if if_struct.scope != ScopeID::default() {
+            if_struct.scope
+        } else {
+            let if_scope = self.objs.scope_push(Scope {
+                name: None,
+                variant: ScopeVariant::Scope,
+                parent_scope: scope,
+                refers_to: Some(ScopeRefersTo::Expr(expr)),
+                ..Default::default()
+            });
+
+            match &mut self.objs.expr_mut(expr).variant {
+                ExprVariant::If(if_struct) | ExprVariant::Elif(if_struct) => if_struct.scope = if_scope,
+                _ => panic!("should be if"),
+            };
+
+            if_scope
         };
 
         // will analyze each sub expr and if any are not finalized then will not finalized this expr
@@ -425,7 +446,7 @@ impl AST {
 
         let boolean_type_id = self.get_builtin_type_id(BOOLEAN_TYPE);
 
-        self.analyze_expr(ctx, scope, if_struct.cond);
+        self.analyze_expr(ctx, if_scope, if_struct.cond);
 
         let mut finalized = true;
 
@@ -446,14 +467,14 @@ impl AST {
             finalized = false;
         }
 
-        self.analyze_expr(ctx, scope, if_struct.body);
+        self.analyze_expr(ctx, if_scope, if_struct.body);
 
         if !self.objs.expr(if_struct.body).finalized {
             finalized = false;
         }
 
         if let Some(else_expr) = if_struct.else_expr {
-            self.analyze_expr(ctx, scope, else_expr);
+            self.analyze_expr(ctx, if_scope, else_expr);
 
             if !self.objs.expr(else_expr).finalized {
                 finalized = false;
