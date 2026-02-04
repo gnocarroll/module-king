@@ -263,19 +263,23 @@ pub struct Operation {
     pub operand2: Option<ExprID>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct If {
     pub cond: ExprID,
     pub body: ExprID,
 
     // expr to go to if cond is false
     pub else_expr: Option<ExprID>,
+
+    pub scope: ScopeID,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct While {
     pub cond: ExprID,
     pub body: ExprID,
+
+    pub scope: ScopeID,
 }
 
 #[derive(Clone)]
