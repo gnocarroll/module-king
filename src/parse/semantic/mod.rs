@@ -414,6 +414,45 @@ impl AST {
         (pattern, err)
     }
 
+    fn analyze_block(&mut self, ctx: &mut SemanticContext, scope: ScopeID, expr: ExprID) {
+        let block_struct = match &self.objs.expr(expr).variant {
+            ExprVariant::Block(block_struct) => block_struct.clone(),
+            _ => panic!("should be block"),
+        };
+
+        // get if scope or create if necessary
+
+        let block_scope = if block_struct.scope != ScopeID::default() {
+            block_struct.scope
+        } else {
+            let block_scope = self.objs.scope_push(Scope {
+                name: None,
+                variant: ScopeVariant::Scope,
+                parent_scope: scope,
+                refers_to: Some(ScopeRefersTo::Expr(expr)),
+                ..Default::default()
+            });
+
+            match &mut self.objs.expr_mut(expr).variant {
+                ExprVariant::Block(block_struct) => block_struct.scope = block_scope,
+                _ => panic!("should be block"),
+            };
+
+            block_scope
+        };
+
+        // will analyze sub expr and if it is not finalized then will not finalize this expr
+
+        self.analyze_expr(ctx, block_scope, block_struct.body);
+
+        let finalized = self.expr(block_struct.body).finalized;
+
+        let expr_mut = self.expr_mut(expr);
+
+        expr_mut.type_id = TypeID::unit();
+        expr_mut.finalized = finalized;
+    }
+
     fn analyze_if_elif(&mut self, ctx: &mut SemanticContext, scope: ScopeID, expr: ExprID) {
         let if_struct = match &self.objs.expr(expr).variant {
             ExprVariant::If(if_struct) | ExprVariant::Elif(if_struct) => if_struct.clone(),
@@ -935,6 +974,9 @@ impl AST {
             }
             ExprVariant::Identifier(ident) => {
                 self.analyze_ident(ctx, scope, expr, ident.clone());
+            }
+            ExprVariant::Block(_) => {
+                self.analyze_block(ctx, scope, expr);
             }
             ExprVariant::If(_) | ExprVariant::Elif(_) => {
                 self.analyze_if_elif(ctx, scope, expr);

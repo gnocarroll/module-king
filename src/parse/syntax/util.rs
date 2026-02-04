@@ -260,6 +260,12 @@ impl AST {
                     self.expr_to_string(type_literal.body),
                 )
             }
+            ExprVariant::Block(block) => {
+                format!(
+                    "(block {})",
+                    self.expr_to_string(block.body),
+                )
+            }
         }
     }
 }
