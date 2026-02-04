@@ -420,6 +420,9 @@ impl AST {
             _ => panic!("should be func literal"),
         };
 
+        // will analyze each sub expr and if any are not finalized then will not finalized this expr
+        // only additional check is to check that cond expr is of type Boolean
+
         let boolean_type_id = self.get_builtin_type_id(BOOLEAN_TYPE);
 
         self.analyze_expr(ctx, scope, if_struct.cond);
