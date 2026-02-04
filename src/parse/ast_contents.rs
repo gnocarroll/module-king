@@ -13,17 +13,19 @@ use crate::{
 #[derive(Clone)]
 pub struct ASTContents {
     // exprs used in initial parsing and semantic analysis stage
-    pub exprs: Vec<Expr>,
+    exprs: Vec<Expr>,
 
     // exprs are main thing for parsing so e.g. scopes members are for
     // semantic analysis
-    pub scopes: Vec<Scope>,
-    pub types: Vec<Type>,
-    pub members: Vec<Member>,
+    scopes: Vec<Scope>,
+    types: Vec<Type>,
+    members: Vec<Member>,
 
-    pub patterns: Vec<Pattern>,
+    patterns: Vec<Pattern>,
 
-    pub functions: Vec<Function>,
+    functions: Vec<Function>,
+
+    file_modules: Vec<ScopeID>,
 
     curr_file_module: ScopeID,
 }
@@ -41,6 +43,7 @@ impl Default for ASTContents {
             members: vec![Member::default()],
             patterns: vec![Pattern::default()],
             functions: vec![Function::default()],
+            file_modules: Vec::new(),
             curr_file_module: ScopeID::global(),
         };
 
