@@ -291,6 +291,13 @@ pub struct While {
     pub scope: ScopeID,
 }
 
+#[derive(Clone, Default)]
+pub struct Block {
+    pub body: ExprID,
+
+    pub scope: ScopeID,
+}
+
 #[derive(Clone)]
 pub enum ExprVariant {
     Unit,
@@ -308,6 +315,8 @@ pub enum ExprVariant {
     Identifier(Identifier),
 
     Operation(Operation),
+
+    Block(Block),
 
     // without separate categories then these would be recorded the same
     // if ... else if

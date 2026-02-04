@@ -63,12 +63,6 @@ static OP_INFO_TABLE: &[&[OperatorInfo]] = &[
             assoc: Assoc::Left,
             _is_rhs_optional: true,
         },
-        OperatorInfo {
-            ttype: TokenType::Begin,
-            variant: Around,
-            assoc: Assoc::Left,
-            _is_rhs_optional: true,
-        },
     ],
     &[OperatorInfo {
         ttype: TokenType::PipeGt,

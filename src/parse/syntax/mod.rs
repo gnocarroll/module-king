@@ -5,7 +5,7 @@ use operator::OperatorVariant::*;
 
 use crate::{
     parse::{
-        AST, Expr, ExprVariant, Function, FunctionLiteral, Identifier, IdentifierVariant,
+        AST, Block, Expr, ExprVariant, Function, FunctionLiteral, Identifier, IdentifierVariant,
         Operation, Tokens, TypeLiteral, TypeVariant, While,
         ast_contents::{ExprID, MemberID},
         errors::{InvalidExpr, NameMismatch, ParseError, SemanticError},
@@ -408,6 +408,36 @@ impl AST {
         })
     }
 
+    fn parse_block(&mut self) -> ExprID {
+        // assumes TokenType::Begin has been checked for
+
+        let tok_idx = self.tokens_idx();
+        self.tokens_next();
+
+        let body = self.parse_expr();
+
+        if self.expect(TokenType::End).is_err() {
+            let found = self
+                .tokens_mut()
+                .sync(&[TokenType::End, TokenType::Semicolon]);
+
+            if found.ttype == TokenType::End {
+                self.tokens_next();
+            }
+        }
+
+        self.expr_push(Expr {
+            tok: tok_idx,
+            end_tok: self.tokens_idx(),
+            variant: ExprVariant::Block(Block {
+                body,
+                ..Default::default()
+            }),
+
+            ..Default::default()
+        })
+    }
+
     // atom e.g. literal like integer
     fn parse_atom(&mut self) -> ExprID {
         let tok_idx = self.tokens_idx();
@@ -478,6 +508,7 @@ impl AST {
                     ..Default::default()
                 })
             }
+            TokenType::Begin => self.parse_block(),
             TokenType::If => self.parse_if(),
             TokenType::While => self.parse_while(),
             TokenType::Function => self.parse_function(),
