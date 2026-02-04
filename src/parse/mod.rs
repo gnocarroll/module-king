@@ -561,6 +561,10 @@ pub struct AST {
     pub semantic_errors: Vec<SemanticError>,
 
     pub curr_file_module: ScopeID,
+
+    // true => doing second pass and everything should be able to be resolved correctly
+    // (i.e. finalized)
+    pub doing_repair: bool,
 }
 
 impl AST {
@@ -585,7 +589,7 @@ impl AST {
     pub fn display_semantic_errors(&self) {
         for err in &self.semantic_errors {
             eprintln!("{:?}", err);
-            
+
             match err {
                 SemanticError::InvalidOperation(invalid_op) => {
                     eprintln!("EXPR TEXT: {}", self.expr_to_string(invalid_op.operation));
@@ -596,7 +600,7 @@ impl AST {
                         eprintln!("TYPE MISSING: {}", self.expr_to_string(*expr));
                     }
                     _ => (),
-                }
+                },
                 _ => {
                     eprintln!("Displaying not implemented for this kind of semantic error.")
                 }
@@ -678,6 +682,9 @@ impl AST {
         });
         scope_mut.file_module = scope_id;
 
+        // AST will keep record of all file modules pushed this way
+        self.objs.file_module_push(scope_id);
+
         Ok(scope_id)
     }
 
@@ -715,6 +722,22 @@ impl AST {
             }
         }
     }
+
+    // suppose file imports function from other file which was parsed later
+    // this way those imports and the code can be fixed up
+    pub fn repair(&mut self) {
+        let file_module_scopes: Vec<ScopeID> = self.objs.file_module_iter().collect();
+
+        for scope_id in file_module_scopes {
+            self.curr_file_module = scope_id;
+
+            self.doing_repair = true;
+
+            self.do_semantic_analysis();
+
+            self.doing_repair = false;
+        }
+    }
 }
 
 // module path is what module this file corresponds to e.g.
@@ -722,14 +745,14 @@ impl AST {
 pub fn parse_file(ast: &mut AST, tokens: Tokens, modulepath: Vec<String>) {
     // tokens will be stored in Scope corresponding to module, so we create
     // that here with helper function and pass in tokens
-    
+
     let file_scope_id = match ast.add_file_module(tokens, modulepath.clone()) {
         Ok(scope_id) => scope_id,
         Err(_) => {
             return;
         }
     };
-    
+
     // set this to indicate current file module being analyzed (its scope)
     // also set for ASTContents (happens inside this helper method)
 

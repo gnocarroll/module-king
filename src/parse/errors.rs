@@ -3,7 +3,7 @@
 use crate::{
     parse::{
         ExprReturns,
-        ast_contents::{ExprID, MemberID, TypeID},
+        ast_contents::{ExprID, MemberID, ScopeID, TypeID},
     },
     scan::Token,
     tokens::ExpectedToken,
@@ -71,7 +71,6 @@ pub struct DuplicateName {
 
     // old member was already in scope and there was an attempt to add new
     // member with same name
-
     pub old_member: MemberID,
     pub new_member: MemberID,
 }
@@ -85,7 +84,10 @@ pub enum SemanticError {
     UnexpectedExpr(UnexpectedExpr),
     PatternError(PatternError),
     InvalidExpr(InvalidExpr),
-    DuplicateName(DuplicateName)
+    DuplicateName(DuplicateName),
+
+    // after second pass still could not fix everything up
+    RepairFailed(ScopeID),
 }
 
 #[derive(Clone, Copy, Debug)]

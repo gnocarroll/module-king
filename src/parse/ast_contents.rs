@@ -421,4 +421,12 @@ impl ASTContents {
 
         &mut self.functions[function.id as usize]
     }
+
+    pub fn file_module_push(&mut self, file_module: ScopeID) {
+        self.file_modules.push(file_module);
+    }
+
+    pub fn file_module_iter(&self) -> impl Iterator<Item=ScopeID> {
+        (&self.file_modules).iter().map(|scope_id| *scope_id)
+    }
 }

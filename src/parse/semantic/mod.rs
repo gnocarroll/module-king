@@ -958,5 +958,13 @@ impl AST {
         // use current root expr (found/created from syntax analysis)
 
         self.analyze_expr(&mut ctx, self.curr_file_module, self.root_expr());
+
+        // if on second pass (repair pass) and could not finalized root expr
+        // then that is an error/failure
+
+        if self.doing_repair && !self.objs.expr(self.root_expr()).finalized {
+            self.semantic_errors
+                .push(SemanticError::RepairFailed(self.curr_file_module));
+        }
     }
 }
