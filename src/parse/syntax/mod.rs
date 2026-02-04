@@ -347,7 +347,11 @@ impl AST {
         self.expr_push(Expr {
             tok: tok_idx,
             end_tok: self.tokens_idx(),
-            variant: ExprVariant::TypeLiteral(TypeLiteral { variant, body }),
+            variant: ExprVariant::TypeLiteral(TypeLiteral {
+                variant,
+                body,
+                ..Default::default()
+            }),
             ..Default::default()
         })
     }
@@ -395,7 +399,11 @@ impl AST {
         self.expr_push(Expr {
             tok: tok_idx,
             end_tok: self.tokens_idx(),
-            variant: ExprVariant::TypeLiteral(TypeLiteral { variant, body }),
+            variant: ExprVariant::TypeLiteral(TypeLiteral {
+                variant,
+                body,
+                ..Default::default()
+            }),
             ..Default::default()
         })
     }

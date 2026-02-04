@@ -50,13 +50,22 @@ pub enum TypeVariant {
     Boolean,
 }
 
-#[derive(Clone)]
+impl Default for TypeVariant {
+    fn default() -> Self {
+        Self::Integer
+    }
+}
+
+#[derive(Clone, Default)]
 pub struct TypeLiteral {
     // may be empty str if type literal does not provide name
     pub variant: TypeVariant,
 
     // body is an Expr
     pub body: ExprID,
+
+    // during semantic analysis will connect to corresponding Type
+    pub type_id: TypeID,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
