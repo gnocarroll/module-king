@@ -521,23 +521,29 @@ impl AST {
         };
 
         let function_id = func_literal.function_id;
-        let func_name = self.objs.function(function_id).name;
+        
+        let function_struct = self.objs.function(function_id);
+        
+        let func_name = function_struct.name;
 
+        // IFF FUNCTION SCOPE HAS NOT ALREADY BEEN CREATED
         // create function scope as child of parent then use it later on
 
-        let func_scope = self.objs.scope_push(Scope {
-            name: None,
-            variant: ScopeVariant::Scope,
-            parent_scope: scope,
-
-            // connect to function obj
-            refers_to: Some(ScopeRefersTo::Function(function_id)),
-
-            ..Default::default()
-        });
-
-        self.objs.function_mut(function_id).scope = func_scope;
-
+        if function_struct.scope == ScopeID::default() {
+            let func_scope = self.objs.scope_push(Scope {
+                name: None,
+                variant: ScopeVariant::Scope,
+                parent_scope: scope,
+    
+                // connect to function obj
+                refers_to: Some(ScopeRefersTo::Function(function_id)),
+    
+                ..Default::default()
+            });
+    
+            self.objs.function_mut(function_id).scope = func_scope;
+        }
+        
         // record current function scope in context
 
         let old_curr_func = ctx.curr_func;

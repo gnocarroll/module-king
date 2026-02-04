@@ -108,6 +108,10 @@ fn main() -> ExitCode {
         }
     }
 
+    // pass 2 for semantic analysis
+
+    ast.repair();
+
     if !ast.has_errors() {
         run::run(&ast);
     }
