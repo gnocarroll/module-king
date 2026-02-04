@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::{
     parse::{
         AST, HasFileModule, MemberVariant, Type,
-        ast_contents::{FunctionID, MemberID, ScopeID, TypeID},
+        ast_contents::{ExprID, FunctionID, MemberID, ScopeID, TypeID},
         builtin::Builtin,
     },
     run::{ExecutionContext, util::type_to_value_id},
@@ -161,6 +161,23 @@ pub enum ValueVariant {
     // Containers (String is also a container but it is above)
     List(Vec<ValueID>),
     Map(HashMap<String, ValueID>),
+}
+
+impl ValueVariant {
+    pub fn to_runtime_ref(
+        self,
+        ast: &AST,
+        expr: ExprID,
+        ctx: &mut ExecutionContext,
+        scope: RuntimeScopeID,
+    ) -> RuntimeRef {
+        let type_id = ast.objs.expr(expr).type_id;
+
+        Value {
+            type_id: Some(type_id),
+            variant: self,
+        }.to_runtime_ref(ctx, scope)
+    }
 }
 
 #[derive(Clone)]
@@ -326,9 +343,7 @@ impl RuntimeRef {
                 let type_id = type_id.expect("type should exist for enum Value");
 
                 let scope_id = match ast.objs.type_get(type_id) {
-                    Type::Scope(scope_id) => {
-                        *scope_id
-                    }
+                    Type::Scope(scope_id) => *scope_id,
                     _ => {
                         panic!("enum should have scope");
                     }
@@ -336,7 +351,9 @@ impl RuntimeRef {
 
                 let member_id = ast.objs.scope(scope_id).members.nth_member(*discriminant);
 
-                let name = member_id.get_name(ast).expect("enum member should have name");
+                let name = member_id
+                    .get_name(ast)
+                    .expect("enum member should have name");
 
                 name
             }

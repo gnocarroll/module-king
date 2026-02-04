@@ -1,14 +1,15 @@
 use std::collections::HashMap;
 
 use crate::{
-    constants::INTEGER_TYPE, parse::{
+    parse::{
         AST, HasFileModule, MemberVariant, ScopeVariant, Type, TypeVariant, Visibility,
         ast_contents::{FunctionID, PatternID, ScopeID, TypeID},
         builtin::Builtin,
-    }, run::{
+    },
+    run::{
         ExecutionContext,
         context_contents::{RuntimeRef, RuntimeScope, Value, ValueID, ValueVariant},
-    }
+    },
 };
 
 // for each member that can be located from pattern,

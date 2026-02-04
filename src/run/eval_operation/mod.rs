@@ -171,6 +171,26 @@ fn eval_operation_unary(
 
     if op == TokenType::LParen {
         return Ok(operand_ref);
+    } else if op == TokenType::Ampersand {
+        // get ref
+
+        let variant = match &ctx.objs.ref_get(operand_ref).variant {
+            ValueVariant::Identifier(member_id) => ValueVariant::Ref(
+                ctx.objs
+                    .instance_get(*member_id)
+                    .expect("instance should be allocated"),
+            ),
+            ValueVariant::ImplicitCharRef(char_ref) => ValueVariant::CharRef(*char_ref),
+            ValueVariant::ImplicitRef(rref) => ValueVariant::Ref(*rref),
+            _ => {
+                return Err(RuntimeException {
+                    expr,
+                    variant: RuntimeErrorVariant::InvalidOperation,
+                });
+            }
+        };
+
+        return Ok(variant.to_runtime_ref(ast, expr, ctx, ctx.curr_scope));
     }
 
     let operand_ref = eval_eager(ast, ctx, operand_ref)?;
