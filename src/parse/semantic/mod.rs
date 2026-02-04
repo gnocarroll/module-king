@@ -707,16 +707,29 @@ impl AST {
             _ => panic!(),
         };
 
-        let type_scope = self.objs.scope_push(Scope {
-            name: None,
-            variant: ScopeVariant::Type(type_literal.variant),
-            parent_scope: scope,
-            refers_to: None,
+        let (type_scope, type_id) = if type_literal.type_id != TypeID::default() {
+            let type_scope = match self.objs.type_get(type_literal.type_id) {
+                Type::Scope(scope_id) => *scope_id,
+                _ => {
+                    panic!("type connected to TypeLiteral should be guaranteed to have corresponding scope");
+                }
+            };
 
-            ..Default::default()
-        });
+            (type_scope, type_literal.type_id)
+        } else {
+            let type_scope = self.objs.scope_push(Scope {
+                name: None,
+                variant: ScopeVariant::Type(type_literal.variant),
+                parent_scope: scope,
+                refers_to: None,
+    
+                ..Default::default()
+            });
+    
+            let type_id = self.type_push_scope(type_scope);
 
-        let type_id = self.type_push_scope(type_scope);
+            (type_scope, type_id)
+        };
 
         // connect scope back to type it is related to
 
