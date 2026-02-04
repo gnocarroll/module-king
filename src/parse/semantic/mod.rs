@@ -434,7 +434,9 @@ impl AST {
             });
 
             match &mut self.objs.expr_mut(expr).variant {
-                ExprVariant::If(if_struct) | ExprVariant::Elif(if_struct) => if_struct.scope = if_scope,
+                ExprVariant::If(if_struct) | ExprVariant::Elif(if_struct) => {
+                    if_struct.scope = if_scope
+                }
                 _ => panic!("should be if"),
             };
 
@@ -502,10 +504,10 @@ impl AST {
                 name: None,
                 variant: ScopeVariant::Scope,
                 parent_scope: scope,
-    
+
                 // connect to function obj
                 refers_to: Some(ScopeRefersTo::Expr(expr)),
-    
+
                 ..Default::default()
             });
 
@@ -555,9 +557,9 @@ impl AST {
         };
 
         let function_id = func_literal.function_id;
-        
+
         let function_struct = self.objs.function(function_id);
-        
+
         let func_name = function_struct.name;
 
         // IFF FUNCTION SCOPE HAS NOT ALREADY BEEN CREATED
@@ -570,18 +572,18 @@ impl AST {
                 name: None,
                 variant: ScopeVariant::Scope,
                 parent_scope: scope,
-    
+
                 // connect to function obj
                 refers_to: Some(ScopeRefersTo::Function(function_id)),
-    
+
                 ..Default::default()
             });
-    
+
             self.objs.function_mut(function_id).scope = func_scope;
 
             func_scope
         };
-        
+
         // record current function scope in context
 
         let old_curr_func = ctx.curr_func;
@@ -704,14 +706,16 @@ impl AST {
     fn analyze_type_literal(&mut self, ctx: &mut SemanticContext, scope: ScopeID, expr: ExprID) {
         let type_literal = match &self.objs.expr(expr).variant {
             ExprVariant::TypeLiteral(t) => t.clone(),
-            _ => panic!(),
+            _ => panic!("should be guaranteed to be TypeLiteral"),
         };
 
         let (type_scope, type_id) = if type_literal.type_id != TypeID::default() {
             let type_scope = match self.objs.type_get(type_literal.type_id) {
                 Type::Scope(scope_id) => *scope_id,
                 _ => {
-                    panic!("type connected to TypeLiteral should be guaranteed to have corresponding scope");
+                    panic!(
+                        "type connected to TypeLiteral should be guaranteed to have corresponding scope"
+                    );
                 }
             };
 
@@ -722,11 +726,16 @@ impl AST {
                 variant: ScopeVariant::Type(type_literal.variant),
                 parent_scope: scope,
                 refers_to: None,
-    
+
                 ..Default::default()
             });
-    
+
             let type_id = self.type_push_scope(type_scope);
+
+            match &mut self.objs.expr_mut(expr).variant {
+                ExprVariant::TypeLiteral(t) => t.type_id = type_id,
+                _ => panic!("should be guaranteed to be TypeLiteral"),
+            };
 
             (type_scope, type_id)
         };
