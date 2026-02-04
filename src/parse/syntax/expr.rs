@@ -149,6 +149,7 @@ impl AST {
             cond,
             body,
             else_expr,
+            ..Default::default()
         };
 
         self.expr_push(Expr {

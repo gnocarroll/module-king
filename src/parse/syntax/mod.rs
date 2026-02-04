@@ -91,7 +91,11 @@ impl AST {
         self.objs.expr_push(Expr {
             tok: start_tok_idx,
             end_tok: self.tokens_idx(),
-            variant: ExprVariant::While(While { cond, body }),
+            variant: ExprVariant::While(While {
+                cond,
+                body,
+                ..Default::default()
+            }),
             ..Default::default()
         })
     }

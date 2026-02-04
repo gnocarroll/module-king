@@ -469,19 +469,32 @@ impl AST {
     fn analyze_while(&mut self, ctx: &mut SemanticContext, scope: ScopeID, expr: ExprID) {
         let while_struct = match &self.objs.expr(expr).variant {
             ExprVariant::While(while_struct) => while_struct.clone(),
-            _ => panic!("should be func literal"),
+            _ => panic!("should be while"),
         };
 
-        let while_scope = self.objs.scope_push(Scope {
-            name: None,
-            variant: ScopeVariant::Scope,
-            parent_scope: scope,
+        // get while scope if exists or create if necessary
 
-            // connect to function obj
-            refers_to: Some(ScopeRefersTo::Expr(expr)),
+        let while_scope = if while_struct.scope != ScopeID::default() {
+            while_struct.scope
+        } else {
+            let while_scope = self.objs.scope_push(Scope {
+                name: None,
+                variant: ScopeVariant::Scope,
+                parent_scope: scope,
+    
+                // connect to function obj
+                refers_to: Some(ScopeRefersTo::Expr(expr)),
+    
+                ..Default::default()
+            });
 
-            ..Default::default()
-        });
+            match &mut self.objs.expr_mut(expr).variant {
+                ExprVariant::While(while_struct) => while_struct.scope = while_scope,
+                _ => panic!("should be while"),
+            };
+
+            while_scope
+        };
 
         self.analyze_expr(ctx, while_scope, while_struct.cond);
         self.analyze_expr(ctx, while_scope, while_struct.body);
@@ -529,7 +542,9 @@ impl AST {
         // IFF FUNCTION SCOPE HAS NOT ALREADY BEEN CREATED
         // create function scope as child of parent then use it later on
 
-        if function_struct.scope == ScopeID::default() {
+        let func_scope = if function_struct.scope != ScopeID::default() {
+            function_struct.scope
+        } else {
             let func_scope = self.objs.scope_push(Scope {
                 name: None,
                 variant: ScopeVariant::Scope,
@@ -542,7 +557,9 @@ impl AST {
             });
     
             self.objs.function_mut(function_id).scope = func_scope;
-        }
+
+            func_scope
+        };
         
         // record current function scope in context
 
