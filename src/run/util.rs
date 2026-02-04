@@ -211,7 +211,11 @@ pub fn type_to_value_id(ast: &AST, runtime_scope: &mut RuntimeScope, type_id: Ty
 
             ValueVariant::Array(value_id_vec)
         }
-        _ => todo!("have not implemented in interpreter other sorts of types yet"),
+        t @ _ => {
+            eprintln!("{:?}", t);
+
+            todo!("have not implemented in interpreter other sorts of types yet")
+        }
     };
 
     runtime_scope.value_push(Value {

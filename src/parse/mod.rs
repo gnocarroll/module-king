@@ -59,14 +59,14 @@ pub struct TypeLiteral {
     pub body: ExprID,
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SliceIndex {
     pub type_id: TypeID,
 
     pub size: Option<usize>,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Type {
     Error,
     Unit,
