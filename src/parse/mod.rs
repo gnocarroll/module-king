@@ -6,6 +6,8 @@ pub mod scope_members;
 mod semantic;
 mod syntax;
 
+use std::collections::HashMap;
+
 use crate::{
     parse::{
         ast_contents::{ASTContents, ExprID, FunctionID, MemberID, PatternID, ScopeID, TypeID},
@@ -241,6 +243,10 @@ pub struct Function {
 
     // order in Vec should be order they are listed in program
     pub params: Vec<PatternID>,
+
+    // record exprs corresponding to params to prevent duplicate param insertion
+    // (on semantic pass after first)
+    pub expr_to_param_idx: HashMap<ExprID, usize>,
 
     pub file_module: ScopeID,
 }

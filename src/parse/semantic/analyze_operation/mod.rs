@@ -33,7 +33,7 @@ impl AST {
                     finalized = false;
                 }
 
-                // it is fine for rhs to be missing e.g. function f(0 : Integer,) ...
+                // it is fine for rhs to be missing e.g. function f(x: Integer,) ...
 
                 if matches!(self.expr(operand2).variant, ExprVariant::Unit) {
                     let operand2_mut = self.expr_mut(operand2);
@@ -76,7 +76,19 @@ impl AST {
                     finalized = false;
                 }
 
-                self.objs.function_mut(curr_func).params.push(pattern);
+                let function_mut = self.objs.function_mut(curr_func);
+
+                // check if expr is already associated with some param idx
+                // if it is => set pattern there to whatever pattern we have now
+                // if not => record param index this expr will correspond to and push pattern
+
+                if let Some(param_idx) = function_mut.expr_to_param_idx.get(&expr).map(|idx| *idx) {
+                    function_mut.params[param_idx] = pattern;
+                } else {
+                    function_mut.expr_to_param_idx.insert(expr, function_mut.params.len());
+
+                    function_mut.params.push(pattern);
+                }
 
                 if finalized {
                     self.analyze_expr(ctx, scope, operand1);
