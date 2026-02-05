@@ -406,7 +406,7 @@ impl TokenType {
     fn get_scan_method(&self) -> ScanMethod {
         match self {
             Semicolon => Text(b";"),
-            LParen => Text(b"(b"),
+            LParen => Text(b"("),
             RParen => Text(b")"),
             LBrace => Text(b"["),
             RBrace => Text(b"]"),
