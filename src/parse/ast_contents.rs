@@ -5,7 +5,7 @@ use crate::{
     constants::{ERROR_TYPE, STRING_TYPE, UNIT_TYPE},
     parse::{
         AST, Expr, Function, HasFileModule, Member, MemberVariant, Pattern, PatternIterator, Scope,
-        ScopeVariant, TupleIterator, Type, Visibility,
+        ScopeVariant, TupleIterator, Type, Visibility, builtin::Builtin,
     },
     tokens::TokenOrString,
 };
@@ -90,6 +90,22 @@ impl Default for ASTContents {
                 .members
                 .insert(name.to_string(), member_id)
                 .expect("names of built-ins should not be duplicate");
+        }
+
+        for builtin in Builtin::get_builtin_iter() {
+            let name = builtin.get_builtin_name().to_string();
+
+            let member_id = ret.member_push(Member {
+                name: TokenOrString::String(name.clone()),
+                visibility: Visibility::Export,
+                variant: MemberVariant::Builtin(builtin),
+                file_module: ScopeID::global(),
+            });
+
+            ret.scope_mut(ScopeID::global())
+                .members
+                .insert(name, member_id)
+                .expect("names of builtin functions should not be duplicate");
         }
 
         ret

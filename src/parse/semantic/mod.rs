@@ -87,7 +87,7 @@ impl AST {
                                 ExprVariant::Identifier(ident) => {
                                     ident.member_id = member_id;
                                     ident.variant = IdentifierVariant::Instance;
-                                },
+                                }
                                 _ => {
                                     panic!(
                                         "Expr connected to Ident pattern variant should always be identifier"
@@ -883,12 +883,30 @@ impl AST {
             // name eq => match
             // create builtin type and set fields of expr
 
+            let member_id = self
+                .scope_search(ScopeID::global(), builtin_name)
+                .expect("builtin functions should be guaranteed to be in global scope");
+
             let type_id = self.objs.type_push(Type::Builtin(builtin));
 
             let expr_mut = self.expr_mut(expr);
 
+            match &mut expr_mut.variant {
+                ExprVariant::Identifier(ident) => {
+                    ident.member_id = member_id;
+                    ident.variant = IdentifierVariant::Function;
+                }
+                _ => {
+                    panic!("expr should be guarantee to be Identifier");
+                }
+            }
+
             expr_mut.type_id = type_id;
+
+            expr_mut.is_var = true;
             expr_mut.finalized = true;
+
+            return;
         }
 
         if let AnalyzingNow::TypeBody(_) = ctx.analyzing_now {
@@ -928,42 +946,64 @@ impl AST {
 
             // now attempt to insert new member
 
-            let _ = self.scope_try_insert(scope, new_member_id);
+            let finalized = self.scope_try_insert(scope, new_member_id).is_ok();
+
+            let expr_mut = self.objs.expr_mut(expr);
+
+            if let ExprVariant::Identifier(ident) = &mut expr_mut.variant {
+                ident.member_id = new_member_id;
+                ident.variant = IdentifierVariant::Instance;
+            }
+
+            expr_mut.type_id = type_id;
+
+            expr_mut.is_var = true;
+            expr_mut.finalized = finalized;
 
             return;
         }
 
-        if let Some(member_id) = self.scope_search(scope, name.as_str()) {
-            let member = self.objs.member(member_id);
+        let member_id = match self.scope_search(scope, name.as_str()) {
+            Some(member_id) => member_id,
+            None => {
+                // Failed to find
 
-            let (type_id, ident_variant) = match member.variant {
-                MemberVariant::Module(scope_id) => (
-                    self.objs.type_push(Type::Module(scope_id)),
-                    IdentifierVariant::Module,
-                ),
-                MemberVariant::Type(type_id) => (
-                    self.objs.type_push(Type::Type(type_id)),
-                    IdentifierVariant::Type,
-                ),
-                MemberVariant::Instance(type_id) => (type_id, IdentifierVariant::Instance),
-                MemberVariant::Function(function_id) => (
-                    self.objs.function(function_id).func_type,
-                    IdentifierVariant::Function,
-                ),
-            };
-
-            let expr_mut = self.expr_mut(expr);
-
-            expr_mut.type_id = type_id;
-
-            if let ExprVariant::Identifier(ident) = &mut expr_mut.variant {
-                ident.member_id = member_id;
-                ident.variant = ident_variant;
+                return;
             }
+        };
 
-            expr_mut.is_var = true;
-            expr_mut.finalized = true;
+        let member = self.objs.member(member_id);
+
+        let (type_id, ident_variant) = match member.variant {
+            MemberVariant::Module(scope_id) => (
+                self.objs.type_push(Type::Module(scope_id)),
+                IdentifierVariant::Module,
+            ),
+            MemberVariant::Type(type_id) => (
+                self.objs.type_push(Type::Type(type_id)),
+                IdentifierVariant::Type,
+            ),
+            MemberVariant::Instance(type_id) => (type_id, IdentifierVariant::Instance),
+            MemberVariant::Function(function_id) => (
+                self.objs.function(function_id).func_type,
+                IdentifierVariant::Function,
+            ),
+            MemberVariant::Builtin(_) => {
+                panic!("should have already handled builtin");
+            }
+        };
+
+        let expr_mut = self.expr_mut(expr);
+
+        expr_mut.type_id = type_id;
+
+        if let ExprVariant::Identifier(ident) = &mut expr_mut.variant {
+            ident.member_id = member_id;
+            ident.variant = ident_variant;
         }
+
+        expr_mut.is_var = true;
+        expr_mut.finalized = true;
     }
 
     // semantic analysis on particular expression

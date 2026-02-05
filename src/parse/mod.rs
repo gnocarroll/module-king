@@ -407,6 +407,7 @@ pub enum MemberVariant {
     Type(TypeID),
     Instance(TypeID),
     Function(FunctionID),
+    Builtin(Builtin),
 }
 
 #[derive(Clone)]
