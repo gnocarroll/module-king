@@ -3,10 +3,7 @@ mod unary;
 
 use crate::{
     parse::{
-        AST, ExprVariant, Operation,
-        ast_contents::{ExprID, ScopeID, TypeID},
-        errors::{InvalidOperation, SemanticError},
-        semantic::{AnalyzingNow, SemanticContext},
+        AST, Block, ExprVariant, Operation, ast_contents::{ExprID, ScopeID, TypeID}, errors::{InvalidOperation, SemanticError}, semantic::{AnalyzingNow, SemanticContext}
     },
     scan::TokenType,
 };
@@ -85,7 +82,9 @@ impl AST {
                 if let Some(param_idx) = function_mut.expr_to_param_idx.get(&expr).map(|idx| *idx) {
                     function_mut.params[param_idx] = pattern;
                 } else {
-                    function_mut.expr_to_param_idx.insert(expr, function_mut.params.len());
+                    function_mut
+                        .expr_to_param_idx
+                        .insert(expr, function_mut.params.len());
 
                     function_mut.params.push(pattern);
                 }
@@ -125,30 +124,6 @@ impl AST {
         operation: Operation,
     ) {
         match operation.op {
-            TokenType::Begin => {
-                // Block
-                let child_expr = operation
-                    .operand1
-                    .expect("Block should always contain Expr");
-
-                match self.objs.expr(child_expr).variant {
-                    ExprVariant::Operation(Operation {
-                        op: TokenType::Begin,
-                        ..
-                    }) => {
-                        self.semantic_errors.push(SemanticError::InvalidOperation(
-                            InvalidOperation {
-                                operation: child_expr,
-                                msg: "no nested blocks in type body",
-                            },
-                        ));
-                        return;
-                    }
-                    _ => (),
-                }
-
-                self.analyze_expr(ctx, scope, child_expr);
-            }
             TokenType::Semicolon | TokenType::Comma => {
                 if operation.op == TokenType::Comma {
                     self.invalid_operation(
