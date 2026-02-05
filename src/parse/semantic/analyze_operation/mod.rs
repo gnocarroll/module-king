@@ -3,7 +3,10 @@ mod unary;
 
 use crate::{
     parse::{
-        AST, Block, ExprVariant, Operation, ast_contents::{ExprID, ScopeID, TypeID}, errors::{InvalidOperation, SemanticError}, semantic::{AnalyzingNow, SemanticContext}
+        AST, Block, ExprVariant, Operation,
+        ast_contents::{ExprID, ScopeID, TypeID},
+        errors::{InvalidOperation, SemanticError},
+        semantic::{AnalyzingNow, SemanticContext},
     },
     scan::TokenType,
 };
@@ -162,18 +165,32 @@ impl AST {
                 expr_mut.finalized = finalized;
             }
             TokenType::Colon => {
+                let (operand1, operand2) = (
+                    operation.operand1.expect("LHS should be present"),
+                    operation.operand2.expect("RHS should be present"),
+                );
+
                 let (pattern, err) = self.analyze_instance_creation(
                     ctx,
                     scope,
                     expr,
-                    operation.operand1,
-                    operation.operand2,
+                    Some(operand1),
+                    Some(operand2),
                 );
 
-                let finalized = self
+                let mut finalized = self
                     .scope_create_members_from_pattern(ctx, scope, pattern)
                     .is_ok()
-                    && err.is_none();
+                    && err.is_none()
+                    && self.expr(operand2).finalized;
+
+                if finalized {
+                    self.analyze_expr(ctx, scope, operand1);
+
+                    if !self.expr(operand1).finalized {
+                        finalized = false;
+                    }
+                }
 
                 let expr_mut = self.objs.expr_mut(expr);
 
@@ -181,7 +198,12 @@ impl AST {
                 expr_mut.is_var = true;
                 expr_mut.finalized = finalized;
             }
-            _ => {}
+            _ => {
+                self.invalid_operation(
+                    expr,
+                    "only operations Semicolon and Colon should be used in type body",
+                );
+            }
         }
     }
 
