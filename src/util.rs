@@ -1,11 +1,28 @@
-use std::{collections::HashMap, fmt::write};
+use std::{collections::HashMap};
+
+#[derive(Debug)]
+pub enum ToAsciiErr {
+    NotAscii(char),
+    FromChar(core::char::TryFromCharError),
+}
 
 // err => some char could not be converted to u8
-pub fn string_to_ascii(s: String) -> Result<Vec<u8>, core::char::TryFromCharError> {
+pub fn string_to_ascii(s: String) -> Result<Vec<u8>, ToAsciiErr> {
     let mut ascii = Vec::<u8>::new();
 
     for c in s.chars() {
-        ascii.push(c.try_into()?);
+        if !c.is_ascii() {
+            return Err(ToAsciiErr::NotAscii(c));
+        }
+
+        let next_u8 = match c.try_into() {
+            Ok(value) => value,
+            Err(e) => {
+                return Err(ToAsciiErr::FromChar(e));
+            }
+        };
+
+        ascii.push(next_u8);
     }
 
     Ok(ascii)
