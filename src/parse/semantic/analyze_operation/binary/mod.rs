@@ -326,6 +326,14 @@ impl AST {
             // TODO: if function is being accessed through instance should return function with first param
             // bound to certain instance
             MemberVariant::Function(function_id) => self.objs.function(function_id).func_type,
+
+            MemberVariant::Builtin(_) => {
+                self.invalid_operation(
+                    expr,
+                    "should not be trying to use builtin name to access something w/ period",
+                );
+                return;
+            }
         };
 
         let expr_mut = self.objs.expr_mut(expr);

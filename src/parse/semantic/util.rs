@@ -65,7 +65,7 @@ impl AST {
     // ret: member id of instance
     pub fn scope_add_instance(
         &mut self,
-        ctx: &mut SemanticContext,
+        _ctx: &mut SemanticContext,
         scope: ScopeID,
         name: TokenOrString,
         type_id: Option<TypeID>,
@@ -274,17 +274,6 @@ impl AST {
         Ok(type_id)
     }
 
-    pub fn _member_type_or_module(&mut self, member: MemberID) -> TypeOrModule {
-        match self.objs.member(member).variant {
-            MemberVariant::Function(function_id) => {
-                TypeOrModule::Type(self.objs.function(function_id).func_type)
-            }
-            MemberVariant::Instance(type_id) => TypeOrModule::Type(type_id),
-            MemberVariant::Type(type_id) => TypeOrModule::Type(type_id),
-            MemberVariant::Module(scope_id) => TypeOrModule::Module(scope_id),
-        }
-    }
-
     pub fn scope_try_insert(
         &mut self,
         scope: ScopeID,
@@ -378,6 +367,7 @@ impl AST {
                         Some(self.objs.function(function_id).scope)
                     }
                     MemberVariant::Instance(_) => None,
+                    MemberVariant::Builtin(_) => None,
                 }
             }
             ExprVariant::FunctionLiteral(function_literal) => {
