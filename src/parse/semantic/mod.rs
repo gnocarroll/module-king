@@ -7,7 +7,7 @@ use crate::{
         AST, ExprReturns, ExprVariant, Identifier, IdentifierVariant, Member, MemberVariant,
         Operation, Pattern, PatternVariant, Scope, ScopeRefersTo, ScopeVariant, TokenOrString,
         Type, TypeVariant, Visibility,
-        ast_contents::{ExprID, FunctionID, PatternID, ScopeID, TypeID},
+        ast_contents::{ExprID, FunctionID, MemberID, PatternID, ScopeID, TypeID},
         builtin::Builtin,
         errors::{
             DuplicateName, ExpectedExprReturns, ExpectedType, ExprAndType, InvalidExpr,
@@ -56,15 +56,48 @@ impl AST {
             let type_id = pattern_ref.type_id;
 
             match pattern_ref.variant {
-                PatternVariant::Ident(token) => {
+                PatternVariant::Ident(expr) => {
+                    let ident_struct = match &self.objs.expr(expr).variant {
+                        ExprVariant::Identifier(ident) => ident.clone(),
+                        _ => {
+                            panic!(
+                                "Expr connected to Ident pattern variant should always be identifier"
+                            );
+                        }
+                    };
+
+                    // MemberID != default => already created member for this ident
+
+                    if ident_struct.member_id != MemberID::default() {
+                        continue;
+                    }
+
                     // instance is added from identifier piece of pattern
-                    if let Err(e) = self.scope_add_instance(
+                    // Ok + get member id => set member ID and variant of Identifier
+                    // Err => record error
+
+                    match self.scope_add_instance(
                         ctx,
                         scope,
-                        TokenOrString::Token(token),
+                        TokenOrString::Token(ident_struct.name),
                         Some(type_id),
                     ) {
-                        err = Some(e);
+                        Ok(member_id) => {
+                            match &mut self.objs.expr_mut(expr).variant {
+                                ExprVariant::Identifier(ident) => {
+                                    ident.member_id = member_id;
+                                    ident.variant = IdentifierVariant::Instance;
+                                },
+                                _ => {
+                                    panic!(
+                                        "Expr connected to Ident pattern variant should always be identifier"
+                                    );
+                                }
+                            };
+                        }
+                        Err(e) => {
+                            err = Some(e);
+                        }
                     }
                 }
                 PatternVariant::Tuple((lhs, rhs)) | PatternVariant::Slice((lhs, rhs)) => {
@@ -159,11 +192,11 @@ impl AST {
         let type_val = self.objs.type_get(type_id).clone();
 
         match self.objs.expr(ident_expr).variant {
-            ExprVariant::Identifier(ident) => {
+            ExprVariant::Identifier(_) => {
                 return (
                     self.objs.pattern_push(Pattern {
                         type_id: type_id,
-                        variant: PatternVariant::Ident(ident.name),
+                        variant: PatternVariant::Ident(ident_expr),
                     }),
                     pattern_err,
                 );

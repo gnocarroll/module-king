@@ -508,7 +508,10 @@ pub enum PatternVariant {
     Tuple((PatternID, Option<PatternID>)),
     RestOfTuple((PatternID, PatternID)),
 
-    Ident(Token),
+    // this will link to expr which should be of the variant Identifier
+    // I will prefer to link it to expr rather than just Token to have more info
+    // connected here
+    Ident(ExprID),
 
     // expr id, should be statically computable I guess
     Value(ExprID),
@@ -556,7 +559,12 @@ impl Iterator for PatternIterator<'_> {
 
             match pattern.variant {
                 PatternVariant::IgnoreOne | PatternVariant::IgnoreMultiple => (),
-                PatternVariant::Ident(token) => return Some((token, type_id)),
+                PatternVariant::Ident(expr) => match &self.ast.objs.expr(expr).variant {
+                    ExprVariant::Identifier(ident) => return Some((ident.name, type_id)),
+                    _ => {
+                        panic!("Ident pattern variant should only have expr w/ variant Identifier")
+                    }
+                },
                 PatternVariant::Tuple((lhs, None)) | PatternVariant::Slice((lhs, None)) => {
                     self.pattern_stack.push(lhs)
                 }
