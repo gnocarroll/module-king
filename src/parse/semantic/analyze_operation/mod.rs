@@ -19,37 +19,38 @@ impl AST {
         expr: ExprID,
         operation: Operation,
     ) {
+        let operand1 = operation.operand1.expect("should be LHS");
+        let operand2 = operation.operand2.expect("should be RHS");
+
         match operation.op {
             TokenType::Comma => {
                 let mut finalized = true;
 
-                if let Some(lhs) = operation.operand1 {
-                    // scope remains same and still analyzing func params
-                    self.analyze_expr(ctx, scope, lhs);
+                // scope remains same and still analyzing func params
+                self.analyze_expr(ctx, scope, operand1);
 
-                    if !self.objs.expr(lhs).finalized {
-                        finalized = false;
-                    }
-                } else {
-                    // should be param on lhs
+                if !self.objs.expr(operand1).finalized {
                     finalized = false;
-
-                    self.missing_operand(expr, 1);
                 }
 
                 // it is fine for rhs to be missing e.g. function f(0 : Integer,) ...
-                if let Some(rhs) = operation.operand2 {
-                    self.analyze_expr(ctx, scope, rhs);
 
-                    if !self.objs.expr(rhs).finalized {
+                if matches!(self.expr(operand2).variant, ExprVariant::Unit) {
+                    let operand2_mut = self.expr_mut(operand2);
+
+                    operand2_mut.type_id = TypeID::unit();
+                    operand2_mut.finalized = true;
+                } else {
+                    self.analyze_expr(ctx, scope, operand2);
+
+                    if !self.objs.expr(operand2).finalized {
                         finalized = false;
                     }
                 }
 
-                self.set_expr_returns_unit(ctx, expr);
-
                 let expr_mut = self.expr_mut(expr);
 
+                expr_mut.type_id = TypeID::unit();
                 expr_mut.finalized = finalized;
             }
             TokenType::Colon => {
@@ -57,8 +58,8 @@ impl AST {
                     ctx,
                     scope,
                     expr,
-                    operation.operand1,
-                    operation.operand2,
+                    Some(operand1),
+                    Some(operand2),
                 );
 
                 let mut finalized = err.is_none();
@@ -71,7 +72,6 @@ impl AST {
                 if self
                     .scope_create_members_from_pattern(ctx, func_scope, pattern)
                     .is_err()
-                    && finalized
                 {
                     finalized = false;
                 }
@@ -79,12 +79,15 @@ impl AST {
                 self.objs.function_mut(curr_func).params.push(pattern);
 
                 if finalized {
-                    self.analyze_expr(ctx, scope, operation.operand1.expect("should be LHS"));
+                    self.analyze_expr(ctx, scope, operand1);
 
-                    self.set_expr_returns_unit(ctx, expr);
+                    if !self.objs.expr(operand1).finalized {
+                        finalized = false;
+                    }
 
                     let expr_mut = self.objs.expr_mut(expr);
 
+                    expr_mut.type_id = TypeID::unit();
                     expr_mut.finalized = finalized;
                 }
             }
