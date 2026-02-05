@@ -16,6 +16,7 @@ pub struct NameMismatch {
     pub found: Token,
 }
 
+#[derive(Clone, Debug)]
 pub enum ParseError {
     ExpectedToken(ExpectedToken),
     NameMismatch(NameMismatch),

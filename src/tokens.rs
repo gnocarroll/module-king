@@ -6,7 +6,7 @@ pub enum TokenOrString {
     String(String),
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct ExpectedToken {
     pub expected: TokenType,
     pub found: Token,

@@ -1,8 +1,8 @@
 use std::{string::String, sync::LazyLock};
 
 enum ScanMethod {
-    Text(&'static str),
-    Proc(fn(&str) -> usize),
+    Text(&'static [u8]),
+    Proc(fn(&[u8]) -> usize),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -142,11 +142,11 @@ impl std::fmt::Display for TokenType {
 use ScanMethod::*;
 use TokenType::*;
 
-fn scan_identifier(s: &str) -> usize {
-    let mut chars = s.chars();
+fn scan_identifier(s: &[u8]) -> usize {
+    let mut chars = s.iter();
 
     if let Some(first_c) = chars.next() {
-        if first_c != '_' && !first_c.is_alphabetic() {
+        if *first_c != b'_' && !first_c.is_ascii_alphabetic() {
             return 0;
         }
     } else {
@@ -156,7 +156,7 @@ fn scan_identifier(s: &str) -> usize {
     let mut ret = 1;
 
     for c in chars {
-        if c == '_' || c.is_alphanumeric() {
+        if *c == b'_' || c.is_ascii_alphanumeric() {
             ret += 1;
         } else {
             break;
@@ -166,11 +166,15 @@ fn scan_identifier(s: &str) -> usize {
     ret
 }
 
-fn scan_integer(s: &str) -> usize {
+fn is_u8_numeric(value: u8) -> bool {
+    value >= b'0' && value <= b'9'
+}
+
+fn scan_integer(s: &[u8]) -> usize {
     let mut ret = 0;
 
-    for c in s.chars() {
-        if c.is_numeric() {
+    for c in s.iter() {
+        if is_u8_numeric(*c) {
             ret += 1;
         } else {
             break;
@@ -180,17 +184,17 @@ fn scan_integer(s: &str) -> usize {
     return ret;
 }
 
-fn scan_float(s: &str) -> usize {
+fn scan_float(s: &[u8]) -> usize {
     let mut ret = scan_integer(s);
 
     if ret == 0 {
         return 0;
     }
 
-    let mut chars = s.chars();
+    let mut chars = s.iter();
 
     match chars.nth(ret) {
-        Some('.') => {}
+        Some(b'.') => {}
         _ => {
             return 0;
         }
@@ -198,7 +202,7 @@ fn scan_float(s: &str) -> usize {
 
     ret += 1;
 
-    let after_period = scan_integer(chars.as_str());
+    let after_period = scan_integer(chars.as_slice());
 
     if after_period == 0 {
         return 0;
@@ -207,17 +211,17 @@ fn scan_float(s: &str) -> usize {
     ret += after_period;
 
     match chars.nth(after_period) {
-        Some('e' | 'E') => {
+        Some(b'e' | b'E') => {
             ret += 1;
 
             let mut is_number_after_e = true;
 
             match chars.next() {
                 Some(c) => {
-                    if c == '-' || c.is_numeric() {
+                    if *c == b'-' || is_u8_numeric(*c) {
                         ret += 1;
 
-                        if c == '-' {
+                        if *c == b'-' {
                             is_number_after_e = false;
                         }
                     } else {
@@ -229,7 +233,7 @@ fn scan_float(s: &str) -> usize {
                 }
             }
 
-            let after_e = scan_integer(chars.as_str());
+            let after_e = scan_integer(chars.as_slice());
 
             if after_e == 0 && !is_number_after_e {
                 return 0;
@@ -243,11 +247,11 @@ fn scan_float(s: &str) -> usize {
     ret
 }
 
-fn scan_string(s: &str) -> usize {
-    let mut chars = s.chars();
+fn scan_string(s: &[u8]) -> usize {
+    let mut chars = s.iter();
 
     match chars.next() {
-        Some('"') => {}
+        Some(b'"') => {}
         _ => {
             return 0;
         }
@@ -264,9 +268,9 @@ fn scan_string(s: &str) -> usize {
             continue;
         }
 
-        if c == '\\' {
+        if *c == b'\\' {
             is_escaped = true;
-        } else if c == '"' {
+        } else if *c == b'"' {
             break;
         }
     }
@@ -275,7 +279,7 @@ fn scan_string(s: &str) -> usize {
 }
 
 // separate internal function to use ? operator on next()
-fn scan_character_internal(s: &str) -> Option<usize> {
+fn scan_character_internal(s: &[u8]) -> Option<usize> {
     // quote, char, quote => 3
     // quote, backslash, other, quote => 4 (or 1 extra)
 
@@ -285,20 +289,20 @@ fn scan_character_internal(s: &str) -> Option<usize> {
     // which chars you can escape e.g. n for \n (newline)
     // not gonna do as many as C I think these are enough
 
-    static ESC_SEQUENCE_CHARS: &str = "nrt\\\'";
+    static ESC_SEQUENCE_CHARS: &[u8] = b"nrt\\\'";
 
-    let mut chars = s.chars();
+    let mut chars = s.iter();
 
     // start quote
 
-    if chars.next()? != '\'' {
+    if *chars.next()? != b'\'' {
         return None;
     }
 
     let is_escaped;
 
     match chars.next()? {
-        '\\' => {
+        b'\\' => {
             is_escaped = true;
 
             // next char must be one of the valid escape sequence chars
@@ -321,7 +325,7 @@ fn scan_character_internal(s: &str) -> Option<usize> {
 
     // end quote
 
-    if chars.next()? != '\'' {
+    if *chars.next()? != b'\'' {
         return None;
     }
 
@@ -332,22 +336,22 @@ fn scan_character_internal(s: &str) -> Option<usize> {
     }
 }
 
-fn scan_character(s: &str) -> usize {
+fn scan_character(s: &[u8]) -> usize {
     match scan_character_internal(s) {
         Some(len) => len,
         None => 0,
     }
 }
 
-fn scan_dollar_number(s: &str) -> usize {
-    let mut chars = s.chars();
+fn scan_dollar_number(s: &[u8]) -> usize {
+    let mut chars = s.iter();
 
     match chars.next() {
-        Some('$') => (),
+        Some(b'$') => (),
         _ => return 0,
     }
 
-    let ret = 1 + scan_integer(chars.as_str());
+    let ret = 1 + scan_integer(chars.as_slice());
 
     if ret == 1 {
         return 0;
@@ -356,20 +360,20 @@ fn scan_dollar_number(s: &str) -> usize {
     ret
 }
 
-fn scan_ws_and_comments(s: &str) -> usize {
+fn scan_ws_and_comments(s: &[u8]) -> usize {
     let mut len: usize = 0;
-    let mut chars = s.chars();
+    let mut chars = s.iter();
 
     loop {
         let mut found_ws_or_comment = false;
 
         // 'a' is acceptable default since loop will quit if next is None
-        let c = chars.next().unwrap_or('a');
+        let c = chars.next().map(|c| *c).unwrap_or(b'a');
 
-        if c == '/' {
+        if c == b'/' {
             // check if comment has been found, if not break
 
-            if let Some('/') = chars.next() {
+            if let Some(b'/') = chars.next() {
                 found_ws_or_comment = true;
 
                 len += 2;
@@ -377,14 +381,14 @@ fn scan_ws_and_comments(s: &str) -> usize {
                 while let Some(c) = chars.next() {
                     len += 1;
 
-                    if c == '\n' {
+                    if *c == b'\n' {
                         break;
                     }
                 }
             } else {
                 break;
             }
-        } else if c.is_whitespace() {
+        } else if c.is_ascii_whitespace() {
             found_ws_or_comment = true;
 
             len += 1;
@@ -401,91 +405,91 @@ fn scan_ws_and_comments(s: &str) -> usize {
 impl TokenType {
     fn get_scan_method(&self) -> ScanMethod {
         match self {
-            Semicolon => Text(";"),
-            LParen => Text("("),
-            RParen => Text(")"),
-            LBrace => Text("["),
-            RBrace => Text("]"),
-            LCurly => Text("{"),
-            RCurly => Text("}"),
-            Comma => Text(","),
-            Or => Text("or"),
-            And => Text("and"),
-            Pipe => Text("|"),
-            Carrot => Text("^"),
-            Ampersand => Text("&"),
-            EqEq => Text("=="),
-            BangEq => Text("!="),
-            Lt => Text("<"),
-            Gt => Text(">"),
-            Le => Text("<="),
-            Ge => Text(">="),
-            LtLt => Text("<<"),
-            GtGt => Text(">>"),
-            Plus => Text("+"),
-            Minus => Text("-"),
-            Star => Text("*"),
-            FSlash => Text("/"),
-            Percent => Text("%"),
-            StarStar => Text("**"),
-            Bang => Text("!"),
-            Tilde => Text("~"),
-            Period => Text("."),
-            ColonEq => Text(":="),
-            Eq => Text("="),
-            PipeEq => Text("|="),
-            CarrotEq => Text("^="),
-            AmpersandEq => Text("&="),
-            LtLtEq => Text("<<="),
-            GtGtEq => Text(">>="),
-            PlusEq => Text("+="),
-            MinusEq => Text("-="),
-            StarEq => Text("*="),
-            FSlashEq => Text("/="),
-            PercentEq => Text("%="),
-            StarStarEq => Text("**="),
-            Colon => Text(":"),
-            PlusPlus => Text("++"),
-            MinusMinus => Text("--"),
-            DArrow => Text("=>"),
-            PipeGt => Text("|>"),
-            Underscore => Text("_"),
+            Semicolon => Text(b";"),
+            LParen => Text(b"(b"),
+            RParen => Text(b")"),
+            LBrace => Text(b"["),
+            RBrace => Text(b"]"),
+            LCurly => Text(b"{"),
+            RCurly => Text(b"}"),
+            Comma => Text(b","),
+            Or => Text(b"or"),
+            And => Text(b"and"),
+            Pipe => Text(b"|"),
+            Carrot => Text(b"^"),
+            Ampersand => Text(b"&"),
+            EqEq => Text(b"=="),
+            BangEq => Text(b"!="),
+            Lt => Text(b"<"),
+            Gt => Text(b">"),
+            Le => Text(b"<="),
+            Ge => Text(b">="),
+            LtLt => Text(b"<<"),
+            GtGt => Text(b">>"),
+            Plus => Text(b"+"),
+            Minus => Text(b"-"),
+            Star => Text(b"*"),
+            FSlash => Text(b"/"),
+            Percent => Text(b"%"),
+            StarStar => Text(b"**"),
+            Bang => Text(b"!"),
+            Tilde => Text(b"~"),
+            Period => Text(b"."),
+            ColonEq => Text(b":="),
+            Eq => Text(b"="),
+            PipeEq => Text(b"|="),
+            CarrotEq => Text(b"^="),
+            AmpersandEq => Text(b"&="),
+            LtLtEq => Text(b"<<="),
+            GtGtEq => Text(b">>="),
+            PlusEq => Text(b"+="),
+            MinusEq => Text(b"-="),
+            StarEq => Text(b"*="),
+            FSlashEq => Text(b"/="),
+            PercentEq => Text(b"%="),
+            StarStarEq => Text(b"**="),
+            Colon => Text(b":"),
+            PlusPlus => Text(b"++"),
+            MinusMinus => Text(b"--"),
+            DArrow => Text(b"=>"),
+            PipeGt => Text(b"|>"),
+            Underscore => Text(b"_"),
 
-            Type => Text("type"),
-            New => Text("new"),
-            Is => Text("is"),
-            With => Text("with"),
-            Begin => Text("begin"),
-            End => Text("end"),
-            Import => Text("import"),
-            Export => Text("export"),
-            From => Text("from"),
-            Global => Text("global"),
-            Module => Text("module"),
+            Type => Text(b"type"),
+            New => Text(b"new"),
+            Is => Text(b"is"),
+            With => Text(b"with"),
+            Begin => Text(b"begin"),
+            End => Text(b"end"),
+            Import => Text(b"import"),
+            Export => Text(b"export"),
+            From => Text(b"from"),
+            Global => Text(b"global"),
+            Module => Text(b"module"),
 
-            If => Text("if"),
-            Then => Text("then"),
-            Elif => Text("elif"),
-            Else => Text("else"),
-            Loop => Text("loop"),
-            While => Text("while"),
-            For => Text("for"),
-            Do => Text("do"),
+            If => Text(b"if"),
+            Then => Text(b"then"),
+            Elif => Text(b"elif"),
+            Else => Text(b"else"),
+            Loop => Text(b"loop"),
+            While => Text(b"while"),
+            For => Text(b"for"),
+            Do => Text(b"do"),
 
-            Return => Text("return"),
-            Goto => Text("goto"),
-            Break => Text("break"),
-            Continue => Text("continue"),
+            Return => Text(b"return"),
+            Goto => Text(b"goto"),
+            Break => Text(b"break"),
+            Continue => Text(b"continue"),
 
-            KWInteger => Text("integer"),
-            KWFloat => Text("float"),
-            Function => Text("function"),
-            Record => Text("record"),
-            Enum => Text("enum"),
-            Variant => Text("variant"),
+            KWInteger => Text(b"integer"),
+            KWFloat => Text(b"float"),
+            Function => Text(b"function"),
+            Record => Text(b"record"),
+            Enum => Text(b"enum"),
+            Variant => Text(b"variant"),
 
-            True => Text("true"),
-            False => Text("false"),
+            True => Text(b"true"),
+            False => Text(b"false"),
 
             DollarNumber => Proc(scan_dollar_number),
             Identifier => Proc(scan_identifier),
@@ -494,9 +498,9 @@ impl TokenType {
             Character => Proc(scan_character),
             String => Proc(scan_string),
 
-            Eof => Text(""),
+            Eof => Text(b""),
 
-            TokenTypeCount => Text(""),
+            TokenTypeCount => Text(b""),
         }
     }
 }
@@ -544,21 +548,14 @@ pub fn tokenize(s: &Vec<u8>) -> Result<Vec<Token>, String> {
     let mut line = 1;
     let mut column = 1;
 
-    let s = match std::str::from_utf8(s) {
-        Ok(s) => s,
-        Err(_) => {
-            return Err("could not convert u8 vec to str".to_string());
-        }
-    };
-
     // iterator for use throughout function and Token vec for ret
-    let mut chars = s.chars();
+    let mut chars = s.iter();
     let mut tokens: Vec<Token> = Vec::new();
 
-    while chars.as_str() != "" {
+    while chars.as_slice() != b"" {
         // advance past whitespace, comment(s)
 
-        let skip = scan_ws_and_comments(chars.as_str());
+        let skip = scan_ws_and_comments(chars.as_slice());
 
         offset += skip;
 
@@ -569,13 +566,13 @@ pub fn tokenize(s: &Vec<u8>) -> Result<Vec<Token>, String> {
 
             column += 1;
 
-            if c == '\n' {
+            if *c == b'\n' {
                 line += 1;
                 column = 1;
             }
         }
 
-        if chars.as_str() == "" {
+        if chars.as_slice() == b"" {
             break;
         }
 
@@ -592,13 +589,13 @@ pub fn tokenize(s: &Vec<u8>) -> Result<Vec<Token>, String> {
 
             let curr_match = match ttype.get_scan_method() {
                 Text(s) => {
-                    if chars.as_str().starts_with(s) {
-                        s.chars().count()
+                    if chars.as_slice().starts_with(s) {
+                        s.iter().count()
                     } else {
                         0
                     }
                 }
-                Proc(f) => f(chars.as_str()),
+                Proc(f) => f(chars.as_slice()),
             };
 
             if curr_match > max_match {
@@ -609,14 +606,16 @@ pub fn tokenize(s: &Vec<u8>) -> Result<Vec<Token>, String> {
 
         if max_match == 0 {
             // => no match was found
-            let s = chars.as_str();
+            let s = chars.as_slice();
             let len = std::cmp::min(chars.count(), 25);
 
             let s = &s[..len];
 
             return Err(format!(
                 "Ln {}, Col {}: no matching token found here \"{}\"",
-                line, column, s,
+                line,
+                column,
+                crate::util::ascii_to_string(s.to_vec()),
             ));
         }
 

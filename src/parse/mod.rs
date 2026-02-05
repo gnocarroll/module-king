@@ -611,6 +611,8 @@ impl AST {
 
     pub fn display_parse_errors(&self) {
         for err in &self.parse_errors {
+            eprintln!("ParseError: {:?}", err);
+
             match err {
                 ParseError::ExpectedToken(ExpectedToken { expected, found }) => {
                     eprintln!(

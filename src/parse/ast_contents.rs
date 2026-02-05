@@ -245,7 +245,11 @@ impl HasFileModule for MemberID {
     fn get_name(&self, ast: &AST) -> Option<String> {
         let s = match &ast.objs.member(*self).name {
             TokenOrString::String(s) => s.clone(),
-            TokenOrString::Token(token) => self.get_tokens(ast).tok_as_str(token).to_string(),
+            TokenOrString::Token(token) => {
+                let tokens = self.get_tokens(ast);
+
+                tokens.tok_as_str(token).to_string()
+            },
         };
 
         Some(s)
@@ -442,7 +446,7 @@ impl ASTContents {
         self.file_modules.push(file_module);
     }
 
-    pub fn file_module_iter(&self) -> impl Iterator<Item=ScopeID> {
+    pub fn file_module_iter(&self) -> impl Iterator<Item = ScopeID> {
         (&self.file_modules).iter().map(|scope_id| *scope_id)
     }
 }
