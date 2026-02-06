@@ -882,43 +882,45 @@ impl AST {
 
         // test if name of ident is a built-in function
 
-        for builtin in Builtin::get_builtin_iter() {
-            let builtin_name = builtin.get_builtin_name();
+        if ident.member_id == MemberID::default() {
+            for builtin in Builtin::get_builtin_iter() {
+                let builtin_name = builtin.get_builtin_name();
 
-            if name != builtin_name {
-                continue;
-            }
-
-            // name eq => match
-            // create builtin type and set fields of expr
-
-            let member_id = self
-                .scope_search(ScopeID::global(), builtin_name)
-                .expect("builtin functions should be guaranteed to be in global scope");
-
-            let type_id = self.objs.type_push(Type::Builtin(builtin));
-
-            let expr_mut = self.expr_mut(expr);
-
-            match &mut expr_mut.variant {
-                ExprVariant::Identifier(ident) => {
-                    ident.member_id = member_id;
-                    ident.variant = IdentifierVariant::Function;
+                if name != builtin_name {
+                    continue;
                 }
-                _ => {
-                    panic!("expr should be guarantee to be Identifier");
+
+                // name eq => match
+                // create builtin type and set fields of expr
+
+                let member_id = self
+                    .scope_search(ScopeID::global(), builtin_name)
+                    .expect("builtin functions should be guaranteed to be in global scope");
+
+                let type_id = self.objs.type_push(Type::Builtin(builtin));
+
+                let expr_mut = self.expr_mut(expr);
+
+                match &mut expr_mut.variant {
+                    ExprVariant::Identifier(ident) => {
+                        ident.member_id = member_id;
+                        ident.variant = IdentifierVariant::Function;
+                    }
+                    _ => {
+                        panic!("expr should be guarantee to be Identifier");
+                    }
                 }
+
+                expr_mut.type_id = type_id;
+
+                expr_mut.is_var = true;
+                expr_mut.finalized = true;
+
+                return;
             }
-
-            expr_mut.type_id = type_id;
-
-            expr_mut.is_var = true;
-            expr_mut.finalized = true;
-
-            return;
         }
 
-        if let AnalyzingNow::TypeBody(_) = ctx.analyzing_now {
+        if ident.member_id == MemberID::default() && let AnalyzingNow::TypeBody(_) = ctx.analyzing_now {
             // attempt to add discriminant-only member to enum or variant
 
             let scope_struct = self.objs.scope(scope);
@@ -972,12 +974,19 @@ impl AST {
             return;
         }
 
-        let member_id = match self.scope_search(scope, name.as_str()) {
-            Some(member_id) => member_id,
-            None => {
-                // Failed to find
+        // if ident MemberID has already been set (i.e. is not default)
+        // then can just use that otherwise search scope
 
-                return;
+        let member_id = if ident.member_id != MemberID::default() {
+            ident.member_id
+        } else {
+            match self.scope_search(scope, name.as_str()) {
+                Some(member_id) => member_id,
+                None => {
+                    // Failed to find
+
+                    return;
+                }
             }
         };
 
@@ -997,9 +1006,10 @@ impl AST {
                 self.objs.function(function_id).func_type,
                 IdentifierVariant::Function,
             ),
-            MemberVariant::Builtin(_) => {
-                panic!("should have already handled builtin");
-            }
+            MemberVariant::Builtin(builtin) => (
+                self.objs.type_push(Type::Builtin(builtin)),
+                IdentifierVariant::Function,
+            ),
         };
 
         let expr_mut = self.expr_mut(expr);

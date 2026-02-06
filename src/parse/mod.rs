@@ -648,6 +648,9 @@ impl AST {
                 SemanticError::InvalidExpr(invalid_expr) => {
                     eprintln!("EXPR TEXT: {}", self.expr_to_string(invalid_expr.expr));
                 }
+                SemanticError::UnexpectedExpr(unexpected) => {
+                    eprintln!("EXPR TEXT: {}", self.expr_to_string(unexpected.expr));
+                }
                 _ => {
                     eprintln!("Displaying not implemented for this kind of semantic error.")
                 }
