@@ -609,6 +609,11 @@ impl AST {
         self.parse_errors.len() > 0 || self.semantic_errors.len() > 0
     }
 
+    pub fn display_all_errors(&self) {
+        self.display_parse_errors();
+        self.display_semantic_errors();
+    }
+
     pub fn display_parse_errors(&self) {
         for err in &self.parse_errors {
             eprintln!("ParseError: {:?}", err);
@@ -640,6 +645,9 @@ impl AST {
                     }
                     _ => (),
                 },
+                SemanticError::InvalidExpr(invalid_expr) => {
+                    eprintln!("EXPR TEXT: {}", self.expr_to_string(invalid_expr.expr));
+                }
                 _ => {
                     eprintln!("Displaying not implemented for this kind of semantic error.")
                 }
@@ -821,7 +829,7 @@ pub fn parse_file(ast: &mut AST, tokens: Tokens, modulepath: Vec<String>) {
             "One or more syntax errors occurred, module {modulepath_string} will not be compiled."
         );
 
-        ast.display_parse_errors();
+        ast.display_all_errors();
 
         return;
     }
@@ -836,7 +844,7 @@ pub fn parse_file(ast: &mut AST, tokens: Tokens, modulepath: Vec<String>) {
     if ast.has_errors() {
         eprintln!("One or more semantic errors occurred, program will not be compiled.");
 
-        ast.display_semantic_errors();
+        ast.display_all_errors();
 
         return;
     }

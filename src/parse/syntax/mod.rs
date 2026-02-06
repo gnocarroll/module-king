@@ -262,10 +262,7 @@ impl AST {
             // (keyword "function")
 
             let success = match ast.expr(body).variant {
-                ExprVariant::Operation(Operation {
-                    op: TokenType::Begin,
-                    ..
-                }) => ast.expect(TokenType::Function).is_ok(),
+                ExprVariant::Block(_) => ast.expect(TokenType::Function).is_ok(),
                 ExprVariant::Operation(Operation {
                     op: TokenType::Return,
                     ..
