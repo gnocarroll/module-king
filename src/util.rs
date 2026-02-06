@@ -33,9 +33,14 @@ pub fn ascii_to_string(ascii: Vec<u8>) -> String {
     ascii.into_iter().map(|val| val as char).collect()
 }
 
+struct DirInfo {
+    map: HashMap<String, FileVariant>,
+    filenames: Vec<String>,
+}
+
 pub enum FileVariant {
     Regular,
-    Directory(HashMap<String, FileVariant>),
+    Directory(DirInfo),
 }
 
 fn print_file_variant(
@@ -45,10 +50,10 @@ fn print_file_variant(
 ) -> std::fmt::Result {
     match file_variant {
         FileVariant::Regular => write!(f, ""),
-        FileVariant::Directory(map) => {
+        FileVariant::Directory(dir_info) => {
             let mut ret = Ok(());
 
-            for (name, variant) in map {
+            for (name, variant) in &dir_info.map {
                 for _ in 0..indent {
                     write!(f, " ");
                 }
@@ -118,8 +123,8 @@ impl<'a> FileVariantTreewalk<'_> {
                 FileVariant::Regular => {
                     break;
                 }
-                FileVariant::Directory(map) => {
-                    filevariant = &map[filename];
+                FileVariant::Directory(dir_info) => {
+                    filevariant = &dir_info.map[filename];
                 }
             }
         }
@@ -129,14 +134,14 @@ impl<'a> FileVariantTreewalk<'_> {
                 FileVariant::Regular => {
                     break;
                 }
-                FileVariant::Directory(map) => {
-                    if map.len() == 0 {
+                FileVariant::Directory(dir_info) => {
+                    if dir_info.map.len() == 0 {
                         break;
                     }
 
-                    let filenames: Vec<String> = map.iter().map(|(filename, _)| filename.clone()).collect();
+                    let filenames = dir_info.filenames.clone();
 
-                    filevariant = &map[&filenames[0]];
+                    filevariant = &dir_info.map[&filenames[0]];
 
                     self.levels.push(DirIter { filenames, idx: 0 });
                 }
@@ -293,8 +298,14 @@ pub fn listdir_with_ext(path: &str, ext: &str) -> Result<Option<FileVariant>, ()
         }
     }
 
+    let mut filenames: Vec<String> = ret_map.iter().map(|(filename, _)| filename.clone()).collect();
+
+    // want sorted filenames so when treewalking it will be same order of files every time
+
+    filenames.sort();
+
     if ret_map.len() > 0 {
-        Ok(Some(FileVariant::Directory(ret_map)))
+        Ok(Some(FileVariant::Directory(DirInfo { map: ret_map, filenames })))
     } else {
         Ok(None)
     }
