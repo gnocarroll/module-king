@@ -228,14 +228,13 @@ impl AST {
         };
 
         format!(
-            "(function {}{} => {} = {})",
+            "(function {}{} => {})",
             match func.name {
                 Some(tok) => format!("{} ", func.literal.get_tokens(self).tok_as_str(&tok),),
                 None => "".to_string(),
             },
             self.expr_to_string(function_literal.params),
             self.expr_to_string(function_literal.return_type_expr),
-            self.expr_to_string(func.body),
         )
     }
 

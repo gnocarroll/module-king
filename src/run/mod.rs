@@ -321,6 +321,9 @@ pub fn run(ast: &AST) {
         Some(function_id) => function_id,
         None => {
             eprintln!("MAIN MODULE FOUND BUT NO MAIN FUNCTION");
+
+            eprintln!("MAIN MODULE INFO: {}", ast.scope_to_string(scope_id));
+
             return;
         }
     };
