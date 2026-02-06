@@ -391,18 +391,25 @@ impl AST {
             let maybe_type_id = if let Some(type_expr) = type_expr {
                 let expr = self.objs.expr(type_expr);
 
-                match self.objs.type_get(expr.type_id) {
-                    Type::Type(t) => Some(*t),
-                    _ => {
-                        let expr_returns = self.expr_returns(type_expr);
+                // possible that operand2 was not finalized => type ID could be default
+                // in which case put None in maybe_type_id
 
-                        err = Some(self.expected_expr_returns(
-                            type_expr,
-                            ExprReturns::Type,
-                            expr_returns,
-                        ));
-
-                        None
+                if expr.type_id == TypeID::default() {
+                    None
+                } else {
+                    match self.objs.type_get(expr.type_id) {
+                        Type::Type(t) => Some(*t),
+                        _ => {
+                            let expr_returns = self.expr_returns(type_expr);
+    
+                            err = Some(self.expected_expr_returns(
+                                type_expr,
+                                ExprReturns::Type,
+                                expr_returns,
+                            ));
+    
+                            None
+                        }
                     }
                 }
             } else {
