@@ -401,13 +401,13 @@ impl AST {
                         Type::Type(t) => Some(*t),
                         _ => {
                             let expr_returns = self.expr_returns(type_expr);
-    
+
                             err = Some(self.expected_expr_returns(
                                 type_expr,
                                 ExprReturns::Type,
                                 expr_returns,
                             ));
-    
+
                             None
                         }
                     }
@@ -686,14 +686,16 @@ impl AST {
 
         let ret_type_expr = self.objs.expr(func_literal.return_type_expr);
 
+        if !ret_type_expr.finalized {
+            return;
+        }
+
         match (
-            ret_type_expr.finalized,
             self.objs.type_get(ret_type_expr.type_id),
             &ret_type_expr.variant,
         ) {
-            (false, ..) => (),               // not finalized, don't test for err
-            (_, _, ExprVariant::Unit) => (), // Ok, function returns Unit
-            (_, Type::Type(t), _) => {
+            (_, ExprVariant::Unit) => (), // Ok, function returns Unit
+            (Type::Type(t), _) => {
                 // Ok, record type
                 ret_type_id = *t;
             }
@@ -704,7 +706,7 @@ impl AST {
                         msg: "either provide valid return type or omit return type",
                     }));
 
-                finalized = false;
+                return;
             }
         }
 
