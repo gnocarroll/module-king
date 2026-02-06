@@ -318,7 +318,7 @@ impl AST {
             ..Default::default()
         });
 
-        self.expr_push(Expr {
+        let literal = self.expr_push(Expr {
             tok: tok_idx,
             end_tok: self.tokens_idx(),
             variant: ExprVariant::FunctionLiteral(FunctionLiteral {
@@ -327,7 +327,11 @@ impl AST {
                 function_id,
             }),
             ..Default::default()
-        })
+        });
+
+        self.objs.function_mut(function_id).literal = literal;
+
+        literal
     }
 
     fn parse_number_type_literal(&mut self) -> ExprID {

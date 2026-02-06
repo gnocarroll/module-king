@@ -1,7 +1,6 @@
 use crate::{
     parse::{
-        AST, ExprVariant, HasFileModule, ScopeVariant, Type,
-        ast_contents::{ExprID, ScopeID, TypeID},
+        AST, ExprVariant, HasFileModule, MemberVariant, ScopeVariant, Type, ast_contents::{ExprID, FunctionID, ScopeID, TypeID}
     },
     scan::{Token, TokenType},
     tokens::Tokens,
@@ -179,14 +178,65 @@ impl AST {
     }
 
     pub fn scope_to_string(&self, scope: ScopeID) -> String {
-        let name = match &self.objs.scope(scope).name {
+        let scope_struct = self.objs.scope(scope);
+
+        let name = match &scope_struct.name {
             Some(token_or_string) => scope
                 .get_tokens(self)
                 .tok_or_string_to_string(token_or_string),
             None => "(anonymous)".to_string(),
         };
 
-        format!("(scope {})", name,)
+        let mut member_strings: Vec<String> = Vec::new();
+
+        for member_id in scope_struct.members.member_iter() {
+            let name = member_id.get_name(self).expect("all members should be named");
+
+            let desc = match self.objs.member(member_id).variant {
+                MemberVariant::Builtin(builtin) => format!(
+                    "Builtin {}",
+                    builtin.get_builtin_name(),
+                ),
+                MemberVariant::Function(function_id) => {
+                    self.function_to_string(function_id)
+                },
+                MemberVariant::Instance(type_id) => {
+                    format!("w/ type {}", self.type_to_string(type_id))
+                }
+                MemberVariant::Module(scope_id) => {
+                    format!("module {}", self.scope_to_string(scope_id))
+                }
+                MemberVariant::Type(type_id) => {
+                    format!("is type {}", self.type_to_string(type_id))
+                }
+            };
+
+            member_strings.push(format!("{} {}", name, desc));
+        }
+
+        format!("(scope {}\n{})", name, member_strings.join("\n"))
+    }
+
+    pub fn function_to_string(&self, function_id: FunctionID) -> String {
+        let func = self.objs.function(function_id);
+
+        let function_literal = match &self.objs.expr(func.literal).variant {
+            ExprVariant::FunctionLiteral(function_literal) => function_literal,
+            _ => {
+                panic!("Expr stored in literal field of struct Function should be FunctionLiteral");
+            }
+        };
+
+        format!(
+            "(function {}{} => {} = {})",
+            match func.name {
+                Some(tok) => format!("{} ", func.literal.get_tokens(self).tok_as_str(&tok),),
+                None => "".to_string(),
+            },
+            self.expr_to_string(function_literal.params),
+            self.expr_to_string(function_literal.return_type_expr),
+            self.expr_to_string(func.body),
+        )
     }
 
     pub fn expr_to_string(&self, expr: ExprID) -> String {
@@ -240,18 +290,7 @@ impl AST {
                 )
             }
             ExprVariant::FunctionLiteral(function_literal) => {
-                let func = self.objs.function(function_literal.function_id);
-
-                format!(
-                    "(function {}{} => {} = {})",
-                    match func.name {
-                        Some(tok) => format!("{} ", expr.get_tokens(self).tok_as_str(&tok),),
-                        None => "".to_string(),
-                    },
-                    self.expr_to_string(function_literal.params),
-                    self.expr_to_string(function_literal.return_type_expr),
-                    self.expr_to_string(func.body),
-                )
+                self.function_to_string(function_literal.function_id)
             }
             ExprVariant::TypeLiteral(type_literal) => {
                 format!(

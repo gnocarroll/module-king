@@ -233,6 +233,9 @@ pub struct FunctionLiteral {
 pub struct Function {
     pub name: Option<Token>,
 
+    // connect back to literal
+    pub literal: ExprID,
+
     pub return_type: TypeID,
 
     pub scope: ScopeID,
