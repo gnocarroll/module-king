@@ -35,6 +35,13 @@ impl ScopeMembers {
         self.member_to_idx.get(&member_id).map(|idx| *idx)
     }
 
+    pub fn member_iter(&self) -> impl Iterator<Item=MemberID> {
+        ScopeMembersIter {
+            idx: 0,
+            scope_members: &self,
+        }
+    }
+
     // try to insert to scope, return error if name exists
     pub fn insert(&mut self, s: String, member: MemberID) -> Result<MemberID, DuplicateName> {
         if let Some(old_member) = self.map.get(&s) {
@@ -53,5 +60,26 @@ impl ScopeMembers {
         self.member_to_idx.insert(member, self.order.len() - 1);
 
         Ok(member)
+    }
+}
+
+pub struct ScopeMembersIter<'a> {
+    idx: usize,
+    scope_members: &'a ScopeMembers,
+}
+
+impl Iterator for ScopeMembersIter<'_> {
+    type Item = MemberID;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.idx >= self.scope_members.member_count() {
+            return None;
+        }
+
+        let ret = self.scope_members.nth_member(self.idx);
+
+        self.idx += 1;
+
+        Some(ret)
     }
 }
