@@ -506,6 +506,12 @@ impl AST {
 
         let finalized = self.expr(operand1).finalized && self.expr(operand2).finalized;
 
+        // return early if an operand was not finalized to prevent problems
+
+        if !finalized {
+            return;
+        }
+
         let operand1_is_type = matches!(
             self.objs.type_get(self.objs.expr(operand1).type_id),
             Type::Type(_),
