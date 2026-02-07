@@ -264,7 +264,13 @@ pub enum IdentifierVariant {
     Member, // e.g. for point.x would be "x"
 }
 
-#[derive(Clone, Copy)]
+impl Default for IdentifierVariant {
+    fn default() -> Self {
+        Self::Unknown
+    }
+}
+
+#[derive(Clone, Copy, Default)]
 pub struct Identifier {
     pub name: Token,
 
@@ -272,6 +278,10 @@ pub struct Identifier {
     pub member_id: MemberID,
 
     pub variant: IdentifierVariant,
+
+    // can put expr which corresponds to initial value of ident here
+    // e.g. ident := initial_value;
+    pub initial_value: Option<ExprID>,
 }
 
 #[derive(Clone, Copy)]
