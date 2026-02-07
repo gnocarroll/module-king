@@ -17,7 +17,7 @@ use crate::{
         expr_to_unit,
         util::{
             allocate_instances_from_pattern, runtime_ref_to_builtin, runtime_ref_to_function,
-            runtime_ref_to_type,
+            runtime_ref_to_type, type_to_value,
         },
     },
 };
@@ -78,6 +78,19 @@ pub fn eval_operation_apply_function(
 
     let function_struct = ast.objs.function(function_id);
 
+    let ret_ref = ctx.objs.ret_location(ret_location);
+
+    // if function fails to run return statement by the end then return value
+    // will be default for return type of function
+
+    let default_ret_value = type_to_value(
+        ast,
+        ctx.objs.runtime_scope_mut(function_scope),
+        function_struct.return_type,
+    );
+
+    ctx.objs.ref_set(ret_ref, default_ret_value);
+
     // allocate space for param variables
 
     for pattern_id in &function_struct.params {
@@ -135,8 +148,6 @@ pub fn eval_operation_apply_function(
     // body has finished execution, so set this flag to false
     // otherwise caller will "return now" also
     ctx.return_now = false;
-
-    let ret_ref = ctx.objs.ret_location(ret_location);
 
     let ret_value = ret_ref.dup_in_scope(ast, ctx, outside_scope);
 

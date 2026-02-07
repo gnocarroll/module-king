@@ -88,13 +88,13 @@ pub fn runtime_ref_to_builtin(
     }
 }
 
-fn types_to_tuple_value_id(
+fn types_to_tuple_value(
     ast: &AST,
     runtime_scope: &mut RuntimeScope,
     type_id: TypeID,
     t1: TypeID,
     maybe_t2: Option<TypeID>,
-) -> ValueID {
+) -> Value {
     let mut value_id_vec = vec![type_to_value_id(ast, runtime_scope, t1)];
 
     if let Some(t2) = maybe_t2 {
@@ -124,13 +124,13 @@ fn types_to_tuple_value_id(
         }
     }
 
-    runtime_scope.value_push(Value {
+    Value {
         type_id: Some(type_id),
         variant: ValueVariant::Tuple(value_id_vec),
-    })
+    }
 }
 
-pub fn type_to_value_id(ast: &AST, runtime_scope: &mut RuntimeScope, type_id: TypeID) -> ValueID {
+pub fn type_to_value(ast: &AST, runtime_scope: &mut RuntimeScope, type_id: TypeID) -> Value {
     let variant = match ast.objs.type_get(type_id) {
         Type::Error => panic!("error type in type_to_value"),
         Type::Unit => ValueVariant::Unit,
@@ -173,10 +173,10 @@ pub fn type_to_value_id(ast: &AST, runtime_scope: &mut RuntimeScope, type_id: Ty
             }
         },
         Type::Tuple((t1, maybe_t2)) => {
-            return types_to_tuple_value_id(ast, runtime_scope, type_id, *t1, *maybe_t2);
+            return types_to_tuple_value(ast, runtime_scope, type_id, *t1, *maybe_t2);
         }
         Type::RestOfTuple((t1, t2)) => {
-            return types_to_tuple_value_id(ast, runtime_scope, type_id, *t1, Some(*t2));
+            return types_to_tuple_value(ast, runtime_scope, type_id, *t1, Some(*t2));
         }
         Type::Slice((element_type_id, slice_index)) => {
             let element_type_id = *element_type_id;
@@ -221,8 +221,14 @@ pub fn type_to_value_id(ast: &AST, runtime_scope: &mut RuntimeScope, type_id: Ty
         }
     };
 
-    runtime_scope.value_push(Value {
+    Value {
         type_id: Some(type_id),
         variant,
-    })
+    }
+}
+
+pub fn type_to_value_id(ast: &AST, runtime_scope: &mut RuntimeScope, type_id: TypeID) -> ValueID {
+    let value = type_to_value(ast, runtime_scope, type_id);
+    
+    runtime_scope.value_push(value)
 }
