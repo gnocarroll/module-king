@@ -84,6 +84,8 @@ impl Default for ASTContents {
                 visibility: Visibility::Export,
                 variant: MemberVariant::Type(type_id),
                 file_module: ScopeID::global(),
+
+                ..Default::default()
             });
 
             ret.scope_mut(ScopeID::global())
@@ -100,6 +102,8 @@ impl Default for ASTContents {
                 visibility: Visibility::Export,
                 variant: MemberVariant::Builtin(builtin),
                 file_module: ScopeID::global(),
+
+                ..Default::default()
             });
 
             ret.scope_mut(ScopeID::global())
