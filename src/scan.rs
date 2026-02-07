@@ -127,12 +127,6 @@ impl AsRef<str> for TokenType {
     }
 }
 
-impl TokenType {
-    pub fn as_str(&self) -> &str {
-        self.as_ref()
-    }
-}
-
 impl std::fmt::Display for TokenType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self)

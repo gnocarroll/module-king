@@ -207,7 +207,6 @@ impl AST {
         {
             finalized = self
                 .scope_add_member_type_from_name_and_id(
-                    ctx,
                     scope,
                     TokenOrString::Token(name),
                     *type_id,

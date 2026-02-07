@@ -6,9 +6,9 @@ use operator::OperatorVariant::*;
 use crate::{
     parse::{
         AST, Block, Expr, ExprVariant, Function, FunctionLiteral, Identifier, IdentifierVariant,
-        Operation, Tokens, TypeLiteral, TypeVariant, While,
+        Operation, TypeLiteral, TypeVariant, While,
         ast_contents::{ExprID, MemberID},
-        errors::{InvalidExpr, NameMismatch, ParseError, SemanticError},
+        errors::{InvalidExpr, ParseError, SemanticError},
         operator,
     },
     scan::{Token, TokenType},
@@ -38,26 +38,6 @@ impl AST {
         }
 
         Ok(ret)
-    }
-
-    fn _test_name_match(
-        &mut self,
-        tokens: &mut Tokens,
-        expected: Token,
-        found: Token,
-    ) -> Result<(), NameMismatch> {
-        if tokens.tok_as_str(&expected) == tokens.tok_as_str(&found) {
-            Ok(())
-        } else {
-            let ret = NameMismatch {
-                expected: expected,
-                found: found,
-            };
-
-            self.parse_errors.push(ParseError::NameMismatch(ret));
-
-            Err(ret)
-        }
     }
 
     fn parse_while(&mut self) -> ExprID {

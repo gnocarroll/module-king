@@ -1107,7 +1107,7 @@ impl AST {
         }
     }
 
-    fn add_basic_types(&mut self, ctx: &mut SemanticContext) {
+    fn add_basic_types(&mut self) {
         for (name, variant) in [
             (INTEGER_TYPE, TypeVariant::Integer),
             (FLOAT_TYPE, TypeVariant::Float),
@@ -1121,7 +1121,6 @@ impl AST {
             }
 
             self.scope_add_member_type(
-                ctx,
                 ScopeID::global(),
                 TokenOrString::String(name.to_string()),
                 variant,
@@ -1163,7 +1162,7 @@ impl AST {
             curr_func: None,
         };
 
-        self.add_basic_types(&mut ctx);
+        self.add_basic_types();
 
         // provide file module scope as scope
         // use current root expr (found/created from syntax analysis)

@@ -5,11 +5,9 @@ pub enum RuntimeErrorVariant {
     IntegerOverflow,
     NotImplemented,
     InvalidOperation,
-    RootExprMissing,
     MemberDNE,
     BadIdent,
     UnexpectedType,
-    BuiltinFailed,
     IndexOutOfBounds,
 }
 

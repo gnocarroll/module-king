@@ -7,7 +7,6 @@ use crate::{
     util::listdir_with_ext,
 };
 
-mod args;
 mod constants;
 mod parse;
 mod run;
@@ -18,7 +17,7 @@ mod util;
 const MANIFEST_PATH: &str = env!("CARGO_MANIFEST_DIR");
 
 fn main() -> ExitCode {
-    let wd = match std::env::current_dir() {
+    let _wd = match std::env::current_dir() {
         Ok(s) => match s.as_os_str().to_str() {
             Some(as_str) => as_str.to_string(),
             None => {
@@ -131,8 +130,11 @@ fn process_file(ast: &mut AST, filepath: &str, modulepath: Vec<String>) -> Resul
 
     let file_string = match crate::util::string_to_ascii(file_string) {
         Ok(s) => s,
-        Err(_) => {
-            return Err(format!("a char in {filepath} could not be converted to u8"));
+        Err(crate::util::ToAsciiErr::NotAscii(c)) => {
+            return Err(format!("a char in {filepath} could not be converted to u8: {c}"));
+        }
+        Err(crate::util::ToAsciiErr::FromChar(e)) => {
+            return Err(format!("a char in {filepath} could not be converted to u8: {e}"));
         }
     };
 

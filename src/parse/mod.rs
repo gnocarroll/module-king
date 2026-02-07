@@ -202,7 +202,7 @@ impl Default for Type {
 }
 
 #[derive(Clone)]
-struct FileModuleInfo {
+pub struct FileModuleInfo {
     pub tokens: Tokens,
     pub root_expr: ExprID,
 }
@@ -350,7 +350,6 @@ impl Default for ExprVariant {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ExprReturns {
-    Error,
     Unit,
     Value,
     Type,
@@ -417,18 +416,6 @@ pub enum MemberVariant {
     Instance(TypeID),
     Function(FunctionID),
     Builtin(Builtin),
-}
-
-#[derive(Clone)]
-pub enum TypeOrModule {
-    Type(TypeID),
-    Module(ScopeID),
-}
-
-impl Default for TypeOrModule {
-    fn default() -> Self {
-        TypeOrModule::Type(TypeID::default())
-    }
 }
 
 #[derive(Clone)]
@@ -654,6 +641,14 @@ impl AST {
                 SemanticError::UnexpectedExpr(unexpected) => {
                     eprintln!("EXPR TEXT: {}", self.expr_to_string(unexpected.expr));
                 }
+                SemanticError::ExpectedExprReturns(expected_expr_returns) => {
+                    eprintln!(
+                        "EXPR TEXT: {}\nEXPECTED: {:?}\nFOUND:{:?}",
+                        self.expr_to_string(expected_expr_returns.expr),
+                        expected_expr_returns.expected,
+                        expected_expr_returns.found,
+                    );
+                }
                 _ => {
                     eprintln!("Displaying not implemented for this kind of semantic error.")
                 }
@@ -782,7 +777,7 @@ impl AST {
         let file_module_scopes: Vec<ScopeID> = self.objs.file_module_iter().collect();
 
         for scope_id in file_module_scopes {
-            self.curr_file_module = scope_id;
+            self.set_curr_file_module(scope_id);
 
             self.doing_repair = true;
 

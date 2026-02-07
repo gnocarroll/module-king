@@ -5,21 +5,12 @@ use crate::{
         ExprReturns,
         ast_contents::{ExprID, MemberID, ScopeID, TypeID},
     },
-    scan::Token,
     tokens::ExpectedToken,
 };
-
-// e.g. function beginning, end name does not match
-#[derive(Clone, Copy, Debug)]
-pub struct NameMismatch {
-    pub expected: Token,
-    pub found: Token,
-}
 
 #[derive(Clone, Debug)]
 pub enum ParseError {
     ExpectedToken(ExpectedToken),
-    NameMismatch(NameMismatch),
 }
 
 // an expr could return different things e.g. a module or a type

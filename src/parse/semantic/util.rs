@@ -2,8 +2,8 @@ use crate::{
     constants::{ERROR_TYPE, UNIT_TYPE},
     parse::{
         AST, ExprReturns, ExprVariant, FunctionLiteral, HasFileModule, Identifier, Member,
-        MemberVariant, Scope, ScopeRefersTo, ScopeVariant, TokenOrString, Type, TypeOrModule,
-        TypeVariant, Visibility,
+        MemberVariant, Scope, ScopeRefersTo, ScopeVariant, TokenOrString, Type, TypeVariant,
+        Visibility,
         ast_contents::{ExprID, FunctionID, MemberID, ScopeID, TypeID},
         errors::{DuplicateName, InvalidOperation, MissingOperand, PatternError, SemanticError},
         semantic::SemanticContext,
@@ -195,33 +195,9 @@ impl AST {
         self.objs.type_push(Type::Scope(scope_id))
     }
 
-    // provide scope, type id to add type to scope as a member
-    // ret: member id
-    pub fn _scope_add_member_type_from_id(
-        &mut self,
-        ctx: &mut SemanticContext,
-        scope: ScopeID,
-        type_id: TypeID,
-    ) -> Result<MemberID, DuplicateName> {
-        let name = match self.objs.type_get(type_id) {
-            Type::Scope(scope) => self.objs.scope(*scope).name.clone(),
-            _ => None,
-        };
-
-        let member_id = self.objs.member_push(Member {
-            name: name.expect("CURRENTLY CAN ONLY ADD NAMED TYPE AS SCOPE MEMBER"),
-            visibility: Visibility::Private,
-            variant: MemberVariant::Type(type_id),
-            ..Default::default()
-        });
-
-        self.scope_try_insert(scope, member_id)
-    }
-
     // return is the id of the Scope which represents the type
     pub fn scope_add_member_type_from_name_and_id(
         &mut self,
-        ctx: &mut SemanticContext,
         scope: ScopeID,
         name: TokenOrString,
         type_id: TypeID,
@@ -255,7 +231,6 @@ impl AST {
     // return is the id of the Scope which represents the type
     pub fn scope_add_member_type(
         &mut self,
-        ctx: &mut SemanticContext,
         scope: ScopeID,
         name: TokenOrString,
         variant: TypeVariant,

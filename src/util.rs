@@ -1,6 +1,6 @@
 use std::{collections::HashMap};
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum ToAsciiErr {
     NotAscii(char),
     FromChar(core::char::TryFromCharError),
@@ -33,11 +33,13 @@ pub fn ascii_to_string(ascii: Vec<u8>) -> String {
     ascii.into_iter().map(|val| val as char).collect()
 }
 
-struct DirInfo {
+#[derive(Clone, Debug)]
+pub struct DirInfo {
     map: HashMap<String, FileVariant>,
     filenames: Vec<String>,
 }
 
+#[derive(Clone, Debug)]
 pub enum FileVariant {
     Regular,
     Directory(DirInfo),
@@ -51,19 +53,17 @@ fn print_file_variant(
     match file_variant {
         FileVariant::Regular => write!(f, ""),
         FileVariant::Directory(dir_info) => {
-            let mut ret = Ok(());
-
             for (name, variant) in &dir_info.map {
                 for _ in 0..indent {
-                    write!(f, " ");
+                    write!(f, " ")?;
                 }
 
-                writeln!(f, "{}", name);
+                writeln!(f, "{}", name)?;
 
-                ret = print_file_variant(variant, indent + 4, f);
+                print_file_variant(variant, indent + 4, f)?;
             }
 
-            ret
+            Ok(())
         }
     }
 }

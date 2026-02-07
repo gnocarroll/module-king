@@ -55,10 +55,18 @@ pub fn eval_operation_apply(
 pub fn eval_operation_apply_function(
     ast: &AST,
     ctx: &mut ExecutionContext,
-    _expr: ExprID,
+    expr: ExprID,
     function_id: FunctionID,
     args: RuntimeRef,
 ) -> Result<RuntimeRef, RuntimeException> {
+    println!(
+        "RUNNING FUNCTION: {}",
+        match function_id.get_name(ast) {
+            Some(name) => name,
+            None => "(anonymous)".to_string(),
+        },
+    );
+
     // save ID of outside scope, switch to function scope
 
     let outside_scope = ctx.curr_scope;
@@ -115,7 +123,9 @@ pub fn eval_operation_apply_function(
             .instance_get(member_id)
             .expect("should be allocated");
 
-        do_assignment(ast, ctx, assign_to_ref, *new_value_ref);
+        if let Err(variant) = do_assignment(ast, ctx, assign_to_ref, *new_value_ref) {
+            return Err(RuntimeException { expr, variant });
+        }
     }
 
     // eval body and then get return value

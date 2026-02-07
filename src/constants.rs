@@ -1,4 +1,4 @@
-pub static LANG_NAME: &str = "Spectra";
+pub static _LANG_NAME: &str = "Spectra";
 pub static LANG_FILE_EXT: &str = "sp";
 
 // filename to indicate file is module code for directory module

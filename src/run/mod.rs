@@ -8,14 +8,14 @@ mod util;
 use crate::{
     constants::UNIT_TYPE,
     parse::{
-        AST, Block, ExprVariant, If, MemberVariant, Type, While, ast_contents::{ExprID, FunctionID, ScopeID, TypeID}
+        AST, Block, ExprVariant, If, MemberVariant, Type, While,
+        ast_contents::{ExprID, FunctionID, ScopeID, TypeID},
     },
     run::{
         context_contents::{ContextObjects, RuntimeRef, RuntimeScopeID, Value, ValueVariant},
         error::{RuntimeErrorVariant, RuntimeException},
         eval_operation::{binary::apply::eval_operation_apply_function, eval_operation},
     },
-    tokens::Tokens,
 };
 
 pub struct ExecutionContext {

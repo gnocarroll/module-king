@@ -4,9 +4,7 @@ use std::ops::{Add, Div, Mul, Rem, Sub};
 
 use crate::{
     constants::UNIT_TYPE,
-    parse::{
-        AST, HasFileModule, ScopeRefersTo, ScopeVariant, Type, TypeVariant, ast_contents::ExprID,
-    },
+    parse::{AST, HasFileModule, ScopeVariant, Type, TypeVariant, ast_contents::ExprID},
     run::{
         ExecutionContext, Value, ValueVariant,
         context_contents::{RuntimeRef, RuntimeScopeID, ValueID},
@@ -383,27 +381,32 @@ fn eval_operation_braces(
             operand1_ref = *rref;
         }
         ValueVariant::Identifier(member_id) => {
-            operand1_ref = ctx.objs.instance_get(*member_id).expect("should be allocated");
+            operand1_ref = ctx
+                .objs
+                .instance_get(*member_id)
+                .expect("should be allocated");
         }
         _ => (),
     }
 
     let operand2_ref = eval(ast, ctx, operand2)?;
 
-    let index_value_id_vec =
-        |scope: RuntimeScopeID, value_id_vec: &Vec<ValueID>, idx: usize| -> Result<ValueVariant, RuntimeException> {
-            let value_id = match value_id_vec.get(idx) {
-                Some(value_id) => *value_id,
-                None => {
-                    return Err(RuntimeException {
-                        expr,
-                        variant: RuntimeErrorVariant::IndexOutOfBounds,
-                    });
-                }
-            };
-
-            Ok(ValueVariant::ImplicitRef(RuntimeRef { scope, value_id }))
+    let index_value_id_vec = |scope: RuntimeScopeID,
+                              value_id_vec: &Vec<ValueID>,
+                              idx: usize|
+     -> Result<ValueVariant, RuntimeException> {
+        let value_id = match value_id_vec.get(idx) {
+            Some(value_id) => *value_id,
+            None => {
+                return Err(RuntimeException {
+                    expr,
+                    variant: RuntimeErrorVariant::IndexOutOfBounds,
+                });
+            }
         };
+
+        Ok(ValueVariant::ImplicitRef(RuntimeRef { scope, value_id }))
+    };
 
     let variant = match (
         &ctx.objs.ref_get(operand1_ref).variant,

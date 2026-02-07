@@ -3,7 +3,7 @@ mod unary;
 
 use crate::{
     parse::{
-        AST, Block, ExprVariant, Operation,
+        AST, ExprVariant, Operation,
         ast_contents::{ExprID, ScopeID, TypeID},
         errors::{InvalidOperation, SemanticError},
         semantic::{AnalyzingNow, SemanticContext},
