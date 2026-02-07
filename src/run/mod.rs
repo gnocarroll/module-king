@@ -288,6 +288,33 @@ fn eval_main(
     eval_operation_apply_function(ast, ctx, ExprID::default(), function_id, args)
 }
 
+// go through modules and init module-level variables
+// i.e. global variables
+fn init_globals(ast: &AST, ctx: &mut ExecutionContext) {
+    let mut scope_stack = vec![ScopeID::global()];
+
+    while let Some(top_scope) = scope_stack.pop() {
+        let scope_struct = ast.objs.scope(top_scope);
+
+        for member_id in scope_struct.members.member_iter() {
+            match ast.objs.member(member_id).variant {
+                MemberVariant::Module(scope) => {
+                    // found module => push to stack
+                    scope_stack.push(scope);
+                }
+                MemberVariant::Instance(_) => {
+                    // global variables will live in the "heap" scope
+                    ctx.objs.instance_alloc(ast, RuntimeScopeID::heap(), member_id);
+                }
+
+                // For this function no action associated with other member
+                // variants
+                _ => (),
+            }
+        }
+    }
+}
+
 // central public function of this module, used to run interpreter given
 // program tokens and AST with semantic information
 pub fn run(ast: &AST) {
@@ -329,6 +356,9 @@ pub fn run(ast: &AST) {
     };
 
     let mut ctx = ExecutionContext::new();
+
+    // init global variables
+    init_globals(ast, &mut ctx);
 
     match eval_main(ast, &mut ctx, function_id) {
         Ok(value) => {
