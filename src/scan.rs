@@ -252,6 +252,9 @@ fn scan_string(s: &[u8]) -> usize {
     }
 
     let mut ret = 1;
+
+    // require end quote (so unterminated string literal will be rejected)
+    let mut found_end_quote = false;
     let mut is_escaped = false;
 
     for c in chars {
@@ -265,8 +268,13 @@ fn scan_string(s: &[u8]) -> usize {
         if *c == b'\\' {
             is_escaped = true;
         } else if *c == b'"' {
+            found_end_quote = true;
             break;
         }
+    }
+
+    if !found_end_quote {
+        return 0;
     }
 
     ret
