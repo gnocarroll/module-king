@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
+    constants::BOOLEAN_TYPE,
     parse::{
         AST, HasFileModule, MemberVariant, ScopeVariant, Type, TypeVariant, Visibility,
         ast_contents::{FunctionID, PatternID, ScopeID, TypeID},
@@ -131,12 +132,22 @@ fn types_to_tuple_value(
 }
 
 pub fn type_to_value(ast: &AST, runtime_scope: &mut RuntimeScope, type_id: TypeID) -> Value {
+    let boolean_type_id = ast.get_builtin_type_id(BOOLEAN_TYPE);
+
+    if ast.type_eq(boolean_type_id, type_id) {
+        return Value {
+            type_id: Some(type_id),
+            variant: ValueVariant::Boolean(false),
+        };
+    }
+
     let variant = match ast.objs.type_get(type_id) {
         Type::Error => panic!("error type in type_to_value"),
         Type::Unit => ValueVariant::Unit,
         Type::String => ValueVariant::String(b"".to_vec()),
         Type::Scope(scope) => match &ast.objs.scope(*scope).variant {
             ScopeVariant::Type(variant) => match variant {
+                TypeVariant::Enum => ValueVariant::Enum(0),
                 TypeVariant::Integer => ValueVariant::Integer(0),
                 TypeVariant::Float => ValueVariant::Float(0.0),
                 TypeVariant::Record => {
@@ -211,9 +222,7 @@ pub fn type_to_value(ast: &AST, runtime_scope: &mut RuntimeScope, type_id: TypeI
 
             ValueVariant::Array(value_id_vec)
         }
-        Type::Ref(_) => {
-            ValueVariant::Ref(RuntimeRef::default())
-        }
+        Type::Ref(_) => ValueVariant::Ref(RuntimeRef::default()),
         t @ _ => {
             eprintln!("{:?}", t);
 
@@ -229,6 +238,6 @@ pub fn type_to_value(ast: &AST, runtime_scope: &mut RuntimeScope, type_id: TypeI
 
 pub fn type_to_value_id(ast: &AST, runtime_scope: &mut RuntimeScope, type_id: TypeID) -> ValueID {
     let value = type_to_value(ast, runtime_scope, type_id);
-    
+
     runtime_scope.value_push(value)
 }
