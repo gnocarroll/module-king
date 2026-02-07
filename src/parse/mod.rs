@@ -278,10 +278,6 @@ pub struct Identifier {
     pub member_id: MemberID,
 
     pub variant: IdentifierVariant,
-
-    // can put expr which corresponds to initial value of ident here
-    // e.g. ident := initial_value;
-    pub initial_value: Option<ExprID>,
 }
 
 #[derive(Clone, Copy)]
@@ -436,6 +432,10 @@ pub struct Member {
     pub variant: MemberVariant,
 
     pub file_module: ScopeID,
+
+    // can store expr corresponding to initial value here e.g. for
+    // some_var := initial_value;
+    pub initial_value: Option<ExprID>,
 }
 
 impl Default for Member {
@@ -445,6 +445,7 @@ impl Default for Member {
             visibility: Visibility::Private,
             variant: MemberVariant::Instance(TypeID::error()),
             file_module: ScopeID::default(),
+            initial_value: None,
         }
     }
 }
