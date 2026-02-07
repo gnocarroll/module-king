@@ -59,7 +59,7 @@ pub fn eval_operation_apply_function(
     function_id: FunctionID,
     args: RuntimeRef,
 ) -> Result<RuntimeRef, RuntimeException> {
-    println!(
+    eprintln!(
         "RUNNING FUNCTION: {}",
         match function_id.get_name(ast) {
             Some(name) => name,
@@ -131,6 +131,10 @@ pub fn eval_operation_apply_function(
     // eval body and then get return value
 
     eval(ast, ctx, function_struct.body)?;
+
+    // body has finished execution, so set this flag to false
+    // otherwise caller will "return now" also
+    ctx.return_now = false;
 
     let ret_ref = ctx.objs.ret_location(ret_location);
 
