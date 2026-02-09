@@ -13,6 +13,7 @@ use crate::{
         ast_contents::{ASTContents, ExprID, FunctionID, MemberID, PatternID, ScopeID, TypeID},
         builtin::Builtin,
         errors::{DuplicateName, ParseError, PatternError, SemanticError},
+        operator::OperatorVariant,
         scope_members::ScopeMembers,
     },
     scan::{Token, TokenType},
@@ -283,6 +284,7 @@ pub struct Identifier {
 #[derive(Clone, Copy)]
 pub struct Operation {
     pub op: TokenType,
+    pub op_variant: OperatorVariant,
     pub operand1: Option<ExprID>,
     pub operand2: Option<ExprID>,
 }

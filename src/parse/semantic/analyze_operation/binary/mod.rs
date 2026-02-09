@@ -82,6 +82,7 @@ impl AST {
                     op: TokenType::Colon,
                     operand1: Some(_),
                     operand2: Some(type_expr),
+                    ..
                 }) => {
                     let type_id = self.objs.expr(type_expr).type_id;
 
@@ -175,6 +176,7 @@ impl AST {
                 op: TokenType::Type,
                 operand1: Some(type_name),
                 operand2: None,
+                ..
             }) => {
                 match self.expr(type_name).variant {
                     ExprVariant::Identifier(ident) => Some(ident.name),
@@ -450,6 +452,7 @@ impl AST {
                     op: TokenType::LParen,
                     operand1: Some(operand1),
                     operand2: None,
+                    ..
                 }) => {
                     expr_stack.push(operand1);
                 }
@@ -457,6 +460,7 @@ impl AST {
                     op: TokenType::Comma,
                     operand1: Some(operand1),
                     operand2: Some(operand2),
+                    ..
                 }) => {
                     match self.objs.expr(operand2).variant {
                         ExprVariant::Unit => (),
@@ -637,19 +641,19 @@ impl AST {
         ctx: &mut SemanticContext,
         scope: ScopeID,
         expr: ExprID,
-        operand1: ExprID,
-        operand2: ExprID,
+        arr_operand: ExprID,
+        idx_operand: ExprID,
     ) {
-        self.analyze_expr(ctx, scope, operand1);
-        self.analyze_expr(ctx, scope, operand2);
+        self.analyze_expr(ctx, scope, arr_operand);
+        self.analyze_expr(ctx, scope, idx_operand);
 
-        if !self.expr(operand1).finalized || !self.expr(operand2).finalized {
+        if !self.expr(arr_operand).finalized || !self.expr(idx_operand).finalized {
             return;
         }
 
-        let operand1_type_id = self.objs.expr(operand1).type_id;
+        let operand1_type_id = self.objs.expr(arr_operand).type_id;
 
-        let operand2_struct = self.objs.expr(operand2);
+        let operand2_struct = self.objs.expr(idx_operand);
 
         let operand2_type_id = operand2_struct.type_id;
 

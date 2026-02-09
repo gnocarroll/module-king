@@ -1,7 +1,9 @@
 // utility functionality related to Expr struct
 
 use crate::{
-    parse::{AST, Expr, ExprVariant, If, Operation, ast_contents::ExprID},
+    parse::{
+        AST, Expr, ExprVariant, If, Operation, ast_contents::ExprID, operator::OperatorVariant,
+    },
     scan::Token,
 };
 
@@ -60,6 +62,7 @@ impl AST {
             end_tok: self.objs.expr(rhs).end_tok,
             variant: ExprVariant::Operation(Operation {
                 op: op.ttype,
+                op_variant: OperatorVariant::Infix,
                 operand1: Some(lhs),
                 operand2: Some(rhs),
             }),
@@ -79,6 +82,7 @@ impl AST {
             end_tok: self.expr(rhs).end_tok + if found_end { 1 } else { 0 },
             variant: ExprVariant::Operation(Operation {
                 op: op.ttype,
+                op_variant: OperatorVariant::PostfixAround,
                 operand1: Some(lhs),
                 operand2: Some(rhs),
             }),
@@ -92,6 +96,7 @@ impl AST {
             end_tok: self.expr(rhs).end_tok,
             variant: ExprVariant::Operation(Operation {
                 op: op.ttype,
+                op_variant: OperatorVariant::Prefix,
                 operand1: Some(rhs),
                 operand2: None,
             }),
@@ -105,6 +110,7 @@ impl AST {
             end_tok: self.expr(rhs).end_tok + 1,
             variant: ExprVariant::Operation(Operation {
                 op: op.ttype,
+                op_variant: OperatorVariant::Postfix,
                 operand1: Some(rhs),
                 operand2: None,
             }),
@@ -118,6 +124,7 @@ impl AST {
             end_tok: self.expr(rhs).end_tok + if found_end { 1 } else { 0 },
             variant: ExprVariant::Operation(Operation {
                 op: op.ttype,
+                op_variant: OperatorVariant::Around,
                 operand1: Some(rhs),
                 operand2: None,
             }),
@@ -131,6 +138,7 @@ impl AST {
             end_tok: self.expr(rhs).end_tok,
             variant: ExprVariant::Operation(Operation {
                 op: op.ttype,
+                op_variant: OperatorVariant::PrefixAround,
                 operand1: Some(lhs),
                 operand2: Some(rhs),
             }),

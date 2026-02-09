@@ -402,6 +402,14 @@ static OP_INFO_TABLE: &[&[OperatorInfo]] = &[
             assoc: Assoc::Right,
             _is_rhs_optional: false,
         },
+
+        // decl array type
+        OperatorInfo {
+            ttype: TokenType::LBrace,
+            variant: PrefixAround,
+            assoc: Assoc::Right,
+            _is_rhs_optional: false,
+        },
     ],
     &[
         OperatorInfo {

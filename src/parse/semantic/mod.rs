@@ -167,6 +167,7 @@ impl AST {
                 op: TokenType::LParen,
                 operand1: Some(expr),
                 operand2: None,
+                ..
             }) => {
                 ident_has_parens = true;
                 ident_expr = expr;
@@ -206,6 +207,7 @@ impl AST {
                 op: TokenType::Comma,
                 operand1: lhs,
                 operand2: rhs,
+                ..
             }) => {
                 match type_val {
                     Type::Tuple((lhs_type, rhs_type)) => {
