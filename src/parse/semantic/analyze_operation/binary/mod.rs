@@ -6,7 +6,7 @@ use crate::{
         AST, ExprVariant, IdentifierVariant, MemberVariant, Operation, ScopeVariant, SliceIndex,
         Type, TypeVariant, Visibility,
         ast_contents::{ExprID, ScopeID, TypeID},
-        operator,
+        operator::{self, OperatorVariant},
         semantic::{AnalyzingNow, SemanticContext},
     },
     scan::TokenType,
@@ -208,11 +208,7 @@ impl AST {
             (rhs.finalized, self.objs.type_get(rhs.type_id), name)
         {
             finalized = self
-                .scope_add_member_type_from_name_and_id(
-                    scope,
-                    TokenOrString::Token(name),
-                    *type_id,
-                )
+                .scope_add_member_type_from_name_and_id(scope, TokenOrString::Token(name), *type_id)
                 .is_ok();
         } else {
             self.invalid_operation(expr, "creation of new type could not be completed");
@@ -635,8 +631,8 @@ impl AST {
         expr_mut.finalized = finalized;
     }
 
-    // can be creation of array/slice type or access to array/slice
-    fn analyze_operation_braces(
+    // create arr type
+    fn analyze_operation_arr_type_decl(
         &mut self,
         ctx: &mut SemanticContext,
         scope: ScopeID,
@@ -708,6 +704,42 @@ impl AST {
                 return;
             }
 
+            _ => (),
+        }
+
+        self.invalid_operation(
+            expr,
+            "invalid application of prefix [] operator (it is for type decl)",
+        );
+    }
+
+    // access arr
+    fn analyze_operation_arr_access(
+        &mut self,
+        ctx: &mut SemanticContext,
+        scope: ScopeID,
+        expr: ExprID,
+        arr_operand: ExprID,
+        idx_operand: ExprID,
+    ) {
+        self.analyze_expr(ctx, scope, arr_operand);
+        self.analyze_expr(ctx, scope, idx_operand);
+
+        if !self.expr(arr_operand).finalized || !self.expr(idx_operand).finalized {
+            return;
+        }
+
+        let operand1_type_id = self.objs.expr(arr_operand).type_id;
+
+        let operand2_struct = self.objs.expr(idx_operand);
+
+        let operand2_type_id = operand2_struct.type_id;
+
+        match (
+            self.objs.type_get(operand1_type_id),
+            self.objs.type_get(operand2_type_id),
+            &operand2_struct.variant,
+        ) {
             // access to existing array
             (Type::Slice((type_id, slice_index)), _, _) => {
                 if !self.type_eq(slice_index.type_id, operand2_type_id) {
@@ -734,7 +766,10 @@ impl AST {
             _ => (),
         }
 
-        self.invalid_operation(expr, "invalid application of [] operator");
+        self.invalid_operation(
+            expr,
+            "invalid application of postfix [] operator (use for arr access)",
+        );
     }
 
     pub fn analyze_operation_binary(
@@ -743,6 +778,7 @@ impl AST {
         scope: ScopeID,
         expr: ExprID,
         op: TokenType,
+        op_variant: OperatorVariant,
         operand1: ExprID,
         operand2: ExprID,
     ) {
@@ -815,7 +851,22 @@ impl AST {
                 return;
             }
             TokenType::LBrace => {
-                self.analyze_operation_braces(ctx, scope, expr, operand1, operand2);
+                match op_variant {
+                    OperatorVariant::PrefixAround => {
+                        // note: operand order intentionally reverse because index comes first
+                        // e.g. 3 is first for [3]Integer
+                        self.analyze_operation_arr_type_decl(ctx, scope, expr, operand2, operand1);
+                    }
+                    OperatorVariant::PostfixAround => {
+                        self.analyze_operation_arr_access(ctx, scope, expr, operand1, operand2);
+                    }
+                    _ => {
+                        panic!(
+                            "LBrace should either be PrefixAround (for type decl) or PostfixAround (for arr access)"
+                        );
+                    }
+                }
+
                 return;
             }
             TokenType::Comma => {

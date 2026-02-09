@@ -254,7 +254,15 @@ impl AST {
                 self.analyze_operation_unary(ctx, scope, expr, operation.op, operand);
             }
             (Some(operand1), Some(operand2)) => {
-                self.analyze_operation_binary(ctx, scope, expr, operation.op, operand1, operand2);
+                self.analyze_operation_binary(
+                    ctx,
+                    scope,
+                    expr,
+                    operation.op,
+                    operation.op_variant,
+                    operand1,
+                    operand2,
+                );
             }
             _ => self
                 .semantic_errors
