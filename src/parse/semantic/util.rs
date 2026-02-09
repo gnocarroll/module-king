@@ -440,37 +440,36 @@ impl AST {
                 return *s1 == *s2;
             }
             (
-                Type::Slice((element_type_id_1, slice_index1)),
-                Type::Slice((element_type_id_2, slice_index2)),
+                Type::Slice((element_type_id_1, slice_index_1)),
+                Type::Slice((element_type_id_2, slice_index_2)),
             ) => {
                 if !self.type_eq(*element_type_id_1, *element_type_id_2)
-                    || !self.type_eq(slice_index1.type_id, slice_index2.type_id)
+                    || !self.type_eq(slice_index_1.type_id, slice_index_2.type_id)
                 {
                     return false;
                 }
 
-                return slice_index1.size == slice_index2.size;
+                return slice_index_1.size == slice_index_2.size;
             }
             _ => (),
         }
 
-        // how many of args (t1, t2) are tuples?
+        // are both tuples?
 
-        let tuples_count = [t1, t2]
-            .iter()
-            .map(|t| {
-                matches!(
-                    self.objs.type_get(*t),
-                    Type::Tuple(_) | Type::RestOfTuple(_)
-                ) as usize
-            })
-            .sum::<usize>();
+        let are_both_tuples = [t1, t2].iter().all(|t| {
+            matches!(
+                self.objs.type_get(*t),
+                Type::Tuple(_) | Type::RestOfTuple(_)
+            )
+        });
 
-        if tuples_count != 2 {
-            // if both are not tuples, then return false here
+        if !are_both_tuples {
+            // if one or both are not tuples, return false here
 
             return false;
         }
+
+        // code here will only be run if both are either Tuple or RestOfTuple
 
         let mut t1_iter = t1.to_tuple_iterator(self);
         let mut t2_iter = t2.to_tuple_iterator(self);
