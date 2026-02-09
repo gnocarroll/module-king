@@ -225,7 +225,10 @@ fn eval_operation_apply_cast(
         .to_runtime_ref(ctx, ctx.curr_scope));
     }
 
-    Ok(expr_to_unit(ast, ctx, expr))
+    return Err(RuntimeException {
+        expr,
+        variant: RuntimeErrorVariant::InvalidOperation,
+    });
 }
 
 fn eval_operation_apply_builtin(

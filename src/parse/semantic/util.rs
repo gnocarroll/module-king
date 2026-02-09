@@ -395,6 +395,9 @@ impl AST {
         let t1 = self.type_resolve_aliasing(t1);
         let t2 = self.type_resolve_aliasing(t2);
 
+        eprintln!("T1: {}", self.type_to_string(t1));
+        eprintln!("T2: {}", self.type_to_string(t2));
+
         if t1 == t2 {
             return true;
         }
@@ -436,7 +439,37 @@ impl AST {
 
                 return *s1 == *s2;
             }
+            (
+                Type::Slice((element_type_id_1, slice_index1)),
+                Type::Slice((element_type_id_2, slice_index2)),
+            ) => {
+                if !self.type_eq(*element_type_id_1, *element_type_id_2)
+                    || !self.type_eq(slice_index1.type_id, slice_index2.type_id)
+                {
+                    return false;
+                }
+
+                return slice_index1.size == slice_index2.size;
+            }
             _ => (),
+        }
+
+        // how many of args (t1, t2) are tuples?
+
+        let tuples_count = [t1, t2]
+            .iter()
+            .map(|t| {
+                matches!(
+                    self.objs.type_get(*t),
+                    Type::Tuple(_) | Type::RestOfTuple(_)
+                ) as usize
+            })
+            .sum::<usize>();
+
+        if tuples_count != 2 {
+            // if both are not tuples, then return false here
+
+            return false;
         }
 
         let mut t1_iter = t1.to_tuple_iterator(self);

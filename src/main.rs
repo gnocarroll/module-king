@@ -111,7 +111,9 @@ fn main() -> ExitCode {
 
     ast.repair();
 
-    if !ast.has_errors() {
+    if ast.has_errors() {
+        ast.display_all_errors();
+    } else {
         run::run(&ast);
     }
 

@@ -319,7 +319,7 @@ impl AST {
                     return;
                 }
 
-                if curr_ret_type != operand_type_id {
+                if !self.type_eq(curr_ret_type, operand_type_id) {
                     self.invalid_operation(
                         expr,
                         "type of return operand must match function return type",
