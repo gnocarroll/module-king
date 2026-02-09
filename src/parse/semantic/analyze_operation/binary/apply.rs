@@ -135,9 +135,11 @@ impl AST {
                         // can be some other integer type being casted
 
                         match self.type_get_variant(arg_type) {
-                            Some(TypeVariant::Integer) | Some(TypeVariant::Float) => (),
+                            Some(TypeVariant::Integer | TypeVariant::Float | TypeVariant::Enum) => {
+                                ()
+                            }
                             _ => {
-                                self.invalid_operation(expr, "when casting to integer type argument must be integer or float type");
+                                self.invalid_operation(expr, "when casting to integer type argument must be integer, float, or enum type");
                                 return;
                             }
                         }

@@ -176,6 +176,7 @@ fn eval_operation_apply_cast(
 
                     if bool_value { 1 } else { 0 }
                 }
+                ValueVariant::Enum(discriminant) => discriminant as i64,
                 _ => {
                     return Err(RuntimeException {
                         expr,

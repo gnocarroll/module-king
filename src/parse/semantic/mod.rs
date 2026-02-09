@@ -376,15 +376,29 @@ impl AST {
             err = Some(self.missing_operand(expr, 1));
         }
 
-        if let Some(pattern) = operand2 {
+        let pattern: PatternID;
+
+        if let Some(type_expr) = operand2 {
             ctx.analyzing_now = AnalyzingNow::Type;
-            self.analyze_expr(ctx, scope, pattern);
+            self.analyze_expr(ctx, scope, type_expr);
             ctx.analyzing_now = old_analyzing_now;
+
+            if !self.expr(type_expr).finalized {
+                // create, return dummy pattern
+
+                let err_type_id = self.get_builtin_type_id(ERROR_TYPE);
+
+                pattern = self.objs.pattern_push(Pattern {
+                    type_id: err_type_id,
+                    variant: PatternVariant::IgnoreMultiple,
+                });
+
+                return (pattern, None);
+            }
         } else {
             err = Some(self.missing_operand(expr, 2));
         }
 
-        let pattern: PatternID;
         let mut type_id = self.get_builtin_type_id(ERROR_TYPE);
 
         if let (Some(ident_expr), type_expr) = (operand1, operand2) {

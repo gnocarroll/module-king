@@ -128,10 +128,10 @@ impl AST {
     ) {
         match operation.op {
             TokenType::Semicolon | TokenType::Comma => {
-                if operation.op == TokenType::Comma {
+                if operation.op == TokenType::Semicolon {
                     self.invalid_operation(
                         expr,
-                        "members of type literal should be semicolon-separated",
+                        "members of type literal should be comma-separated",
                     );
                 }
 
