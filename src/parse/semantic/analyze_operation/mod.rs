@@ -4,7 +4,7 @@ mod unary;
 use crate::{
     parse::{
         AST, ExprVariant, Operation,
-        ast_contents::{ExprID, ScopeID, TypeID},
+        ast_contents::{ExprID, PatternID, ScopeID, TypeID},
         errors::{InvalidOperation, SemanticError},
         semantic::{AnalyzingNow, SemanticContext},
     },
@@ -54,6 +54,21 @@ impl AST {
                 expr_mut.finalized = finalized;
             }
             TokenType::Colon => {
+                let curr_func = ctx.curr_func.expect("should be current func recorded");
+
+                let function_mut = self.objs.function_mut(curr_func);
+
+                // save slot in params for this expr now e.g. in case it cannot be finalized now
+                // but can be later
+
+                if !function_mut.expr_to_param_idx.contains_key(&expr) {
+                    function_mut
+                        .expr_to_param_idx
+                        .insert(expr, function_mut.params.len());
+
+                    function_mut.params.push(PatternID::default());
+                }
+
                 let (pattern, err) = self.analyze_instance_creation(
                     ctx,
                     scope,
@@ -62,10 +77,15 @@ impl AST {
                     Some(operand2),
                 );
 
+                // if analysis on operand2 failed then return early
+
+                if !self.expr(operand2).finalized {
+                    return;
+                }
+
                 let mut finalized = err.is_none();
 
                 // add param
-                let curr_func = ctx.curr_func.expect("should be current func recorded");
 
                 let func_scope = self.objs.function(curr_func).scope;
 
@@ -78,19 +98,15 @@ impl AST {
 
                 let function_mut = self.objs.function_mut(curr_func);
 
-                // check if expr is already associated with some param idx
-                // if it is => set pattern there to whatever pattern we have now
-                // if not => record param index this expr will correspond to and push pattern
+                // get param index and store arg info (Pattern)
 
-                if let Some(param_idx) = function_mut.expr_to_param_idx.get(&expr).map(|idx| *idx) {
-                    function_mut.params[param_idx] = pattern;
-                } else {
-                    function_mut
-                        .expr_to_param_idx
-                        .insert(expr, function_mut.params.len());
+                let param_idx = function_mut
+                    .expr_to_param_idx
+                    .get(&expr)
+                    .map(|idx| *idx)
+                    .expect("should have just set up index for param");
 
-                    function_mut.params.push(pattern);
-                }
+                function_mut.params[param_idx] = pattern;
 
                 if finalized {
                     self.analyze_expr(ctx, scope, operand1);
