@@ -391,6 +391,10 @@ fn eval_operation_braces(
 
     let operand2_ref = eval(ast, ctx, operand2)?;
 
+    // eval eager b/c for index we will want e.g. Integer or enum value itself
+
+    let operand2_ref = eval_eager(ast, ctx, operand2_ref)?;
+
     let index_value_id_vec = |scope: RuntimeScopeID,
                               value_id_vec: &Vec<ValueID>,
                               idx: usize|

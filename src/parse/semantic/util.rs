@@ -395,9 +395,6 @@ impl AST {
         let t1 = self.type_resolve_aliasing(t1);
         let t2 = self.type_resolve_aliasing(t2);
 
-        eprintln!("T1: {}", self.type_to_string(t1));
-        eprintln!("T2: {}", self.type_to_string(t2));
-
         if t1 == t2 {
             return true;
         }
