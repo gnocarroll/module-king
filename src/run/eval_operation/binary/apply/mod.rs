@@ -166,6 +166,30 @@ fn eval_operation_apply_cast(
     type_id: TypeID,
     args: RuntimeRef,
 ) -> Result<RuntimeRef, RuntimeException> {
+    let type_id = ast.type_resolve_aliasing(type_id);
+
+    // check if it is cast to String and perform it if so
+
+    if type_id == TypeID::string() {
+        let s = args.to_string(ast, ctx);
+
+        let s = match crate::util::string_to_ascii(s) {
+            Ok(s) => s,
+            Err(_) => {
+                return Err(RuntimeException {
+                    expr,
+                    variant: RuntimeErrorVariant::InvalidOperation,
+                });
+            }
+        };
+
+        return Ok(Value {
+            type_id: Some(type_id),
+            variant: ValueVariant::String(s),
+        }
+        .to_runtime_ref(ctx, ctx.curr_scope));
+    }
+
     let value_variant = match ast.type_get_variant(type_id) {
         Some(TypeVariant::Integer) => {
             let i = match ctx.objs.ref_get(args).variant {

@@ -187,10 +187,14 @@ impl AST {
                     _ => (),
                 }
             }
+            Type::String => {
+                // with String there is nothing to check since anything can be casted to a string
+                simple_cast = false;
+            }
             _ => (),
         }
 
-        if simple_cast && cast_to != arg_type {
+        if simple_cast && !self.type_eq(cast_to, arg_type) {
             self.invalid_operation(expr, "type of args does not match type you are casting to");
             return;
         }
