@@ -110,6 +110,9 @@ pub enum Type {
     // actually separate type
     Alias(TypeID),
 
+    // compiler should not view type as equal to type it derives from
+    DeriveFrom(TypeID),
+
     // Type[Expr]
     Slice((TypeID, SliceIndex)),
 

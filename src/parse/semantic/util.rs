@@ -196,39 +196,6 @@ impl AST {
     }
 
     // return is the id of the Scope which represents the type
-    pub fn scope_add_member_type_from_name_and_id(
-        &mut self,
-        scope: ScopeID,
-        name: TokenOrString,
-        type_id: TypeID,
-    ) -> Result<MemberID, DuplicateName> {
-        let type_id = if let Type::Scope(scope) = self.objs.type_get(type_id) {
-            let scope_mut = self.objs.scope_mut(*scope);
-
-            if scope_mut.name.is_none() {
-                scope_mut.name = Some(name.clone());
-
-                type_id
-            } else {
-                // we have name but type_id provided already corresponds to named scope
-                // => type being created is alias for another type, so get new TypeID
-                self.objs.type_push(Type::Alias(type_id))
-            }
-        } else {
-            type_id
-        };
-
-        let member_id = self.objs.member_push(Member {
-            name: name,
-            visibility: Visibility::Private,
-            variant: MemberVariant::Type(type_id),
-            ..Default::default()
-        });
-
-        self.scope_try_insert(scope, member_id)
-    }
-
-    // return is the id of the Scope which represents the type
     pub fn scope_add_member_type(
         &mut self,
         scope: ScopeID,
