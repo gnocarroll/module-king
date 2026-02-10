@@ -204,13 +204,17 @@ impl AST {
 
         let rhs = self.objs.expr(operand2);
 
+        if !rhs.finalized {
+            return;
+        }
+
         // if type creation can be completed then do it here with helper function
         // else record error
 
         let finalized;
 
-        if let (true, Type::Type(type_id), Some(name)) =
-            (rhs.finalized, self.objs.type_get(rhs.type_id), name)
+        if let (Type::Type(type_id), Some(name)) =
+            (self.objs.type_get(rhs.type_id), name)
         {
             finalized = self
                 .scope_add_member_type_from_name_and_id(scope, TokenOrString::Token(name), *type_id)
