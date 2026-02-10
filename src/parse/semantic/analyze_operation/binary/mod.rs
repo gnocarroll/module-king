@@ -347,6 +347,41 @@ impl AST {
         operand2_mut.finalized = true;
     }
 
+    // var creation
+    // helper function will look at pairing of pattern, type
+    // e.g. (x, y) : (Float, Float)
+    fn analyze_operation_colon(
+        &mut self,
+        ctx: &mut SemanticContext,
+        scope: ScopeID,
+        expr: ExprID,
+        operand1: ExprID,
+        operand2: ExprID,
+    ) {
+        let (pattern, err) =
+            self.analyze_instance_creation(ctx, scope, expr, Some(operand1), Some(operand2));
+
+        let no_err = self
+            .scope_create_members_from_pattern(ctx, scope, pattern)
+            .is_ok()
+            && err.is_none();
+
+        // after creation of members analyze lhs (now relevant vars should exist)
+        self.analyze_expr(ctx, scope, operand1);
+
+        let finalized =
+            no_err && self.objs.expr(operand1).finalized && self.objs.expr(operand2).finalized;
+
+        let unit_type_id = self.get_builtin_type_id(UNIT_TYPE);
+
+        let expr_mut = self.objs.expr_mut(expr);
+
+        expr_mut.type_id = unit_type_id;
+        expr_mut.is_var = true;
+
+        expr_mut.finalized = finalized;
+    }
+
     // var creation + assignment + type inference
     // operand1 := operand2;
     fn analyze_operation_colon_eq(
@@ -792,38 +827,7 @@ impl AST {
 
         match op {
             TokenType::Colon => {
-                // var creation
-                // helper function will look at pairing of pattern, type
-                // e.g. (x, y) : (Float, Float)
-                let (pattern, err) = self.analyze_instance_creation(
-                    ctx,
-                    scope,
-                    expr,
-                    Some(operand1),
-                    Some(operand2),
-                );
-
-                let no_err = self
-                    .scope_create_members_from_pattern(ctx, scope, pattern)
-                    .is_ok()
-                    && err.is_none();
-
-                // after creation of members analyze lhs (now relevant vars should exist)
-                self.analyze_expr(ctx, scope, operand1);
-
-                let finalized = no_err
-                    && self.objs.expr(operand1).finalized
-                    && self.objs.expr(operand2).finalized;
-
-                let unit_type_id = self.get_builtin_type_id(UNIT_TYPE);
-
-                let expr_mut = self.objs.expr_mut(expr);
-
-                expr_mut.type_id = unit_type_id;
-                expr_mut.is_var = true;
-
-                expr_mut.finalized = finalized;
-
+                self.analyze_operation_colon(ctx, scope, expr, operand1, operand2);
                 return;
             }
             TokenType::Import => {
