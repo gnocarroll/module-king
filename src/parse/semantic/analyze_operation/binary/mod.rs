@@ -67,6 +67,11 @@ impl AST {
         operand1: ExprID,
         operand2: ExprID,
     ) {
+        if ctx.curr_func.is_none() {
+            self.invalid_operation(expr, "cannot initialize global variables outside of any function");
+            return;
+        }
+
         self.analyze_expr(ctx, scope, operand1);
         self.analyze_expr(ctx, scope, operand2);
 
@@ -392,6 +397,11 @@ impl AST {
         operand1: ExprID,
         operand2: ExprID,
     ) {
+        if ctx.curr_func.is_none() {
+            self.invalid_operation(expr, "cannot initialize global variables outside of any function");
+            return;
+        }
+
         self.analyze_expr(ctx, scope, operand2);
 
         let maybe_type_id = if self.objs.expr(operand2).finalized {
