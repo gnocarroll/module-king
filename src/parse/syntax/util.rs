@@ -134,6 +134,7 @@ impl AST {
             Type::AnyModule => "AnyModule".to_string(),
             Type::Module(_) => "module".to_string(),
             Type::Alias(t) => self.type_to_string(t),
+            Type::DeriveFrom(t) => format!("(derives from {})", self.type_to_string(t)),
             Type::Ptr(t) => format!("*{}", self.type_to_string(t)),
             Type::Ref(t) => format!("&{}", self.type_to_string(t)),
             Type::Tuple((t, None)) => format!("({},)", self.type_to_string(t)),

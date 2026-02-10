@@ -3,8 +3,8 @@ mod apply;
 use crate::{
     constants::{BOOLEAN_TYPE, ERROR_TYPE, INTEGER_TYPE, UNIT_TYPE},
     parse::{
-        AST, ExprVariant, IdentifierVariant, MemberVariant, Operation, ScopeVariant, SliceIndex,
-        Type, TypeVariant, Visibility,
+        AST, ExprVariant, IdentifierVariant, Member, MemberVariant, Operation, ScopeVariant,
+        SliceIndex, Type, TypeVariant, Visibility,
         ast_contents::{ExprID, ScopeID, TypeID},
         operator::{self, OperatorVariant},
         semantic::{AnalyzingNow, SemanticContext},
@@ -68,7 +68,10 @@ impl AST {
         operand2: ExprID,
     ) {
         if ctx.curr_func.is_none() {
-            self.invalid_operation(expr, "cannot initialize global variables outside of any function");
+            self.invalid_operation(
+                expr,
+                "cannot initialize global variables outside of any function",
+            );
             return;
         }
 
@@ -170,11 +173,7 @@ impl AST {
         operand1: ExprID,
         operand2: ExprID,
     ) {
-        let old_analyzing_now = ctx.analyzing_now;
-
-        ctx.analyzing_now = AnalyzingNow::Type;
-        self.analyze_expr(ctx, scope, operand2);
-        ctx.analyzing_now = old_analyzing_now;
+        // first find name for new type
 
         let name = match self.expr(operand1).variant {
             ExprVariant::Operation(Operation {
@@ -184,11 +183,11 @@ impl AST {
                 ..
             }) => {
                 match self.expr(type_name).variant {
-                    ExprVariant::Identifier(ident) => Some(ident.name),
+                    ExprVariant::Identifier(ident) => ident.name,
                     _ => {
                         self.invalid_operation(expr, "on left-hand side of \"is\" operator expected to find name of new type");
 
-                        None
+                        return;
                     }
                 }
             }
@@ -198,9 +197,34 @@ impl AST {
                     "on left-hand side of \"is\" operator expected to find new type being declared",
                 );
 
-                None
+                return;
             }
         };
+
+        // in order to support self-referential types will create type now initially as alias
+        // for err type and then fix later once operand2 is analyzed
+
+        let named_type_id = self.objs.type_push(Type::Alias(TypeID::error()));
+
+        let type_member_id = self.objs.member_push(Member {
+            name: TokenOrString::Token(name),
+            visibility: Visibility::Export,
+            variant: MemberVariant::Type(named_type_id),
+
+            ..Default::default()
+        });
+
+        if self.scope_try_insert(scope, type_member_id).is_err() {
+            return;
+        }
+
+        // analyze operand 2 after already creating type
+
+        let old_analyzing_now = ctx.analyzing_now;
+
+        ctx.analyzing_now = AnalyzingNow::Type;
+        self.analyze_expr(ctx, scope, operand2);
+        ctx.analyzing_now = old_analyzing_now;
 
         let rhs = self.objs.expr(operand2);
 
@@ -208,20 +232,40 @@ impl AST {
             return;
         }
 
-        // if type creation can be completed then do it here with helper function
-        // else record error
+        // if rhs returns type then perform type assignment
 
-        let finalized;
+        let rhs_type = match self.objs.type_get(rhs.type_id) {
+            Type::Type(type_id) => *type_id,
+            _ => {
+                self.invalid_operation(expr, "expected to find type on right side of type assignment");
+                return;
+            }
+        };
 
-        if let (Type::Type(type_id), Some(name)) =
-            (self.objs.type_get(rhs.type_id), name)
-        {
-            finalized = self
-                .scope_add_member_type_from_name_and_id(scope, TokenOrString::Token(name), *type_id)
-                .is_ok();
-        } else {
-            self.invalid_operation(expr, "creation of new type could not be completed");
-            finalized = false;
+        match self.objs.type_get(rhs_type) {
+            t_enum @ Type::Scope(scope) => {
+                let t_enum = t_enum.clone();
+
+                let scope_mut = self.objs.scope_mut(*scope);
+
+                // if rhs type is scope type without name => add name
+                // else new type is alias to existing scope type
+
+                if scope_mut.name.is_none() {
+                    scope_mut.name = Some(TokenOrString::Token(name));
+
+                    *self.objs.type_mut(named_type_id) = t_enum;
+                } else {
+                    *self.objs.type_mut(named_type_id) = Type::Alias(rhs_type);
+                }
+            }
+
+            // if it is not a scope type then just overwrite with rhs type
+            t_enum @ _ => {
+                let t_enum = t_enum.clone();
+
+                *self.objs.type_mut(named_type_id) = t_enum;
+            }
         }
 
         let unit_type_id = self.get_builtin_type_id(UNIT_TYPE);
@@ -229,7 +273,7 @@ impl AST {
         let expr_mut = self.objs.expr_mut(expr);
 
         expr_mut.type_id = unit_type_id;
-        expr_mut.finalized = finalized;
+        expr_mut.finalized = true;
     }
 
     // member access e.g. point.x
@@ -402,7 +446,10 @@ impl AST {
         operand2: ExprID,
     ) {
         if ctx.curr_func.is_none() {
-            self.invalid_operation(expr, "cannot initialize global variables outside of any function");
+            self.invalid_operation(
+                expr,
+                "cannot initialize global variables outside of any function",
+            );
             return;
         }
 
