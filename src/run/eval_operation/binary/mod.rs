@@ -440,6 +440,49 @@ fn eval_operation_braces(
     Ok(Value { type_id, variant }.to_runtime_ref(ctx, ctx.curr_scope))
 }
 
+fn eval_operation_logical_and_or(
+    ast: &AST,
+    ctx: &mut ExecutionContext,
+    expr: ExprID,
+    op: TokenType,
+    operand1: ExprID,
+    operand2: ExprID,
+) -> Result<RuntimeRef, RuntimeException> {
+    let mut ret_value = Value {
+        type_id: Some(ast.objs.expr(expr).type_id),
+        variant: ValueVariant::Boolean(false),
+    };
+
+    let rref = eval(ast, ctx, operand1)?;
+    let rref = eval_eager(ast, ctx, rref)?;
+
+    // see if should short-circuit
+    // logical and + first operand is false => ret false now
+    // logical or + first operand is true => ret true now
+
+    match (op, &ctx.objs.ref_get(rref).variant) {
+        (TokenType::And, ValueVariant::Boolean(false)) => {
+            ret_value.variant = ValueVariant::Boolean(false);
+
+            return Ok(ret_value.to_runtime_ref(ctx, ctx.curr_scope));
+        }
+        (TokenType::Or, ValueVariant::Boolean(true)) => {
+            ret_value.variant = ValueVariant::Boolean(true);
+
+            return Ok(ret_value.to_runtime_ref(ctx, ctx.curr_scope));
+        }
+        _ => (),
+    }
+
+    let rref = eval(ast, ctx, operand2)?;
+    let rref = eval_eager(ast, ctx, rref)?;
+
+    // for both logical and/or if you evaluated second argument then
+    // it is the case that whatever its boolean value is is also the ret
+
+    Ok(rref)
+}
+
 pub fn eval_operation_binary(
     ast: &AST,
     ctx: &mut ExecutionContext,
@@ -473,6 +516,10 @@ pub fn eval_operation_binary(
         TokenType::Semicolon => return eval_operation_semi(ast, ctx, expr, operand1, operand2),
 
         TokenType::Comma => return eval_operation_comma(ast, ctx, expr, operand1, operand2),
+
+        TokenType::And | TokenType::Or => {
+            return eval_operation_logical_and_or(ast, ctx, expr, op, operand1, operand2);
+        }
 
         // currently same code can be used for Eq, ColonEq
         TokenType::Eq => return eval_operation_eq(ast, ctx, expr, operand1, operand2),
