@@ -216,6 +216,17 @@ impl AST {
     ) {
         let function = self.objs.function(function);
 
+        // if function's return type or the type of the func itself is either default (0) or err
+        // => problem with func and do not finalized this expr
+
+        if function.return_type == TypeID::default()
+            || function.return_type == TypeID::error()
+            || function.func_type == TypeID::default()
+            || function.func_type == TypeID::error()
+        {
+            return;
+        }
+
         let expr_type_id = function.return_type;
 
         let found_arg_type = self.type_resolve_aliasing(self.objs.expr(args).type_id);

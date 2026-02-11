@@ -672,7 +672,11 @@ impl AST {
         // IFF FUNCTION SCOPE HAS NOT ALREADY BEEN CREATED
         // create function scope as child of parent then use it later on
 
+        let mut is_func_already_init = false;
+
         let func_scope = if function_struct.scope != ScopeID::default() {
+            is_func_already_init = true;
+
             function_struct.scope
         } else {
             let func_scope = self.objs.scope_push(Scope {
@@ -691,11 +695,13 @@ impl AST {
             func_scope
         };
 
-        // attempt to add function to scope early to ensure it is there even if problem occurs later
-        // on first pass it should be the case that all possible identifiers are registered so other
-        // modules can see them even if there are problems to be ironed out w/ second pass
+        // if func is not already init and has name try to register in scope here, then other
+        // modules can see it even if problem occurs later in this analyze func
 
-        if let Some(name) = func_name && self.scope_add_function(scope, name, function_id).is_err() {
+        if let Some(name) = func_name
+            && !is_func_already_init
+            && self.scope_add_function(scope, name, function_id).is_err()
+        {
             return;
         }
 
@@ -946,7 +952,9 @@ impl AST {
             }
         }
 
-        if ident.member_id == MemberID::default() && let AnalyzingNow::TypeBody(_) = ctx.analyzing_now {
+        if ident.member_id == MemberID::default()
+            && let AnalyzingNow::TypeBody(_) = ctx.analyzing_now
+        {
             // attempt to add discriminant-only member to enum or variant
 
             let scope_struct = self.objs.scope(scope);
