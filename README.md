@@ -20,6 +20,9 @@ compiler which I currently plan to make output x86 assembly text files.
 The git repo for the self-hosted version which I will get working on is
 [`spectra`](https://github.com/gnocarroll/spectra).
 
+Will change `spectra` from being private when I make some more progress,
+currently just getting started and it is not usable at all.
+
 ## Use of Executable
 
 Executable will look inside directory you run it in for codefiles and directories.
