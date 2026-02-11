@@ -815,8 +815,18 @@ impl AST {
     pub fn repair(&mut self) {
         let file_module_scopes: Vec<ScopeID> = self.objs.file_module_iter().collect();
 
-        for scope_id in file_module_scopes {
-            self.set_curr_file_module(scope_id);
+        for scope_id in &file_module_scopes {
+            self.set_curr_file_module(*scope_id);
+
+            self.do_semantic_analysis();
+        }
+
+        // think I may need to do total of three passes since on third pass
+        // it will be guaranteed every other module has had a second pass and that
+        // may allow them to fix their functions, etc.
+
+        for scope_id in &file_module_scopes {
+            self.set_curr_file_module(*scope_id);
 
             self.doing_repair = true;
 

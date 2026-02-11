@@ -533,12 +533,7 @@ impl AST {
         let mut finalized = true;
         let mut expr_stack = vec![operand2];
 
-        loop {
-            let expr_id = match expr_stack.pop() {
-                Some(expr_id) => expr_id,
-                None => break,
-            };
-
+        while let Some(expr_id) = expr_stack.pop() {
             match self.objs.expr(expr_id).variant {
                 ExprVariant::Operation(Operation {
                     op: TokenType::LParen,
