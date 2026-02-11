@@ -2,7 +2,7 @@ use std::{path::Path, process::ExitCode};
 
 use crate::{
     constants::{LANG_FILE_EXT, MODULE_FILENAME},
-    parse::AST,
+    parse::{AST, ast_contents::ScopeID},
     tokens::Tokens,
     util::listdir_with_ext,
 };
@@ -113,6 +113,8 @@ fn main() -> ExitCode {
 
     if ast.has_errors() {
         ast.display_all_errors();
+
+        eprintln!("GLOBAL:\n{}", ast.scope_to_string(ScopeID::global()));
     } else {
         run::run(&ast);
     }

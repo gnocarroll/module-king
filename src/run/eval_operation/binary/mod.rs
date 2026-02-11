@@ -316,7 +316,7 @@ fn eval_operation_semi(
         return ret;
     }
 
-    let operand_ref2 = eval(ast, ctx, operand2)?;
+    eval(ast, ctx, operand2)?;
 
     ret
 }

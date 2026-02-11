@@ -1,9 +1,10 @@
 use crate::{
     parse::{
-        AST, ExprVariant, HasFileModule, MemberVariant, ScopeVariant, Type, ast_contents::{ExprID, FunctionID, ScopeID, TypeID}
+        AST, ExprVariant, HasFileModule, MemberVariant, ScopeVariant, Type,
+        ast_contents::{ExprID, FunctionID, ScopeID, TypeID},
     },
     scan::{Token, TokenType},
-    tokens::Tokens,
+    tokens::{TokenOrString, Tokens},
 };
 
 // util function that will attempt to parse char from Token
@@ -153,7 +154,11 @@ impl AST {
             ),
             Type::Builtin(builtin) => format!("(builtin {})", builtin.get_builtin_name(),),
             Type::Slice((t, idx)) => {
-                format!("{}[{}]", self.type_to_string(t), self.type_to_string(idx.type_id),)
+                format!(
+                    "{}[{}]",
+                    self.type_to_string(t),
+                    self.type_to_string(idx.type_id),
+                )
             }
             Type::Scope(scope_id) => {
                 let scope = self.objs.scope(scope_id);
@@ -182,25 +187,25 @@ impl AST {
         let scope_struct = self.objs.scope(scope);
 
         let name = match &scope_struct.name {
-            Some(token_or_string) => scope
-                .get_tokens(self)
-                .tok_or_string_to_string(token_or_string),
+            Some(token_or_string) => match token_or_string {
+                TokenOrString::String(s) => s.clone(),
+                TokenOrString::Token(tok) => scope.get_tokens(self).tok_as_str(tok).to_string(),
+            },
             None => "(anonymous)".to_string(),
         };
 
         let mut member_strings: Vec<String> = Vec::new();
 
         for member_id in scope_struct.members.member_iter() {
-            let name = member_id.get_name(self).expect("all members should be named");
+            let name = member_id
+                .get_name(self)
+                .expect("all members should be named");
 
             let desc = match self.objs.member(member_id).variant {
-                MemberVariant::Builtin(builtin) => format!(
-                    "Builtin {}",
-                    builtin.get_builtin_name(),
-                ),
-                MemberVariant::Function(function_id) => {
-                    self.function_to_string(function_id)
-                },
+                MemberVariant::Builtin(builtin) => {
+                    format!("Builtin {}", builtin.get_builtin_name(),)
+                }
+                MemberVariant::Function(function_id) => self.function_to_string(function_id),
                 MemberVariant::Instance(type_id) => {
                     format!("w/ type {}", self.type_to_string(type_id))
                 }
@@ -300,10 +305,7 @@ impl AST {
                 )
             }
             ExprVariant::Block(block) => {
-                format!(
-                    "(block {})",
-                    self.expr_to_string(block.body),
-                )
+                format!("(block {})", self.expr_to_string(block.body),)
             }
         }
     }
