@@ -237,7 +237,10 @@ impl AST {
         let rhs_type = match self.objs.type_get(rhs.type_id) {
             Type::Type(type_id) => *type_id,
             _ => {
-                self.invalid_operation(expr, "expected to find type on right side of type assignment");
+                self.invalid_operation(
+                    expr,
+                    "expected to find type on right side of type assignment",
+                );
                 return;
             }
         };
@@ -863,6 +866,39 @@ impl AST {
         );
     }
 
+    fn analyze_operation_logical_and_or(
+        &mut self,
+        ctx: &mut SemanticContext,
+        scope: ScopeID,
+        expr: ExprID,
+        operand1: ExprID,
+        operand2: ExprID,
+    ) {
+        self.analyze_expr(ctx, scope, operand1);
+        self.analyze_expr(ctx, scope, operand2);
+
+        let operand1_struct = self.objs.expr(operand1);
+        let operand2_struct = self.objs.expr(operand2);
+
+        if !operand1_struct.finalized || !operand2_struct.finalized {
+            return;
+        }
+
+        let boolean_type_id = self.get_builtin_type_id(BOOLEAN_TYPE);
+
+        if !self.type_eq(boolean_type_id, operand1_struct.type_id)
+            || !self.type_eq(boolean_type_id, operand2_struct.type_id)
+        {
+            self.invalid_operation(expr, "both operands to logical and/or should be Booleans");
+            return;
+        }
+
+        let expr_mut = self.expr_mut(expr);
+
+        expr_mut.type_id = boolean_type_id;
+        expr_mut.finalized = true;
+    }
+
     pub fn analyze_operation_binary(
         &mut self,
         ctx: &mut SemanticContext,
@@ -927,6 +963,10 @@ impl AST {
                     }
                 }
 
+                return;
+            }
+            TokenType::And | TokenType::Or => {
+                self.analyze_operation_logical_and_or(ctx, scope, expr, operand1, operand2);
                 return;
             }
             TokenType::Comma => {
