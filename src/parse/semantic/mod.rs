@@ -691,6 +691,14 @@ impl AST {
             func_scope
         };
 
+        // attempt to add function to scope early to ensure it is there even if problem occurs later
+        // on first pass it should be the case that all possible identifiers are registered so other
+        // modules can see them even if there are problems to be ironed out w/ second pass
+
+        if let Some(name) = func_name && self.scope_add_function(scope, name, function_id).is_err() {
+            return;
+        }
+
         // record current function scope in context
 
         let old_curr_func = ctx.curr_func;
@@ -799,16 +807,6 @@ impl AST {
             self.set_expr_returns_unit(ctx, expr);
         } else {
             expr_mut.type_id = func_type;
-        }
-
-        // IF FINALIZED AND FUNCTION IS NAMED,
-        // add function as member of parent scope
-
-        if let (true, Some(name)) = (finalized, func_name) {
-            if self.scope_add_function(scope, name, function_id).is_err() {
-                // duplicate name => problem
-                self.objs.expr_mut(expr).finalized = false;
-            }
         }
     }
 

@@ -233,7 +233,7 @@ pub struct FunctionLiteral {
     pub function_id: FunctionID,
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct Function {
     pub name: Option<Token>,
 
@@ -256,6 +256,26 @@ pub struct Function {
     pub expr_to_param_idx: HashMap<ExprID, usize>,
 
     pub file_module: ScopeID,
+}
+
+impl Default for Function {
+    fn default() -> Self {
+        Self {
+            // these are initialized to error so if there is problem during
+            // semantic analysis anyone using the func can see it returns err
+            // type and thus you cannot finalized expr
+            return_type: TypeID::error(),
+            func_type: TypeID::error(),
+
+            name: None,
+            literal: ExprID::default(),
+            scope: ScopeID::default(),
+            body: ExprID::default(),
+            params: Vec::new(),
+            expr_to_param_idx: HashMap::new(),
+            file_module: ScopeID::default(),
+        }
+    }
 }
 
 #[derive(Clone, Copy, PartialEq)]
