@@ -83,6 +83,41 @@ impl AST {
         );
     }
 
+    // loop control is e.g. break, continue
+    pub fn analyze_operation_loop_control(
+        &mut self,
+        ctx: &mut SemanticContext,
+        _scope: ScopeID,
+        expr: ExprID,
+        _op: TokenType,
+        operand: ExprID,
+    ) {
+        if ctx.curr_loop.is_none() {
+            self.invalid_operation(expr, "cannot do loop control (e.g. break, continue) outside of any loop");
+            return;
+        }
+
+        match self.objs.expr(operand).variant {
+            ExprVariant::Unit => { // Ok
+                let operand_mut = self.expr_mut(operand);
+
+                operand_mut.type_id = TypeID::unit();
+                operand_mut.finalized = true;
+            }
+
+            // currently cannot provide argument (e.g. label) to break or continue
+            _ => {
+                self.invalid_operation(expr, "it is not supported to provide arg to break or continue");
+                return;
+            }
+        }
+
+        let expr_mut = self.expr_mut(expr);
+
+        expr_mut.type_id = TypeID::unit();
+        expr_mut.finalized = true;
+    }
+
     pub fn analyze_operation_unary(
         &mut self,
         ctx: &mut SemanticContext,
@@ -342,6 +377,10 @@ impl AST {
 
                 expr_mut.finalized = true;
 
+                return;
+            }
+            TokenType::Break | TokenType::Continue => {
+                self.analyze_operation_loop_control(ctx, scope, expr, op, operand);
                 return;
             }
             _ => (),
