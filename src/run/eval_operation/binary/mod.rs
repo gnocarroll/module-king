@@ -6,7 +6,7 @@ use crate::{
     constants::UNIT_TYPE,
     parse::{AST, HasFileModule, ScopeVariant, Type, TypeVariant, ast_contents::ExprID},
     run::{
-        ExecutionContext, Value, ValueVariant,
+        ExecutionContext, LoopControl, Value, ValueVariant,
         context_contents::{RuntimeRef, RuntimeScopeID, ValueID},
         error::{RuntimeErrorVariant, RuntimeException},
         eval,
@@ -309,13 +309,14 @@ fn eval_operation_semi(
 
     eval(ast, ctx, operand1)?;
 
-    if ctx.return_now {
+    // if need to return or there is a break/continue active for a loop
+    // then return ret here
+
+    if ctx.return_now || ctx.loop_control != LoopControl::None {
         return ret;
     }
 
     let operand_ref2 = eval(ast, ctx, operand2)?;
-
-    eprintln!("RHS OF SEMI: {}", operand_ref2.to_string(ast, ctx));
 
     ret
 }

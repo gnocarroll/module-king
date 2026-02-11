@@ -665,6 +665,9 @@ impl AST {
                         expected_expr_returns.found,
                     );
                 }
+                SemanticError::RepairFailed(scope_id) => {
+                    eprintln!("{}", self.scope_to_string(*scope_id));
+                }
                 _ => {
                     eprintln!("Displaying not implemented for this kind of semantic error.")
                 }

@@ -18,11 +18,20 @@ use crate::{
     },
 };
 
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum LoopControl {
+    None,
+    Break,
+    Continue,
+}
+
 pub struct ExecutionContext {
     pub objs: ContextObjects,
     pub curr_scope: RuntimeScopeID,
 
     pub return_now: bool,
+
+    pub loop_control: LoopControl,
 }
 
 impl ExecutionContext {
@@ -34,6 +43,7 @@ impl ExecutionContext {
             objs,
             curr_scope,
             return_now: false,
+            loop_control: LoopControl::None,
         }
     }
 
@@ -110,10 +120,17 @@ fn eval_while(
 
         ctx.pop_curr_scope();
 
-        if ctx.return_now {
+        if ctx.return_now || ctx.loop_control == LoopControl::Break {
             break;
         }
+
+        // ensure loop_control is reset at end of every loop and before
+        // leaving this function
+
+        ctx.loop_control = LoopControl::None;
     }
+
+    ctx.loop_control = LoopControl::None;
 
     Ok(expr_to_unit(ast, ctx, expr))
 }

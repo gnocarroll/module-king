@@ -4,7 +4,7 @@ use crate::{
     constants::INTEGER_TYPE,
     parse::{AST, Operation, ast_contents::ExprID},
     run::{
-        ExecutionContext, Value, ValueVariant,
+        ExecutionContext, LoopControl, Value, ValueVariant,
         context_contents::RuntimeRef,
         error::{RuntimeErrorVariant, RuntimeException},
         eval,
@@ -142,6 +142,20 @@ fn eval_operation_unary(
         expr,
         variant: RuntimeErrorVariant::InvalidOperation,
     });
+
+    // if op is break or continue set loop control and then ret early
+
+    if op == TokenType::Break || op == TokenType::Continue {
+        ctx.loop_control = match op {
+            TokenType::Break => LoopControl::Break,
+            TokenType::Continue => LoopControl::Continue,
+            _ => {
+                panic!("should have checked that op is break or continue");
+            }
+        };
+
+        return Ok(expr_to_unit(ast, ctx, expr));
+    }
 
     let type_id = ast.objs.expr(operand).type_id;
 
