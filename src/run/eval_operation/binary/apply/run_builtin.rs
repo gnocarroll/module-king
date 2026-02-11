@@ -354,12 +354,31 @@ pub fn builtin_print(
     ast: &AST,
     ctx: &ExecutionContext,
     args: RuntimeRef,
-    is_println: bool,
+    builtin: Builtin,
 ) -> ValueVariant {
-    print!("{}", args.to_string(ast, ctx));
+    match builtin {
+        Builtin::Print | Builtin::Println => {
+            print!("{}", args.to_string(ast, ctx));
+        }
+        Builtin::Eprint | Builtin::Eprintln => {
+            eprint!("{}", args.to_string(ast, ctx));
+        }
+        _ => {
+            panic!("builtin should be one of the printing ones");
+        }
+    }
 
-    if is_println {
-        println!();
+    match builtin {
+        Builtin::Print | Builtin::Eprint => (), // Do nothing
+        Builtin::Println => {
+            println!();
+        }
+        Builtin::Eprintln => {
+            eprintln!();
+        }
+        _ => {
+            panic!("builtin should be one of the printing ones");
+        }
     }
 
     ValueVariant::Unit

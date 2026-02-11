@@ -395,7 +395,7 @@ impl AST {
                 expr_mut.finalized = true;
             }
 
-            Builtin::Print | Builtin::Println => {
+            Builtin::Print | Builtin::Println | Builtin::Eprint | Builtin::Eprintln => {
                 // args can be anything so just set ret type to Unit
 
                 let expr_mut = self.objs.expr_mut(expr);

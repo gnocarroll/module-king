@@ -289,8 +289,8 @@ fn eval_operation_apply_builtin(
         Builtin::IsFile => run_builtin::is_file(ctx, args),
         Builtin::IsDir => run_builtin::is_dir(ctx, args),
 
-        Builtin::Print | Builtin::Println => {
-            run_builtin::builtin_print(ast, ctx, args, builtin == Builtin::Println)
+        Builtin::Print | Builtin::Println | Builtin::Eprint | Builtin::Eprintln => {
+            run_builtin::builtin_print(ast, ctx, args, builtin)
         }
 
         Builtin::BuiltinCount => {

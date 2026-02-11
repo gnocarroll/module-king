@@ -31,6 +31,9 @@ pub enum Builtin {
     Print,
     Println,
 
+    Eprint,
+    Eprintln,
+
     // do not set discriminants and keep this last and it will be correct
     BuiltinCount,
 }
@@ -79,6 +82,9 @@ impl Builtin {
 
             Print => "print",
             Println => "println",
+
+            Eprint => "eprint",
+            Eprintln => "eprintln",
 
             BuiltinCount => "",
         }
