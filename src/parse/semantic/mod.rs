@@ -36,6 +36,10 @@ pub struct SemanticContext {
 
     // ID of current function, if one is being analyzed
     curr_func: Option<FunctionID>,
+
+    // ID of current loop (expr), if one is being analyzed
+    // will be used to check if break/continue are valid
+    curr_loop: Option<ExprID>,
 }
 
 impl AST {
@@ -590,6 +594,10 @@ impl AST {
             _ => panic!("should be while"),
         };
 
+        let old_loop = ctx.curr_loop;
+
+        ctx.curr_loop = Some(expr);
+
         // get while scope if exists or create if necessary
 
         let while_scope = if while_struct.scope != ScopeID::default() {
@@ -616,6 +624,10 @@ impl AST {
 
         self.analyze_expr(ctx, while_scope, while_struct.cond);
         self.analyze_expr(ctx, while_scope, while_struct.body);
+
+        // reset curr loop after analyzing child exprs
+
+        ctx.curr_loop = old_loop;
 
         let mut finalized = self.objs.expr(while_struct.cond).finalized
             && self.objs.expr(while_struct.body).finalized;
@@ -1176,6 +1188,7 @@ impl AST {
         let mut ctx = SemanticContext {
             analyzing_now: AnalyzingNow::Expr,
             curr_func: None,
+            curr_loop: None,
         };
 
         self.add_basic_types();
