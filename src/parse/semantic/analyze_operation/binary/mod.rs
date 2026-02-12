@@ -414,6 +414,11 @@ impl AST {
         operand1: ExprID,
         operand2: ExprID,
     ) {
+        // attempt to create instances and insert to scope so even if error
+        // occurs they are in the scope
+
+        self.expr_create_instances(operand1, scope);
+
         let (pattern, err) =
             self.analyze_instance_creation(ctx, scope, expr, Some(operand1), Some(operand2));
 
@@ -455,6 +460,11 @@ impl AST {
             );
             return;
         }
+
+        // attempt to create instances and insert to scope so even if error
+        // occurs they are in the scope
+
+        self.expr_create_instances(operand1, scope);
 
         self.analyze_expr(ctx, scope, operand2);
 
