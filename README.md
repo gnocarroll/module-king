@@ -2,6 +2,12 @@
 
 ModuleKing programming language, initial Rust version
 
+Want to restart this project in a different language since I think I learned
+a lot about how to architect the program but think it may be a bit
+difficult to move forward with this codebase.
+
+Below is old README text that is out-of-date since I will be restarting the project.
+
 Planning on renaming the language and want to move on to a
 self-hosted version ASAP
 
@@ -16,12 +22,6 @@ which will be a map from `String` -> `Type`
 
 Once I finish the above feature-set it should be enough to write a self-hosted
 compiler which I currently plan to make output x86 assembly text files.
-
-The git repo for the self-hosted version which I will get working on is
-[`spectra`](https://github.com/gnocarroll/spectra).
-
-Will change `spectra` from being private when I make some more progress,
-currently just getting started and it is not usable at all.
 
 ## Use of Executable
 
