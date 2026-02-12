@@ -1166,6 +1166,10 @@ impl AST {
             }
             _ => (),
         }
+
+        if self.doing_repair && !self.expr(expr).finalized {
+            eprintln!("DID NOT FINALIZE: {}", self.expr_to_string(expr));
+        }
     }
 
     fn add_basic_types(&mut self) {
