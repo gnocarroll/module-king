@@ -686,6 +686,8 @@ impl AST {
                     );
                 }
                 SemanticError::RepairFailed(scope_id) => {
+                    let name = scope_id.get_name(self);
+
                     eprintln!("{}", self.scope_to_string(*scope_id));
                 }
                 _ => {

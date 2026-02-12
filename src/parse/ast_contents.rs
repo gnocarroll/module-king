@@ -158,10 +158,10 @@ impl HasFileModule for ScopeID {
     }
     fn get_name(&self, ast: &AST) -> Option<String> {
         match &ast.objs.scope(*self).name {
-            Some(token_or_string) => Some(
-                self.get_tokens(ast)
-                    .tok_or_string_to_string(&token_or_string),
-            ),
+            Some(token_or_string) => match token_or_string {
+                TokenOrString::String(s) => Some(s.clone()),
+                TokenOrString::Token(tok) => Some(self.get_tokens(ast).tok_as_str(tok).to_string()),
+            },
             None => None,
         }
     }
@@ -253,7 +253,7 @@ impl HasFileModule for MemberID {
                 let tokens = self.get_tokens(ast);
 
                 tokens.tok_as_str(token).to_string()
-            },
+            }
         };
 
         Some(s)

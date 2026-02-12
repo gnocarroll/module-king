@@ -113,8 +113,6 @@ fn main() -> ExitCode {
 
     if ast.has_errors() {
         ast.display_all_errors();
-
-        eprintln!("GLOBAL:\n{}", ast.scope_to_string(ScopeID::global()));
     } else {
         run::run(&ast);
     }

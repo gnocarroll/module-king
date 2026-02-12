@@ -236,6 +236,13 @@ impl AST {
             _ => return,
         };
 
+        // if actual arg type or expected arg type are a tuple with a single type in it then pull
+        // inner type out
+        // this is useful because if args to function are e.g. (Integer,) it will accept just Integer
+
+        let found_arg_type = self.type_unwrap_if_single_tuple(found_arg_type);
+        let actual_arg_type = self.type_unwrap_if_single_tuple(actual_arg_type);
+
         if !self.type_eq(actual_arg_type, found_arg_type) {
             self.invalid_operation(expr, "did not provide correct number or type of args");
             return;
