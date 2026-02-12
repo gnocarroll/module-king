@@ -1,14 +1,9 @@
 use crate::{
     constants::{ERROR_TYPE, UNIT_TYPE},
     parse::{
-        AST, ExprReturns, ExprVariant, FunctionLiteral, HasFileModule, Identifier, Member,
-        MemberVariant, Scope, ScopeRefersTo, ScopeVariant, TokenOrString, Type, TypeVariant,
-        Visibility,
-        ast_contents::{ExprID, FunctionID, MemberID, ScopeID, TypeID},
-        errors::{DuplicateName, InvalidOperation, MissingOperand, PatternError, SemanticError},
-        semantic::SemanticContext,
+        AST, ExprReturns, ExprVariant, FunctionLiteral, HasFileModule, Identifier, IdentifierVariant, Member, MemberVariant, Operation, Scope, ScopeRefersTo, ScopeVariant, TokenOrString, Type, TypeVariant, Visibility, ast_contents::{ExprID, FunctionID, MemberID, ScopeID, TypeID}, errors::{DuplicateName, InvalidOperation, MissingOperand, PatternError, SemanticError}, semantic::SemanticContext
     },
-    scan::Token,
+    scan::{Token, TokenType},
 };
 
 impl AST {
@@ -471,6 +466,66 @@ impl AST {
         match self.objs.type_get(type_id) {
             Type::Tuple((t, None)) => self.type_resolve_aliasing(*t),
             _ => type_id,
+        }
+    }
+
+    // util function to create blank instances from expr which will be LHS for ColonEq or Colon
+    // then member will already exist even if there is problem with RHS
+    pub fn expr_create_instances(&mut self, expr: ExprID, scope: ScopeID) {
+        let mut expr_stack = vec![expr];
+
+        while let Some(expr) = expr_stack.pop() {
+            match self.objs.expr(expr).variant {
+                ExprVariant::Identifier(ident) => {
+                    if ident.member_id != MemberID::default() {
+                        // already init => ignore
+
+                        continue;
+                    }
+
+                    // TypeID error because type is not known yet
+
+                    let member_id = self.objs.member_push(Member {
+                        name: TokenOrString::Token(ident.name),
+                        visibility: Visibility::Export,
+                        variant: MemberVariant::Instance(TypeID::error()),
+                        
+                        ..Default::default()
+                    });
+
+                    match &mut self.objs.expr_mut(expr).variant {
+                        ExprVariant::Identifier(ident) => {
+                            ident.member_id = member_id;
+                            ident.variant = IdentifierVariant::Instance;
+                        }
+                        _ => {
+                            panic!("should be guaranteed to be an identifier");
+                        }
+                    }
+
+                    // attempt scope insertion
+
+                    let _ = self.scope_try_insert(scope, member_id);
+                }
+                ExprVariant::Operation(Operation {
+                    op: TokenType::LParen,
+                    operand1: Some(child),
+                    operand2: None,
+                    ..
+                }) => {
+                    expr_stack.push(child);
+                }
+                ExprVariant::Operation(Operation {
+                    op: TokenType::Comma,
+                    operand1: Some(operand1),
+                    operand2: Some(operand2),
+                    ..
+                }) => {
+                    expr_stack.push(operand2);
+                    expr_stack.push(operand1);
+                }
+                _ => (),
+            }
         }
     }
 }
