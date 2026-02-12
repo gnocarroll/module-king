@@ -1,6 +1,8 @@
 mod analyze_operation;
 mod util;
 
+use std::any::Any;
+
 use crate::{
     constants::{BOOLEAN_TYPE, ERROR_TYPE, FLOAT_TYPE, INTEGER_TYPE, STRING_TYPE, UNIT_TYPE},
     parse::{
@@ -71,8 +73,26 @@ impl AST {
                     };
 
                     // MemberID != default => already created member for this ident
+                    // may need to fix if TypeID is error
 
                     if ident_struct.member_id != MemberID::default() {
+                        let member_mut = self.objs.member_mut(ident_struct.member_id);
+
+                        match member_mut.variant {
+                            MemberVariant::Instance(curr_type_id) => {
+                                if curr_type_id != TypeID::error() {
+                                    continue;
+                                }
+                            }
+                            _ => {
+                                continue;
+                            }
+                        }
+
+                        // member is instance with type id error => fix type id
+
+                        member_mut.variant = MemberVariant::Instance(type_id);
+                        
                         continue;
                     }
 
