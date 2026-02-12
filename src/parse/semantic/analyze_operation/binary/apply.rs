@@ -57,6 +57,11 @@ impl AST {
         ) {
             (false, _) => (),
 
+            (true, Type::Error) => {
+                // problem with operand1, do not proceed
+                return;
+            }
+
             // type cast
             (true, Type::Type(t)) => {
                 apply_case = ApplyCase::Cast(*t);
@@ -77,7 +82,8 @@ impl AST {
             }
 
             _ => {
-                self.invalid_operation(expr, "should be type cast or function call");
+                self.invalid_operation(operand1, "should be type cast or function call");
+
                 finalized = false;
             }
         }

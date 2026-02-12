@@ -1046,6 +1046,13 @@ impl AST {
             ),
         };
 
+        if type_id == TypeID::error() {
+            // problem with ident that needs to be ironed out, try to come back later
+            // (if there are more semantic passes)
+
+            return;
+        }
+
         let expr_mut = self.expr_mut(expr);
 
         expr_mut.type_id = type_id;

@@ -458,24 +458,24 @@ impl AST {
 
         self.analyze_expr(ctx, scope, operand2);
 
-        let maybe_type_id = if self.objs.expr(operand2).finalized {
-            let type_id = self.objs.expr(operand2).type_id;
+        if !self.expr(operand2).finalized {
+            return;
+        }
 
-            match self.objs.type_get(type_id) {
-                Type::Type(_) | Type::Module(_) => {
-                    self.invalid_operation(
-                        expr,
-                        "\":=\" is only for assigning values, not modules or types",
-                    );
-                    None
-                }
-                _ => Some(type_id),
+        let type_id = self.objs.expr(operand2).type_id;
+
+        match self.objs.type_get(type_id) {
+            Type::Type(_) | Type::Module(_) => {
+                self.invalid_operation(
+                    expr,
+                    "\":=\" is only for assigning values, not modules or types",
+                );
+                return;
             }
-        } else {
-            None
-        };
+            _ => (),
+        }
 
-        let (pattern, _) = self.pattern_matching(ctx, scope, operand1, maybe_type_id);
+        let (pattern, _) = self.pattern_matching(ctx, scope, operand1, Some(type_id));
 
         let maybe_err = self.scope_create_members_from_pattern(ctx, scope, pattern);
 

@@ -686,9 +686,14 @@ impl AST {
                     );
                 }
                 SemanticError::RepairFailed(scope_id) => {
-                    let name = scope_id.get_name(self);
+                    let name = match scope_id.get_name(self) {
+                        Some(s) => s,
+                        None => "(anonymous)".to_string(),
+                    };
 
-                    eprintln!("{}", self.scope_to_string(*scope_id));
+                    eprintln!("SCOPE NAME: {}", name);
+
+                    // eprintln!("{}", self.scope_to_string(*scope_id));
                 }
                 _ => {
                     eprintln!("Displaying not implemented for this kind of semantic error.")
